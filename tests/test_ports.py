@@ -19,6 +19,7 @@ ONFA_PATTERN = re.compile(
 
 
 def _compile_and_grep(paths: list[Path]) -> None:
+    assert paths, "target has no python files — package not yet ported or empty"
     for p in paths:
         assert p.exists(), f"target file missing: {p.relative_to(REPO)}"
         py_compile.compile(str(p), doraise=True)

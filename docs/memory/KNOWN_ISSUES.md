@@ -88,8 +88,17 @@
 ### ISSUE-009 — drnickv4 dùng LLM providers nào
 - **Origin:** spec 02 §Assumptions #5
 - **Severity:** medium (Ohana có thể cần bớt/thêm provider)
-- **Status:** DEFERRED (Phase 1.2 port providers/)
+- **Status:** RESOLVED (phase 1.2 target-3, commit pending)
 - **Action:** Đọc `providers/*.py` khi port module 1.2, log actual list. Nếu Ohana chỉ dùng subset → strip.
+- **Resolution:** drnickv4 ships 2 providers — `openai_client` (chat + reasoning-mode) + `openai_embedder` (embeddings via OpenAI-compat gateway). Cả 2 port sạch, single OpenAI provider chain đủ MVP. Multi-provider (Anthropic/Together etc) defer.
+
+### ISSUE-010 — agent/providers/ runtime-import blocked cho tới khi app/config + app/alert_service ported
+- **Origin:** phase 1.2 target-3 (drnickv4 port)
+- **Discovered:** 2026-07-16 · phase-1.2/target-3 session
+- **Severity:** low (Phase 1.2 test bằng py_compile, không runtime-import; roadmap Phase 3+)
+- **Status:** DEFERRED (Phase 3+ hoặc khi cần import providers runtime)
+- **Detail:** `agent/providers/openai_client.py` imports `from app import alert_service` + `from app.config import get_settings`. `agent/providers/openai_embedder.py` imports `from app.config import get_settings`. Ohana chưa port `app/config.py` hoặc `app/alert_service.py` (spec 02 §3 IN scope = agent/embedder/providers/retrieval/parsing/storage; app/ mở rộng defer). test_ports dùng `py_compile` (parse-only, không runtime resolve) nên GATE_MODULE + GATE_FULL cả 2 pass. Rắc rối chỉ xuất hiện khi thực tế `from agent.providers.openai_client import OpenAIClient` được gọi — sẽ ImportError.
+- **Action Phase 3+:** port `app/config.py` (pydantic-settings BaseSettings với env keys `openai_api_key`, `openai_model`, `openai_embed_model`, `reasoning_models`), port `app/alert_service.py` (fire-and-forget 429 counter — có thể stub thành no-op ở MVP).
 
 ---
 
