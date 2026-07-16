@@ -229,14 +229,14 @@ RISK: low
 ### Sub-phase 1.2 — Port generic modules
 
 <!-- ADP:PHASE 1.2 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 GOAL: 6 targets (2 files: agent/llm_client.py, agent/embedder.py · 4 packages: agent/providers/, retrieval/, parsing/, storage/) port sạch, mỗi target ZERO ONFA reference, test_ports.py phủ mỗi target 1 case.
 APPROACH: **1 sub-checkpoint per target** (blame granularity, không batch). Loop: cp (file hoặc -R package) → strip imports theo PRE-108 → viết test case → chạy GATE_MODULE → commit → advance target kế (không chờ Wyatt confirm — RISK: medium theo §12 v2 override).
 ALLOWED_FILES: agent/, retrieval/, parsing/, storage/, tests/test_ports.py
-GATE_MODULE (chạy sau mỗi module port, thay chỗ GATE 1 lần cuối):
-  .venv/bin/python -m pytest tests/test_ports.py::test_<module>_imports_clean -x -q \
-    && grep -rnE "onfa|ONFA|wallet|pending_action|ConfirmEvent|2fa|balance|commission|transaction|deposit|withdraw" <module>/ | grep -v "^Binary" ; [ $? -eq 1 ]
-GATE_FINAL (sau khi cả 6 module DONE):
+GATE_MODULE (informational — executor chạy sau mỗi target trước khi commit; KHÔNG phải spine gate):
+  .venv/bin/python -m pytest tests/test_ports.py::test_<target>_imports_clean -x -q \
+    && ! grep -rnE "onfa|ONFA|wallet|pending_action|ConfirmEvent|2fa|balance|commission|transaction|deposit|withdraw" <target> | grep -v "^Binary"
+GATE_FULL (spine gate — chạy 1 lần khi adp-checkpoint đóng phase 1.2):
   .venv/bin/python -m pytest tests/test_ports.py tests/test_smoke.py -x -q
 RETRY: 0/3
 RISK: medium (chạm agent/, retrieval/ — trong RISK_PATHS)
