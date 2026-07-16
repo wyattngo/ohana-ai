@@ -201,7 +201,8 @@ RISK: low
 ### Sub-phase 1.1 — Skeleton
 
 <!-- ADP:PHASE 1.1 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=b5b6b62, gate_exit=0, duration=6s, review=PASS(judge=APPROVE,model=output-evaluator@haiku,bound=474c15dc4640,tier=low), ran=2026-07-16T22:55
 GOAL: git init + pyproject.toml + app/main.py FastAPI hello + tests/test_smoke.py RED trước, GREEN sau skeleton.
 APPROACH: Copy pyproject.toml từ drnickv4 (dep list), strip financial deps (nếu có). FastAPI app/main.py chỉ có `/health`. test_smoke import app + assert `/health` returns 200.
 ALLOWED_FILES: pyproject.toml, .python-version, .gitignore, app/__init__.py, app/main.py, tests/__init__.py, tests/test_smoke.py
