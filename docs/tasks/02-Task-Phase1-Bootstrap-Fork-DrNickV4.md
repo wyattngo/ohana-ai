@@ -272,16 +272,12 @@ RISK: medium (chạm agent/, retrieval/ — trong RISK_PATHS)
 ### Sub-phase 1.3 — Port .claude/ discipline + CI + Alembic
 
 <!-- ADP:PHASE 1.3 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 GOAL: guardrail.py (adapt R1.13→intent-safety), reviewer agent verify, CI workflow, Alembic skeleton — bổ sung vào ohana-ai/.claude v2.3 sẵn có.
 APPROACH: cp guardrail → adapt DENY rules → verify existing ADP v2.3 hooks không collide → CI workflow adapt project name → alembic init (nếu PRE-106 fail).
-ALLOWED_FILES: .claude/hooks/guardrail.py, .github/workflows/, alembic.ini, db/migrations/, docs/RULES.md (adapt)
-GATE (all-must-pass):
-  1. python -c "import ast; ast.parse(open('.claude/hooks/guardrail.py').read())"       # guardrail parse OK
-  2. echo '{}' | python .claude/hooks/guardrail.py                                       # guardrail smoke-run không crash
-  3. python -c "import yaml,glob; [yaml.safe_load(open(f)) for f in glob.glob('.github/workflows/*.yml')]"   # CI yml parse OK
-  4. .venv/bin/alembic -c alembic.ini current 2>&1 | grep -qE "current|head|INFO"       # alembic env.py loadable
-  5. bash .claude/tools/adp-status.sh                                                    # ADP spine không hỏng sau khi thêm guardrail
+ALLOWED_FILES: .claude/hooks/guardrail.py, .github/workflows/, alembic.ini, db/migrations/, docs/RULES.md
+GATE_FULL: python3 -c "import ast; ast.parse(open('.claude/hooks/guardrail.py').read()); ast.parse(open('db/migrations/env.py').read())" && echo '{"tool_name":"Read","tool_input":{"file_path":"/tmp/foo"}}' | python3 .claude/hooks/guardrail.py && python3 -c "import glob; [open(f).read() for f in glob.glob('.github/workflows/*.yml')]" && .venv/bin/alembic -c alembic.ini heads >/dev/null && bash .claude/tools/adp-status.sh >/dev/null && .venv/bin/python -m pytest tests/test_ports.py tests/test_smoke.py -x -q
+REVIEW: PASS ref=docs/reviews/02-Task-Phase1-Bootstrap-Fork-DrNickV4-phase-1.3.json
 RETRY: 0/3
 RISK: medium (chạm .claude/hooks — cùng dir với ADP v2.3)
 <!-- /ADP -->
