@@ -231,7 +231,7 @@ RISK: low
 <!-- ADP:PHASE 1.2 -->
 STATUS: TODO
 GOAL: 6 targets (2 files: agent/llm_client.py, agent/embedder.py · 4 packages: agent/providers/, retrieval/, parsing/, storage/) port sạch, mỗi target ZERO ONFA reference, test_ports.py phủ mỗi target 1 case.
-APPROACH: **1 sub-checkpoint per target** (không batch). Loop: cp (file hoặc -R package) → strip imports theo PRE-108 → viết test case → chạy GATE_MODULE → commit → STOP+WAIT.
+APPROACH: **1 sub-checkpoint per target** (blame granularity, không batch). Loop: cp (file hoặc -R package) → strip imports theo PRE-108 → viết test case → chạy GATE_MODULE → commit → advance target kế (không chờ Wyatt confirm — RISK: medium theo §12 v2 override).
 ALLOWED_FILES: agent/, retrieval/, parsing/, storage/, tests/test_ports.py
 GATE_MODULE (chạy sau mỗi module port, thay chỗ GATE 1 lần cuối):
   .venv/bin/python -m pytest tests/test_ports.py::test_<module>_imports_clean -x -q \
@@ -258,8 +258,8 @@ RISK: medium (chạm agent/, retrieval/ — trong RISK_PATHS)
 3. Chạy PRE-108 grep local: log hit trong file mới copy.
 4. Strip imports/comments ONFA-specific — commit từng target riêng.
 5. Re-run test_ports + test_smoke → GREEN.
-6. Commit `feat(phase-1.2): port <target>, strip ONFA refs (N lines)`
-7. STOP+WAIT sau mỗi target (RISK medium — không batch).
+6. Commit `feat(phase-1.2): port <target>, strip ONFA refs (N lines)` — 1 checkpoint riêng (adp-checkpoint sau mỗi target)
+7. Advance target kế (không dừng — §12 v2: RISK medium tự flip).
 
 **Anti-patterns:**
 - ❌ Copy retrieval/ và WIRE shop_id ngay (defer Phase 2).
@@ -302,7 +302,7 @@ RISK: medium (chạm .claude/hooks — cùng dir với ADP v2.3)
    - Nếu FAIL: `.venv/bin/alembic init db/migrations` from scratch.
    - Đảm bảo env.py đọc DATABASE_URL từ ohana settings.
 5. Commit từng bước riêng: `feat(phase-1.3a): port guardrail`, `feat(phase-1.3b): CI workflow`, `feat(phase-1.3c): alembic skeleton`.
-6. STOP+WAIT Wyatt review Phase 1 complete.
+6. Checkpoint 1.3 → advance tag ritual (không dừng chờ — §12 v2, RISK medium). Wyatt review async qua REVIEW_QUEUE.md.
 
 ---
 
@@ -361,18 +361,18 @@ git log --oneline
 - `.github/workflows/` CI green
 - `alembic.ini` + `db/migrations/env.py` (empty versions/)
 - `docs/memory/PHASE1_DISCOVERY.md` — audit trail của PRE-101..108
-- Git tag `phase-1-bootstrap` (sau STOP+WAIT approval)
+- Git tag `phase-1-bootstrap` (executor tự tag sau 1.3 DONE — §12 v2 no-stop cho medium; Wyatt revert async nếu reject)
 - `docs/tasks/02-*` PHASE 1.0..1.3 STATUS: DONE (qua adp-checkpoint.sh, không tự gõ)
 
 ---
 
 ## §12 — Constraints
 
-- **STOP+WAIT sau mỗi sub-phase (1.0/1.1/1.2/1.3).**
-  - Ohana ADP v2.3 spine kế thừa RISK tier semantic từ workspace DEC-019 (xem `.claude/tools/adp-checkpoint.sh:326`):
-    `low` = auto-advance · `medium` = 1 confirm Wyatt tại ANCHOR · `high` = per-step confirm.
-  - Spec này chọn **conservative**: STOP+WAIT sau MỖI sub-phase kể cả low (không auto-advance) — vì Phase 1 là bootstrap, blast radius = toàn repo state.
-- **STOP+WAIT sau mỗi module trong 1.2.** Không batch copy 6 module.
+- **STOP+WAIT chỉ khi `RISK: high`.** (Wyatt override 2026-07-16 — spec KHÔNG override DEC-019 tier semantics.)
+  - Spine semantic (DEC-019, `.claude/tools/adp-checkpoint.sh:326`): `low` = auto-advance · `medium` = coder flip inline không cần chờ Wyatt confirm · `high` = per-step confirm + Wyatt sync diff review.
+  - Phase 1 hiện tại đều là low/medium → executor tự flip STATUS: TODO → IN_PROGRESS sau mỗi checkpoint, không chờ ACK.
+  - Nếu future phase gắn `RISK: high`, đây MỚI là điểm STOP+WAIT (per-step + sync diff review).
+- **Batching per target trong 1.2 vẫn giữ 1-checkpoint-per-target** — không dừng chờ, nhưng vẫn commit riêng (blame + rollback granularity).
 - **Additive/verify-first** — grep trước khi cp, không tin blindly spec 01 §5.
 - **KHÔNG fix bug drnickv4** trong lúc port — log KNOWN_ISSUES, defer.
 - **KHÔNG wire shop_id** vào retrieval/ ở Phase 1 (defer Phase 2).
