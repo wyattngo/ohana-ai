@@ -272,7 +272,8 @@ RISK: medium (chạm agent/, retrieval/ — trong RISK_PATHS)
 ### Sub-phase 1.3 — Port .claude/ discipline + CI + Alembic
 
 <!-- ADP:PHASE 1.3 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=cd6b812, gate_exit=0, duration=6s, review=PASS(judge=APPROVE,model=output-evaluator@haiku,bound=8eee59e6309d,tier=medium), ran=2026-07-16T23:27
 GOAL: guardrail.py (adapt R1.13→intent-safety), reviewer agent verify, CI workflow, Alembic skeleton — bổ sung vào ohana-ai/.claude v2.3 sẵn có.
 APPROACH: cp guardrail → adapt DENY rules → verify existing ADP v2.3 hooks không collide → CI workflow adapt project name → alembic init (nếu PRE-106 fail).
 ALLOWED_FILES: .claude/hooks/guardrail.py, .github/workflows/, alembic.ini, db/migrations/, docs/RULES.md
