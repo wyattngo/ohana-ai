@@ -1,0 +1,50 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/wyattngo/Sites/localhost/ohana-ai/.claude/hooks/progress-guard.sh",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/wyattngo/Sites/localhost/ohana-ai/.claude/hooks/gate-verdict.sh",
+            "timeout": 150
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "manual|auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/wyattngo/Sites/localhost/ohana-ai/.claude/hooks/checkpoint-on-compact.sh",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/wyattngo/Sites/localhost/ohana-ai/.claude/hooks/decision-gate.sh",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

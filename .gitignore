@@ -1,0 +1,42 @@
+# macOS
+.DS_Store
+._*
+
+# Python (Phase 1.1+ sẽ dùng)
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.python-version
+
+# IDE
+.vscode/
+.idea/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secure/
+
+# ADP generated artifacts (regeneratable từ spine)
+docs/adp-dashboard.html
+.adp-audit.jsonl
+.adp-state/
+
+# Claude local overrides (không share)
+.claude/settings.local.json
+
+# Logs
+*.log
+logs/
+
+# Test cache
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
