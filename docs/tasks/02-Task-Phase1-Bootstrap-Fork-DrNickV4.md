@@ -229,7 +229,8 @@ RISK: low
 ### Sub-phase 1.2 — Port generic modules
 
 <!-- ADP:PHASE 1.2 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=598ce55, gate_exit=0, duration=1s, review=PASS(judge=APPROVE,model=output-evaluator@haiku,bound=b05123cff661,tier=medium), ran=2026-07-16T23:15
 GOAL: 6 targets (2 files: agent/llm_client.py, agent/embedder.py · 4 packages: agent/providers/, retrieval/, parsing/, storage/) port sạch, mỗi target ZERO ONFA reference, test_ports.py phủ mỗi target 1 case.
 APPROACH: **1 sub-checkpoint per target** (blame granularity, không batch). Loop: cp (file hoặc -R package) → strip imports theo PRE-108 → viết test case → chạy GATE_MODULE → commit → advance target kế (không chờ Wyatt confirm — RISK: medium theo §12 v2 override).
 ALLOWED_FILES: agent/, retrieval/, parsing/, storage/, tests/test_ports.py
