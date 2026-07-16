@@ -61,7 +61,7 @@
 |---|---|
 | **1.0 Discovery** | Đọc drnickv4/ để xác nhận từng file trong port list tồn tại + version |
 | **1.1 Skeleton** | git init, pyproject.toml, app/ FastAPI entry, tests/, .venv |
-| **1.2 Port generic modules** | agent/llm_client + providers/, agent/embedder, retrieval/, parsing/, storage/ |
+| **1.2 Port generic modules** | agent/llm_client, agent/embedder, agent/providers/, retrieval/, parsing/, storage/ |
 | **1.3 Port .claude/ discipline** | guardrail.py (adapt R1.13), reviewer agent, CI workflow, Alembic skeleton — bổ sung vào .claude v2.3 sẵn có |
 
 ### OUT of scope (defer)
@@ -92,7 +92,7 @@
 |---|---|---|---|
 | `agent/llm_client.py` | `agent/llm_client.py` | `test -f drnickv4/agent/llm_client.py` | Expected exist |
 | `agent/embedder.py` | `agent/embedder.py` | `test -f drnickv4/agent/embedder.py` | Expected exist |
-| `providers/` | `providers/` | `test -d drnickv4/providers && ls drnickv4/providers/*.py` | Expected exist |
+| `agent/providers/` | `agent/providers/` | `test -d drnickv4/agent/providers && ls drnickv4/agent/providers/*.py` | Expected exist (sub-package của `agent/`, imports `from agent.providers import ...` — corrected from spec draft after PRE-108, PHASE1_DISCOVERY §CORRECTIONS C-1) |
 | `retrieval/` | `retrieval/` | `test -d drnickv4/retrieval` | [UNVERIFIED] — Ohana Phase 2 sẽ wrap shop_id, Phase 1 chỉ port raw |
 | `parsing/` | `parsing/` | `test -d drnickv4/parsing` | Expected exist |
 | `storage/` | `storage/` | `test -d drnickv4/storage` | [UNVERIFIED] |
@@ -181,7 +181,7 @@ PRE-108: Grep ONFA references in port targets.
 ### Sub-phase 1.0 — Discovery (READ-ONLY)
 
 <!-- ADP:PHASE 1.0 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 GOAL: docs/memory/PHASE1_DISCOVERY.md ghi đầy đủ kết quả PRE-101..108 + version snapshot.
 APPROACH: Run each PRE, capture output, không sửa gì trong drnickv4/.
 ALLOWED_FILES: docs/memory/PHASE1_DISCOVERY.md
@@ -227,9 +227,9 @@ RISK: low
 
 <!-- ADP:PHASE 1.2 -->
 STATUS: TODO
-GOAL: 6 module (agent/llm_client, providers/, agent/embedder, retrieval/, parsing/, storage/) port sạch, mỗi module ZERO ONFA reference, test_ports.py phủ mỗi module 1 case.
-APPROACH: **1 sub-checkpoint per module** (không batch). Loop: cp -R module → strip imports theo PRE-108 → viết test case cho module → chạy GATE_MODULE → commit → STOP+WAIT.
-ALLOWED_FILES: agent/, providers/, retrieval/, parsing/, storage/, tests/test_ports.py
+GOAL: 6 targets (2 files: agent/llm_client.py, agent/embedder.py · 4 packages: agent/providers/, retrieval/, parsing/, storage/) port sạch, mỗi target ZERO ONFA reference, test_ports.py phủ mỗi target 1 case.
+APPROACH: **1 sub-checkpoint per target** (không batch). Loop: cp (file hoặc -R package) → strip imports theo PRE-108 → viết test case → chạy GATE_MODULE → commit → STOP+WAIT.
+ALLOWED_FILES: agent/, retrieval/, parsing/, storage/, tests/test_ports.py
 GATE_MODULE (chạy sau mỗi module port, thay chỗ GATE 1 lần cuối):
   .venv/bin/python -m pytest tests/test_ports.py::test_<module>_imports_clean -x -q \
     && grep -rnE "onfa|ONFA|wallet|pending_action|ConfirmEvent|2fa|balance|commission|transaction|deposit|withdraw" <module>/ | grep -v "^Binary" ; [ $? -eq 1 ]
@@ -239,14 +239,24 @@ RETRY: 0/3
 RISK: medium (chạm agent/, retrieval/ — trong RISK_PATHS)
 <!-- /ADP -->
 
-**Steps per module (loop cho 6 module):**
-1. `test_ports.py` RED trước: `from <module> import *` không lỗi + grep-check `onfa|wallet|pending_action` = 0 hit.
-2. `cp -R /Users/wyattngo/Sites/localhost/drnickv4/<module> ./` (từng module một, không batch).
+**Loop order (6 targets — file trước, sub-package sau, package to nhất cuối):**
+1. `agent/llm_client.py`  (file — 1 hit `ConfirmEvent HALT` line 62 cần strip, xem PHASE1_DISCOVERY §PRE-108)
+2. `agent/embedder.py`     (file — clean)
+3. `agent/providers/`      (sub-package — copy `-R`; đảm bảo `agent/__init__.py` đã tồn tại từ target #1/#2 trước khi copy)
+4. `retrieval/`            (package — clean)
+5. `parsing/`              (package — clean)
+6. `storage/`              (package — clean)
+
+**Steps per target (loop 6 lần):**
+1. `test_ports.py` RED trước: `from <target> import *` (files) hoặc `import <pkg>` (packages) không lỗi + grep-check `onfa|wallet|pending_action` = 0 hit.
+2. Copy:
+   - File: `cp /Users/wyattngo/Sites/localhost/drnickv4/<path>.py ./<path>.py` (đảm bảo parent dir tồn tại)
+   - Package: `cp -R /Users/wyattngo/Sites/localhost/drnickv4/<pkg>/ ./<pkg>/`
 3. Chạy PRE-108 grep local: log hit trong file mới copy.
-4. Strip imports/comments ONFA-specific — commit từng module riêng.
+4. Strip imports/comments ONFA-specific — commit từng target riêng.
 5. Re-run test_ports + test_smoke → GREEN.
-6. Commit `feat(phase-1.2): port <module>, strip ONFA refs (N lines)`
-7. STOP+WAIT sau mỗi module (RISK medium — không batch).
+6. Commit `feat(phase-1.2): port <target>, strip ONFA refs (N lines)`
+7. STOP+WAIT sau mỗi target (RISK medium — không batch).
 
 **Anti-patterns:**
 - ❌ Copy retrieval/ và WIRE shop_id ngay (defer Phase 2).
@@ -343,7 +353,7 @@ git log --oneline
 - `ohana-ai/` = git repo, first working tree.
 - `pyproject.toml` + `.venv` + `.python-version`
 - `app/main.py` (FastAPI hello)
-- `agent/`, `providers/`, `retrieval/`, `parsing/`, `storage/` port clean
+- `agent/` (llm_client + embedder + providers/ sub-package), `retrieval/`, `parsing/`, `storage/` port clean
 - `.claude/hooks/guardrail.py` co-exist với ADP v2.3 hooks (không clobber)
 - `.github/workflows/` CI green
 - `alembic.ini` + `db/migrations/env.py` (empty versions/)
@@ -376,7 +386,7 @@ git log --oneline
 |---|---|---|---|---|
 | 1.0 | Discovery PRE-101..108 | low | TODO | — |
 | 1.1 | Skeleton + smoke | low | TODO | — |
-| 1.2 | Port 6 generic modules | medium | TODO | — |
+| 1.2 | Port 6 generic targets (2 files + 4 packages, incl. agent/providers/) | medium | TODO | — |
 | 1.3 | .claude + CI + Alembic | medium | TODO | — |
 
 > RISK proposed → Wyatt finalize trước khi bắt đầu 1.0. Floor rule: 1.2/1.3 chạm RISK_PATHS → tối thiểu medium.
