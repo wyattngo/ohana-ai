@@ -8,7 +8,7 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
-.python-version
+# .python-version — INTENTIONALLY tracked (Phase 1.1 pin — pyenv/rye auto-select 3.11)
 
 # IDE
 .vscode/

@@ -206,6 +206,7 @@ GOAL: git init + pyproject.toml + app/main.py FastAPI hello + tests/test_smoke.p
 APPROACH: Copy pyproject.toml từ drnickv4 (dep list), strip financial deps (nếu có). FastAPI app/main.py chỉ có `/health`. test_smoke import app + assert `/health` returns 200.
 ALLOWED_FILES: pyproject.toml, .python-version, .gitignore, app/__init__.py, app/main.py, tests/__init__.py, tests/test_smoke.py
 GATE: .venv/bin/python -m pytest tests/test_smoke.py -x -q
+REVIEW: PASS ref=docs/reviews/02-Task-Phase1-Bootstrap-Fork-DrNickV4-phase-1.1.json
 RETRY: 0/3
 RISK: low
 <!-- /ADP -->
