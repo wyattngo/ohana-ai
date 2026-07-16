@@ -181,7 +181,8 @@ PRE-108: Grep ONFA references in port targets.
 ### Sub-phase 1.0 — Discovery (READ-ONLY)
 
 <!-- ADP:PHASE 1.0 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=ad562e0, gate_exit=0, duration=0s, review=skip(docs-only), ran=2026-07-16T22:48
 GOAL: docs/memory/PHASE1_DISCOVERY.md ghi đầy đủ kết quả PRE-101..108 + version snapshot.
 APPROACH: Run each PRE, capture output, không sửa gì trong drnickv4/.
 ALLOWED_FILES: docs/memory/PHASE1_DISCOVERY.md
@@ -200,7 +201,7 @@ RISK: low
 ### Sub-phase 1.1 — Skeleton
 
 <!-- ADP:PHASE 1.1 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 GOAL: git init + pyproject.toml + app/main.py FastAPI hello + tests/test_smoke.py RED trước, GREEN sau skeleton.
 APPROACH: Copy pyproject.toml từ drnickv4 (dep list), strip financial deps (nếu có). FastAPI app/main.py chỉ có `/health`. test_smoke import app + assert `/health` returns 200.
 ALLOWED_FILES: pyproject.toml, .python-version, .gitignore, app/__init__.py, app/main.py, tests/__init__.py, tests/test_smoke.py
