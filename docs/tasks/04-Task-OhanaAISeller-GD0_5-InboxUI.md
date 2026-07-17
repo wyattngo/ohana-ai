@@ -253,7 +253,8 @@ which node && node --version
 ### Phase P0 — Framework decision + `web/` scaffold
 
 <!-- ADP:PHASE P0 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=3e07293, gate_exit=0, duration=2s, review=PASS(judge=APPROVE,model=haiku,bound=ee8e9f6b888f,tier=medium), ran=2026-07-17T17:24
 GOAL: Wyatt lock U1 via DEC-OHANA-01 → `web/` subdir scaffolded với chosen framework, `app/main.py` mount static/template, `auth/identity.py` mở rộng cookie-based derive + CSRF, dev-mock `POST /api/mock/authorize` endpoint, gate test `test_web_scaffold.py` PASS.
 APPROACH:
   1. TDD gate: viết `tests/test_web_scaffold.py` với 4 test: (a) GET `/` trả 200 + HTML shell, (b) GET `/api/inbox` không cookie → 401, (c) GET `/api/inbox` với dev cookie → 200 + `[]`, (d) POST `/api/mock/authorize` set cookie + return `{oa_id, shop_id}`. Confirm RED.

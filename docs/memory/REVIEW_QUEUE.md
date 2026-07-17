@@ -10,3 +10,4 @@ Revert 1 lệnh kèm sẵn (evidence commit revert riêng nếu cần).
 - [ ] 2026-07-17T07:43 · 01-Task-OhanaAISeller-GD0 phase-1 · tier=medium · review=PASS(judge=APPROVE,model=output-evaluator@haiku,bound=50349fe23478,tier=medium) · commit=299f4c8 · revert: git revert 299f4c8
 - [ ] 2026-07-17T08:27 · 01-Task-OhanaAISeller-GD0 phase-3 · tier=low · review=PASS(judge=APPROVE,model=output-evaluator@haiku,bound=30857328e051,tier=low) · commit=a19dafc · revert: git revert a19dafc
 - [ ] 2026-07-17T08:53 · 01-Task-OhanaAISeller-GD0 phase-4 · tier=medium · review=PASS(judge=APPROVE,model=output-evaluator@haiku,bound=ea3e7883f364,tier=medium) · commit=9a596f2 · revert: git revert 9a596f2
+- [ ] 2026-07-17T17:24 · 04-Task-OhanaAISeller-GD0_5-InboxUI phase-P0 · tier=medium · review=PASS(judge=APPROVE,model=haiku,bound=ee8e9f6b888f,tier=medium) · commit=3e07293 · revert: git revert 3e07293
