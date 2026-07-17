@@ -2,7 +2,7 @@
 
 > Nơi log deferred bugs / assumption breaks / waivers / open PRE checks. Update mỗi sub-phase (ghi mới, KHÔNG xoá cũ — chỉ đổi STATUS + gắn resolved commit SHA).
 >
-> Last updated: 2026-07-16 · Status: PRE-BOOTSTRAP (chưa có code, chưa Phase 1.0)
+> Last updated: 2026-07-17 · Status: Spec 01 = 100% DONE. Contract gates all GREEN via mocks/fixtures; PRE-002/003/004 backfill deferred until source landed. Newly-tracked deferred items from Phase 2–5: HS256+exp/aud/iss upgrade (auth), send-on-approve worker (F3), shops/customers/conversations tables, wider F2 read-tools.
 
 ---
 

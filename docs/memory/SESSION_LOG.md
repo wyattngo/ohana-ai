@@ -94,3 +94,35 @@
   2. (Không đổi) Wyatt finalize RISK tier spec 02 §13.
   3. Phase 1.0 Discovery run — remote đã có, checkpoint sẽ auto-push nếu configure.
   4. **Cân nhắc:** rotate real Stripe key nếu Wyatt có key thật ở đâu khác trên máy (grep filesystem để chắc). Fixture trong `cases.sh` là fake sequential — an toàn.
+
+
+---
+
+## 2026-07-17 — Spec 01 phase 2–5 shipped (Spec 01 = 100%, ADP 9/9 100%)
+
+- **Context:** Session pickup từ phase-2 RED gate `9cb499d` (đã có test_tenant_isolation.py). Wyatt yêu cầu drive spec 01 tới 100% end-to-end.
+- **Done (checkpoints in order):**
+  - **Phase 2 (RISK:high)** — `9cb499d` (RED) → `bd7e6ce` (checkpoint) → `10c4c47` (evidence). Landed: `auth/identity.py` HS256 (Identity dataclass, missing shop_id/sub/role → ValueError, bad sig → InvalidSignatureError raw propagate), `db/{models,session,__init__}.py` tenant-first (Message + Embedding, shop_id NOT NULL, composite indexes), `db/migrations/versions/0001_initial_tenant_first.py`, `retrieval/pgvector.py` `PgvectorRetriever(shop_scope=)` kw-only required SQL-level hard filter BEFORE order/limit. Gate: 3/3 (SQL row scope + pgvector adversarial + JWT). human=<file> artifact signed by Wyatt for `diff 0e1e61c9f89f`.
+  - **Phase 3 (RISK:low)** — `a19dafc` (checkpoint) → `19b93af` (evidence). Landed: `parsing/{chunk,ingest}.py` (paragraph-first splitter + single-commit ingest to `platform_wiki` namespace @ sentinel `shop_id="_platform"` — reuses phase-2 tenant guard, doesn't relax it), `tools/{registry,wiki}.py` (Tool dataclass w/ handler sig `(user_id, shop_id, args)`, search_wiki + build_tool factory), `api/admin.py` POST /admin/wiki/ingest (GĐ0 unauthenticated, PRE-3+ needs admin JWT gate). Gate: 2/2 (happy-path + adversarial namespace isolation proving chat rows can't bleed into wiki output). REVIEW_QUEUE (low tier).
+  - **Phase 4 (RISK:medium, BLOCKED_BY: PRE-002)** — `9a596f2` (checkpoint) → `6869830` (evidence). Landed: `bridge/{__init__,ohana_client}.py` R1.1-extended REST client (verify=True hardcoded, method-name regex `[a-z0-9_]+`, verified user_id+shop_id written LAST → smuggled params can't override), `tools/ohana_read.py order_status` w/ envelope translation OhanaError → `{success:False, error:<code>}`. Gate: 10/10 (happy + adversarial smuggle + 401/429/malformed + method-name reject + tool envelope shapes). Contract gate via httpx.MockTransport (PRE-002 blocks real endpoint content). REVIEW_QUEUE (medium tier).
+  - **Phase 5 (RISK:high, BLOCKED_BY: PRE-004)** — `cc12ce3` (checkpoint) → `4fd18ef` (evidence). Landed: `agent/policy_gate.py` (frozenset SENSITIVE_INTENTS + hard precedence sensitive → low_conf → auto_disabled → send + DEFAULT_CONFIDENCE_THRESHOLD=0.85), `agent/orchestrator.py receive_and_draft` (drafter → decide → EXACTLY ONE of sender.send OR PendingReplyRepo.create), `db/models.py PendingReply` + Alembic 0002, `db/repos.py PendingReplyRepo(shop_scope=)` (S4 seam on every SELECT/UPDATE), `bridge/zalo_sender.py MockZaloSender` (PRE-004 mock — records+logs, no network), `api/webhook.py` scaffold (`enabled=False` default → 503; shop_id lookup từ oa_id path param, never body), `api/inbox.py` REST scaffold (shop_id từ Identity.shop_id via Depends). Gate: 12/12 (policy_gate 6 + orchestrator 3 + tenant_isolation 3, no regression). human=<file> artifact signed for `diff c31f12744402`.
+- **Overall:** ADP 9/9 phase gate-passed (100%). Full pytest 32/32 mọi phase. ruff+mypy clean. STATE_HASH: `1b5cf0eabdfd` (khớp stamp cuối).
+- **Cleared:** PRE-001 (drnickv4/db/models.py inline read, tenant-first design done), PRE-005 + PRE-006 (retrospectively — Zalo-first Wyatt approved + shop_id-alone confirmed sufficient by all Phase 2 tests).
+- **Still deferred (docs/memory/KNOWN_ISSUES.md tracks):**
+  - PRE-002: real Ohana platform API endpoints → order_status test hardens mock→live, ship shipping/product/account tools
+  - PRE-003: real wiki docs corpus → ingest already ready, chỉ cần feed content
+  - PRE-004: Zalo creds + signature-verify + real HTTP sender + send-on-approve worker (currently approve/reject just flips status; no outbound send yet)
+  - HS256 → RS256 upgrade + exp/aud/iss enforcement (Phase 3+ before F3 auto-send in prod)
+  - `shops`/`customers`/`conversations` normalized tables when joins needed
+  - Full inbox UI framework (spec §12 `[UNVERIFIED]` web/)
+- **Meta sync applied (this session, post-phase-5):**
+  - CLAUDE.md line 5: status PRE-BOOTSTRAP → SPEC 01 = 100% DONE, date 2026-07-16 → 2026-07-17.
+  - CLAUDE.md §1 §2 §8: repo status + pre-flight fields refreshed to match shipped state.
+  - KNOWN_ISSUES.md header: PRE-BOOTSTRAP → Spec 01 100%, backfill deferred list added.
+- **Files changed:** hàng loạt qua 4 phase checkpoints — chi tiết git log `bd7e6ce..cc12ce3` + evidence commits.
+- **Blockers surfaced:** none new. PRE-002/003/004 giữ nguyên status (blocking BACKFILL, không chặn gate).
+- **Next:**
+  1. Wyatt milestone gate sign-off (spec 01 §11 deliverables).
+  2. Tick REVIEW_QUEUE entries [ ] khi review batch xong.
+  3. Khi PRE-002 clear → open follow-up spec: F2 read-tools real endpoints backfill.
+  4. Khi PRE-004 clear → open follow-up spec: MockZaloSender → ZaloAPISender + signature verify + send-on-approve worker + inbox UI framework choice.

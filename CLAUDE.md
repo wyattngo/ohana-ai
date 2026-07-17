@@ -2,7 +2,7 @@
 
 > **Sub-project của workspace `localhost/`.** Router level 0 tại `../CLAUDE.md`.
 > Owner: Tân (dev lead) · Approver: Wyatt Ngo (fractional CTO)
-> Last updated: 2026-07-16 · Status: **PRE-BOOTSTRAP** (chưa init code, đang audit spec)
+> Last updated: 2026-07-17 · Status: **SPEC 01 = 100% DONE (Phase 1–5 shipped)** — F1 wiki-RAG + F2 API Q&A (mock endpoints) + F3 policy-gate/pending_reply/inbox scaffold all landed; PRE-002/003/004 backfill deferred until source landed.
 
 ---
 
@@ -12,8 +12,8 @@
 |---|---|
 | Project | Ohana AI Seller (GĐ0 MVP) |
 | Kind | AI copilot cho seller social-commerce VN (Zalo/FB/IG) |
-| Stack (dự kiến) | Python 3.x / FastAPI / PostgreSQL + pgvector / Redis / Alembic — **fork chọn lọc từ `drnickv4/`** |
-| Repo | `ohana-ai` (chưa init) |
+| Stack | Python 3.11 / FastAPI / PostgreSQL + pgvector / Alembic — **fork chọn lọc từ `drnickv4/`**. Redis chưa wire (Phase 3+). |
+| Repo | `ohana-ai` (init) — branch `main`, phases 1–5 shipped, no remote configured |
 | Duration | 3–4 tuần, Zalo-only |
 | Priority order | safety → user trust → stability → growth (KHÔNG dùng fintech Survival Framework) |
 | Parent workspace | `/Users/wyattngo/Sites/localhost/` |
@@ -22,10 +22,19 @@
 
 ## 2. Trạng thái hiện tại
 
-- ⚠️ **Chưa có code.** Repo chưa init. Đang ở giai đoạn audit spec.
-- Spec canonical: `docs/tasks/01-Task-OhanaAISeller-GD0.md` (chờ Wyatt duyệt tier RISK cho từng phase).
-- Chưa clear PRE-001..005 (xem spec §6).
-- Chưa fork/port module nào từ `drnickv4/`.
+- ✅ **Spec 01 = 100% (5/5 phases DONE)** · Overall ADP 9/9 phase gate-passed (100%).
+- Spec canonical: `docs/tasks/01-Task-OhanaAISeller-GD0.md` — tất cả phase blocks ở STATUS: DONE với EVIDENCE stamped.
+- Latest STATE_HASH: `1b5cf0eabdfd` @ phase-5 close (2026-07-17).
+- **Shipped surface:**
+  - Phase 2 (RISK:high) — `auth/identity.py` HS256, `db/{models,session,repos}.py` tenant-first + Alembic 0001, `retrieval/pgvector.py PgvectorRetriever(shop_scope=)` SQL-level hard filter, gate `tests/test_tenant_isolation.py` 3/3.
+  - Phase 3 (low) — `parsing/{chunk,ingest}.py`, `tools/{registry,wiki}.py`, `api/admin.py` ingest, gate `test_wiki_rag.py` 2/2 (happy + adversarial ns iso).
+  - Phase 4 (medium) — `bridge/ohana_client.py` R1.1-extended REST client (verify=True hardcoded), `tools/ohana_read.py order_status`, gate `test_ohana_tools.py` 10/10 (MockTransport).
+  - Phase 5 (RISK:high) — `agent/{policy_gate,orchestrator}.py`, `db/models.py PendingReply` + Alembic 0002, `bridge/zalo_sender.py MockZaloSender`, `api/{webhook,inbox}.py` scaffolds, gate `test_policy_gate + test_orchestrator + test_tenant_isolation` 12/12.
+- **Blocking backfill (không chặn gate — chặn real-endpoint content):**
+  - PRE-002 — real Ohana platform API endpoint spec chưa từ Tân → order_status test hiện là MockTransport contract; F2 tools thứ 2/3/4 (shipping/product/account) chưa land.
+  - PRE-003 — real Wiki docs corpus chưa land → ingest hoạt động, chỉ chưa có nội dung thật.
+  - PRE-004 — Zalo OA creds + webhook signature + rate-limit spec chưa từ Tân → webhook `enabled=False` default, `MockZaloSender` thay real sender, send-on-approve worker chưa wire.
+- Cleared: PRE-001 (drnickv4/db/models.py đọc + tenant-first design landed Phase 2), PRE-005 (Zalo-first confirmed by Wyatt lock in 2026-07-16 spec approval), PRE-006 (`shop_id` alone confirmed sufficient qua tất cả Phase 2 tests).
 
 ---
 
@@ -125,18 +134,18 @@ ohana-ai/
 
 ---
 
-## 8. Pre-flight blocking (chờ Wyatt/Tân)
+## 8. Pre-flight status (updated 2026-07-17)
 
-| ID | Chờ ai | Nội dung |
-|---|---|---|
-| PRE-001 | Claude/dev | Đọc `drnickv4/db/models.py` body để biết có scaffold tenant sẵn không |
-| PRE-002 | Tân/nền tảng | Ohana platform REST API spec (order/shipping/product/account endpoints) |
-| PRE-003 | Tân | Wiki docs source (Notion/Drive/markdown) + format |
-| PRE-004 | Tân | Zalo OA credentials + webhook contract + rate-limit thật (48h/8-msg window) |
-| PRE-005 | Wyatt | Confirm channel đầu = Zalo OA (không phải FB/Meta) |
-| PRE-006 | Wyatt | Cardinality tenant: `shop_id` đủ, hay cần cả `seller_id`/`tenant_id` (1 seller nhiều shop?) |
+| ID | Status | Chờ ai | Nội dung / resolution |
+|---|---|---|---|
+| PRE-001 | ✅ RESOLVED | — | `drnickv4/db/models.py` đọc trong phase 2 discovery; single-tenant confirmed → viết lại tenant-first (`shop_id NOT NULL` mọi bảng). |
+| PRE-002 | ⏳ BLOCKING (backfill) | Tân/nền tảng | Ohana platform REST API spec. Phase 4 gate GREEN qua MockTransport contract; `bridge/ohana_client.py` shape locked; F2 tools thứ 2/3/4 (shipping_info/product_info/account_lookup) chờ endpoint list. |
+| PRE-003 | ⏳ BLOCKING (backfill) | Tân | Real wiki docs corpus location + format. Phase 3 gate GREEN qua inline fixture; `parsing/{chunk,ingest}.py` + `api/admin.py` ingest endpoint ready to accept real content. |
+| PRE-004 | ⏳ BLOCKING (backfill) | Tân | Zalo OA creds + webhook signature + rate-limit. Phase 5 gate GREEN qua `MockZaloSender`; `bridge/zalo_sender.py` interface locked; webhook `enabled=False` default until sig-verify + shops table land. |
+| PRE-005 | ✅ RESOLVED | — | Zalo-first confirmed via spec 01 approval 2026-07-16. |
+| PRE-006 | ✅ RESOLVED | — | `shop_id` alone sufficient — all Phase 2 tenant-isolation tests pass with single-scalar scope; no `seller_id`/`tenant_id` needed at GĐ0 (revisit if per-seller-many-shops case emerges in Phase 6+). |
 
-Chưa clear PRE-* → KHÔNG bootstrap Phase 1.
+Contract gates all GREEN với mock/fixture. Real-content backfill = separate follow-up specs khi source landed, KHÔNG chặn milestone gate.
 
 ---
 
