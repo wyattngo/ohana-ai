@@ -1,0 +1,25 @@
+.ohana-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  font-family: var(--ohana-font-family, "Inter", system-ui, sans-serif);
+  color: var(--ohana-color-greyscale-800, #151515);
+  background: var(--ohana-color-greyscale-50, #f2f2f2);
+}
+
+.ohana-shell h1 {
+  font-weight: var(--ohana-weight-semibold, 600);
+  font-size: 24px;
+  margin: 0;
+}
+
+.ohana-shell p {
+  font-weight: var(--ohana-weight-regular, 400);
+  font-size: var(--ohana-size-button, 16px);
+  color: var(--ohana-color-greyscale-500, #5e5e5e);
+  margin: 0;
+}

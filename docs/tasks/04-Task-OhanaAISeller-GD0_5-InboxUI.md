@@ -253,7 +253,7 @@ which node && node --version
 ### Phase P0 — Framework decision + `web/` scaffold
 
 <!-- ADP:PHASE P0 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 GOAL: Wyatt lock U1 via DEC-OHANA-01 → `web/` subdir scaffolded với chosen framework, `app/main.py` mount static/template, `auth/identity.py` mở rộng cookie-based derive + CSRF, dev-mock `POST /api/mock/authorize` endpoint, gate test `test_web_scaffold.py` PASS.
 APPROACH:
   1. TDD gate: viết `tests/test_web_scaffold.py` với 4 test: (a) GET `/` trả 200 + HTML shell, (b) GET `/api/inbox` không cookie → 401, (c) GET `/api/inbox` với dev cookie → 200 + `[]`, (d) POST `/api/mock/authorize` set cookie + return `{oa_id, shop_id}`. Confirm RED.
@@ -268,6 +268,7 @@ GATE: .venv/bin/python -m pytest tests/test_web_scaffold.py -x -q
 GATE_FULL: .venv/bin/python -m pytest tests/test_web_scaffold.py tests/test_tenant_isolation.py tests/test_policy_gate.py tests/test_orchestrator.py -x -q
 RETRY: 0/3
 RISK: medium
+REVIEW: PASS ref=docs/reviews/04-Task-OhanaAISeller-GD0_5-InboxUI-phase-P0.json
 <!-- /ADP -->
 
 ### Phase P1 — 3 seller-facing screens
