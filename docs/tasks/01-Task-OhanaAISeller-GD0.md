@@ -202,11 +202,13 @@ RISK: high (finalized Wyatt 2026-07-16 — thay đổi auth + schema behavior; p
 
 ### Phase 3 — Feature 1 Wiki RAG (Sub-task C)
 <!-- ADP:PHASE 3 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 GOAL: Ingest 1 wiki doc → chunk → embed → `search_wiki(query)` trả kết quả đúng namespace platform_wiki.
-APPROACH: parsing pipeline + admin ingest endpoint + read-tool trong registry.
-ALLOWED_FILES: parsing/, retrieval/, tools/wiki.py, tools/registry.py, api/admin.py
-GATE: pytest tests/test_wiki_rag.py -x -q
+APPROACH: parsing pipeline + admin ingest endpoint + read-tool trong registry. Platform-shared docs sit at sentinel shop_id="_platform" (PgvectorRetriever hard-filter còn giữ nguyên; search_wiki dựng retriever scope="_platform"). Wiki source deferred (PRE-003) — dùng inline text fixture cho gate, backfill real docs sau.
+ALLOWED_FILES: parsing/, retrieval/, tools/, api/, tests/test_wiki_rag.py, tests/conftest.py, docs/reviews/, docs/tasks/01-Task-OhanaAISeller-GD0.md
+GATE: .venv/bin/python -m pytest tests/test_wiki_rag.py -x -q
+GATE_FULL: .venv/bin/python -m pytest tests/test_wiki_rag.py -x -q
+REVIEW: PASS ref=docs/reviews/01-Task-OhanaAISeller-GD0-phase-3.json
 RETRY: 0/3
 RISK: low (finalized Wyatt 2026-07-16 — additive Wiki RAG, no auth/schema mutation)
 <!-- /ADP -->

@@ -1,0 +1,12 @@
+{
+  "verdict": "APPROVE",
+  "model": "output-evaluator@haiku",
+  "tier": "low",
+  "spec": "01-Task-OhanaAISeller-GD0",
+  "phase": "3",
+  "reasoning": "Phase 3 Wiki RAG implementation is complete and correct. Parsing pipeline (chunk.py + ingest.py) correctly chunks text, embeds, and persists to DB with namespace='platform_wiki' and shop_id='_platform' (sentinel). Tool registry and wiki.py tool implement (user_id, shop_id, args) handler signature correctly — LLM cannot target other shops via the tool arguments. PgvectorRetriever hard-filters at SQL level BEFORE order/limit, preventing nearer out-of-scope vectors from outranking farther in-scope rows (R1.22 analog). The adversarial test in test_wiki_rag proves namespace isolation is SQL-level, not post-filter: a chat namespace row with a nearer vector is rejected. Admin ingest endpoint is unauthenticated at GĐ0 with a forward-looking comment noting Phase 3+ needs role='admin' JWT gate. All quality gates pass (pytest 13/13, ruff + mypy clean, test_ports.py ONFA-blocklist passes). Tenant guard from Phase 2 is reused, not relaxed — the wiki tool creates a retriever with required shop_scope='_platform' rather than adding a bypass path. No financial integrity risks; no wallet/schema corruption paths.",
+  "confidence": "high",
+  "concerns": [],
+  "diff_sha256": "30857328e05113f03c62988323ae8a25bf08ef69516eacc2f115f63cb6874e84",
+  "stamped_at": "2026-07-17T08:27"
+}

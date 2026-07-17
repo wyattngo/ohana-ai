@@ -1,0 +1,8 @@
+{
+  "phase-3-wiki-rag": {
+    "acc_sha": "085b64cfd5f9d89ffd931a8afc8638011a534c7ab78eb2751f950de59e0b354f",
+    "red_exit": "1",
+    "red_ts": "2026-07-17T08:21:34+0700",
+    "files": "parsing/chunk.py,parsing/ingest.py,tools/registry.py,tools/wiki.py,api/admin.py"
+  }
+}
