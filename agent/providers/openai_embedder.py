@@ -3,10 +3,10 @@
 
 from __future__ import annotations
 
+from app.config import get_settings
 from openai import AsyncOpenAI
 
 from agent.embedder import Embedder
-from app.config import get_settings
 
 
 class OpenAIEmbedder(Embedder):

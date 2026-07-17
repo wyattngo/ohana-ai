@@ -25,7 +25,11 @@ def _compile_and_grep(paths: list[Path]) -> None:
         py_compile.compile(str(p), doraise=True)
         text = p.read_text(encoding="utf-8")
         m = ONFA_PATTERN.search(text)
-        assert m is None, f"ONFA reference in {p.relative_to(REPO)}: {m.group(0)!r} (line context: {text[max(0, m.start() - 40):m.end() + 40]!r})"
+        if m is not None:
+            ctx = text[max(0, m.start() - 40) : m.end() + 40]
+            raise AssertionError(
+                f"ONFA reference in {p.relative_to(REPO)}: {m.group(0)!r} (context: {ctx!r})"
+            )
 
 
 def test_agent_llm_client_imports_clean() -> None:

@@ -100,6 +100,20 @@
 - **Detail:** `agent/providers/openai_client.py` imports `from app import alert_service` + `from app.config import get_settings`. `agent/providers/openai_embedder.py` imports `from app.config import get_settings`. Ohana chưa port `app/config.py` hoặc `app/alert_service.py` (spec 02 §3 IN scope = agent/embedder/providers/retrieval/parsing/storage; app/ mở rộng defer). test_ports dùng `py_compile` (parse-only, không runtime resolve) nên GATE_MODULE + GATE_FULL cả 2 pass. Rắc rối chỉ xuất hiện khi thực tế `from agent.providers.openai_client import OpenAIClient` được gọi — sẽ ImportError.
 - **Action Phase 3+:** port `app/config.py` (pydantic-settings BaseSettings với env keys `openai_api_key`, `openai_model`, `openai_embed_model`, `reasoning_models`), port `app/alert_service.py` (fire-and-forget 429 counter — có thể stub thành no-op ở MVP).
 
+### ISSUE-011 — DrNick milestone/spec lore residue in ported agent/ files (audit gap)
+- **Origin:** spec 01 Phase 1 close audit (2026-07-16)
+- **Discovered:** 2026-07-16 · while running ruff pre-check for Phase 1 GATE_FULL
+- **Severity:** low (comments only — no functional/security impact, DoD §2 grep still passes)
+- **Status:** DEFERRED (Phase 2+ agent/ touch or dedicated cleanup pass)
+- **Detail:** Phase 1.2 target-1/target-3 audit used grep pattern `Spec [0-9]+|R[0-9]+\.[0-9]+|R-NEW-[0-9]+|debt [A-Z]|DrNick|Charlie|DEC-00[0-9]`. This missed:
+  * DrNick milestone refs: `M1`..`M7`, `M1–M3 path` (progressive milestone naming)
+  * DrNick feature refs: `FR2`, `FR4` (functional requirement IDs)
+  * Provider chatter: `V4-Pro`, `DeepSeek`, `Together`, `DeepInfra`, `LiteLLM`
+  * Comment-form spec refs missed by initial pass (e.g. `agent/providers/openai_client.py:28` import-line comment `# spec 34 P2`)
+- **Files affected:** `agent/llm_client.py` (~15 hits), `agent/providers/openai_client.py` (~10 hits)
+- **Why not blocking:** These are code comments about DrNick's evolution history. They don't reference ONFA/wallet/money (DoD §2 pattern clean). Ruff/mypy/pytest all pass. Test regex `onfa|wallet|pending_action|ConfirmEvent|2fa|balance|commission|transaction|deposit|withdraw` doesn't match either.
+- **Action Phase 2+:** When Phase 2 touches agent/ area (unlikely per ALLOWED_FILES), OR run a dedicated cleanup sub-task with broader grep pattern `\bFR[0-9]+\b|\bM[0-9]+\b|V[0-9]-Pro|DeepSeek|Together|DeepInfra|LiteLLM|spec [0-9]+` — target rewrite comments to Ohana-generic. Est. 30min.
+
 ---
 
 ## Deferred bugs (chưa có — Phase 1 chưa chạy)

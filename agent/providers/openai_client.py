@@ -10,6 +10,7 @@ from collections.abc import AsyncIterator
 from typing import Any, cast
 
 import openai
+from app.config import get_settings
 from openai import AsyncOpenAI, AsyncStream
 from openai.types.chat import ChatCompletion, ChatCompletionChunk
 
@@ -25,7 +26,6 @@ from agent.llm_client import (
     ToolCall,
 )
 from app import alert_service  # spec 34 P2 — provider-429 counter (re-raises unchanged)
-from app.config import get_settings
 
 
 def _to_openai_content(content: str | list[Any]) -> Any:

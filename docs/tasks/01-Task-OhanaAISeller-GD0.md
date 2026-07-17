@@ -166,14 +166,14 @@ PRE-005: Confirm channel đầu = Zalo OA (memory: recommended, chưa Wyatt lock
 
 ### Phase 1 — Bootstrap repo + port engine (Sub-task A)
 <!-- ADP:PHASE 1 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 GOAL: Repo `ohana-ai` chạy được `uvicorn app.main:app`; llm_client + embedder + retrieval + parsing port sạch, test smoke pass; financial modules KHÔNG có mặt.
-APPROACH: Copy module generic; strip import ONFA/money; giữ CI + guardrail + ADP. Reviewer subagent port kèm.
-ALLOWED_FILES: agent/, retrieval/, parsing/, storage/, app/, .claude/, pyproject.toml, Dockerfile
-GATE: .venv/bin/python -m pytest tests/test_smoke.py -x -q
-GATE_FULL: pytest -q + ruff check . + mypy app
+APPROACH: Copy module generic; strip import ONFA/money; giữ CI + guardrail + ADP. Reviewer subagent port kèm. Delegated to spec 02 (4 sub-phases 1.0/1.1/1.2/1.3 all DONE, tagged phase-1-bootstrap).
+ALLOWED_FILES: agent/, retrieval/, parsing/, storage/, app/, tests/, .claude/, pyproject.toml, .python-version, .gitignore, .github/, alembic.ini, db/, docs/memory/, docs/reviews/, Dockerfile
+GATE_FULL: .venv/bin/python -m pytest -q && .venv/bin/ruff check . && .venv/bin/ruff format --check . && .venv/bin/mypy app
+REVIEW: PASS ref=docs/reviews/01-Task-OhanaAISeller-GD0-phase-1.json
 RETRY: 0/3
-RISK: medium  (proposed — overlap agent/; Wyatt finalize)
+RISK: medium (finalized Wyatt 2026-07-16 — chạm agent/ + .claude/hooks/ trong RISK_PATHS)
 <!-- /ADP -->
 
 1. Init repo, copy port-list module, xóa `bridge/onfa_*`, `tools/onfa_*`, financial pending logic.
@@ -190,7 +190,7 @@ ALLOWED_FILES: auth/identity.py, auth/jwt.py, db/models.py, db/migrations/, retr
 GATE: pytest tests/test_tenant_isolation.py -x -q
 GATE_FULL: pytest tests/test_tenant_isolation.py tests/test_retrieval.py -q
 RETRY: 0/3
-RISK: high  (proposed — thay đổi auth + schema behavior; Wyatt finalize)
+RISK: high (finalized Wyatt 2026-07-16 — thay đổi auth + schema behavior; per-step confirm + human review artifact required)
 <!-- /ADP -->
 
 5. `test_tenant_isolation.py` (RED): query shop A không thấy row shop B (DB + vector).
@@ -206,7 +206,7 @@ APPROACH: parsing pipeline + admin ingest endpoint + read-tool trong registry.
 ALLOWED_FILES: parsing/, retrieval/, tools/wiki.py, tools/registry.py, api/admin.py
 GATE: pytest tests/test_wiki_rag.py -x -q
 RETRY: 0/3
-RISK: low  (proposed)
+RISK: low (finalized Wyatt 2026-07-16 — additive Wiki RAG, no auth/schema mutation)
 <!-- /ADP -->
 
 9. `test_wiki_rag.py` (RED): ingest doc mẫu → query → hit.
@@ -221,7 +221,7 @@ APPROACH: port REST client pattern; read-tools kind=READ; user_id/shop_id là ha
 ALLOWED_FILES: bridge/ohana_client.py, tools/ohana_read.py, tools/registry.py
 GATE: pytest tests/test_ohana_tools.py -x -q
 RETRY: 0/3
-RISK: medium  (proposed — bridge/ overlap; Wyatt finalize)
+RISK: medium (finalized Wyatt 2026-07-16 — bridge/ overlap RISK_PATHS)
 BLOCKED_BY: PRE-002
 <!-- /ADP -->
 
@@ -237,7 +237,7 @@ ALLOWED_FILES: api/webhook.py, agent/policy_gate.py, agent/orchestrator.py, db/m
 GATE: pytest tests/test_policy_gate.py -x -q
 GATE_FULL: pytest tests/test_policy_gate.py tests/test_orchestrator.py tests/test_tenant_isolation.py -q
 RETRY: 0/3
-RISK: high  (proposed — draft→customer behavior + gate; Wyatt finalize)
+RISK: high (finalized Wyatt 2026-07-16 — draft→customer behavior + auto-send gate; per-step confirm + human review)
 BLOCKED_BY: PRE-004
 <!-- /ADP -->
 

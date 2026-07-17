@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from db.models import Embedding
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from db.models import Embedding
 from retrieval.base import Hit, Retriever
 
 
