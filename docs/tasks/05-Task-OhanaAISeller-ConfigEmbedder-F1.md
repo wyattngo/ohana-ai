@@ -220,7 +220,7 @@ REVIEW: PASS ref=docs/reviews/05-Task-OhanaAISeller-ConfigEmbedder-F1-phase-P0.j
 ### Phase P1 — Wire OpenAIEmbedder + re-verify F1
 
 <!-- ADP:PHASE P1 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 GOAL: `default_embedder()` chọn embedder theo env (key→real, no-key+dev→fake, no-key+prod→raise); deterministic gate verify selection-logic + dim-contract; live acceptance test (`-m live`) ingest→search với real OpenAIEmbedder soạn sẵn để Wyatt/Tân chạy.
 APPROACH:
   1. TDD gate: `tests/test_embedder_wiring.py` (deterministic, KHÔNG network): (a) monkeypatch `openai_api_key` set → `default_embedder()` trả instance `OpenAIEmbedder` (mock `AsyncOpenAI` để __init__ không cần key thật), (b) no key + `OHANA_ENV=dev` → `_DeterministicDevEmbedder`, (c) no key + `OHANA_ENV` unset → raise RuntimeError, (d) `OpenAIEmbedder.embed()` với mock client trả đúng shape `list[list[float]]` dim 1536. Confirm RED (factory hiện trả fake vô điều kiện).
@@ -234,6 +234,8 @@ GATE: .venv/bin/python -m pytest tests/test_embedder_wiring.py -x -q
 GATE_FULL: .venv/bin/python -m pytest tests/ -x -q -m 'not live'
 RETRY: 0/3
 RISK: medium
+REVIEW: PASS ref=docs/reviews/05-Task-OhanaAISeller-ConfigEmbedder-F1-phase-P1.json
+AMENDED 2026-07-18 (tại ANCHOR P1, Wyatt chọn "chấp nhận deviation"): §3 B pseudocode đề xuất `default_embedder()` RAISE khi no-key+non-dev. Executor phát hiện `app/main.py:55` gọi `default_embedder()` lúc IMPORT (không per-request) → raise ở factory crash CẢ app (mọi route, không chỉ wiki-ingest). Thay bằng: factory KHÔNG raise, no-key→`_DeterministicDevEmbedder`, dựa vào `embed()` raise-outside-dev. Safety property GIỮ NGUYÊN — verify độc lập: `parsing/ingest.py` gọi `embed()` (line 19) TRƯỚC mọi `s.add`/`commit` (line 25-34) → raise short-circuit trước DB write, không partial-state. Khớp convention per-request của codebase (`api/mock_auth.py::_is_dev_env`). Reviewer + Wyatt + main-session verify đồng thuận deviation TỐT HƠN spec (crash-1-route vs crash-cả-app, seller UI vẫn sống khi thiếu key). Pseudocode §3 B vốn ghi "đề xuất — Wyatt xem", không frozen.
 <!-- /ADP -->
 
 ### Phase P2 — OPTIONAL: Consolidate env-reading (Wyatt quyết cắt/giữ)
