@@ -122,6 +122,28 @@ _Empty. Log ở đây khi port drnickv4 phát hiện bug nhưng defer fix per sp
 
 ---
 
+## Open — GĐ0.5 UI (spec 04)
+
+### ISSUE-012 — React screens 0% test coverage; P1 GATE không khoá được deliverable của P1
+- **Origin:** spec 04 §7 phase P1 · Wyatt accept tại ANCHOR 2026-07-17
+- **Discovered:** 2026-07-17 · session spec-04-P1 (reviewer NEEDS_REVIEW finding #1 + #4)
+- **Severity:** medium
+- **Status:** DEFERRED (spec riêng — FE test harness)
+- **Detail:** `tests/test_inbox_ui_e2e.py` (4 test) chỉ khoá HTTP contract mà screens bind vào — KHÔNG exercise dòng nào trong `web/src/**`. Xoá sạch `web/src/screens/*.tsx` thì GATE `pytest tests/test_inbox_ui_e2e.py -x -q` vẫn xanh. Kèm theo: 3/4 test GREEN ngay từ đầu, không RED được, vì brief P0 bảo mount `api/inbox.py` trong khi spec §7 P1 step 2 giao việc mount cho P1 → contract đã live trước khi P1 viết dòng React nào. TDD discipline không thoả ở P1.
+- **Why not blocking:** DoD §2.5 chỉ yêu cầu backend flow `draft → approve → status flip` (đã đạt, 42/42 test xanh). GĐ0.5 = local demo Wyatt/Tân, chưa có seller thật. Thêm harness = dep mới (`vitest`/`playwright`) + config mới → phase riêng đúng nghĩa, không nhét vào P1.
+- **Action:** (1) Wyatt/Tân smoke browser thủ công theo spec 04 §10 PC6 TRƯỚC khi merge `feat/gd0_5-inbox-ui` — session P1 không có browser harness nên KHÔNG verify được rendering/click-through/polling/`document.cookie` parsing. (2) Mở spec riêng cho FE test harness: Vitest+RTL (nhẹ, test component) hoặc Playwright (nặng, test click-through thật) — quyết lúc scope. Ưu tiên trước khi có seller thật (spec 05 real login).
+
+### ISSUE-013 — `web/.oxlintrc.json` thiếu ignorePatterns cho `web/dist/`
+- **Origin:** spec 04 phase P0 (config gap) · phát hiện lúc P1
+- **Discovered:** 2026-07-17 · session spec-04-P1
+- **Severity:** low
+- **Status:** OPEN
+- **Detail:** `pnpm lint` emit ~60 warning từ bundle minified trong `web/dist/`, không phải từ source. `npx oxlint src` trên code thật thì sạch (0 warning). Noise này làm lint output vô dụng — người đọc sẽ quen bỏ qua rồi miss warning thật.
+- **Why not blocking:** GATE dùng pytest, không dùng oxlint. `web/.oxlintrc.json` ngoài ALLOWED_FILES của P1.
+- **Action:** Thêm `"ignorePatterns": ["dist/**"]` vào `web/.oxlintrc.json`. Gộp vào P2 hoặc spec FE test harness (ISSUE-012). Est. 2 phút. Lưu ý: nếu sau này thêm CI Node build step thì `dist/` sẽ hết committed (xem deviation #3 của P0) → issue này tự biến mất.
+
+---
+
 ## Waivers / trade-offs (chưa có)
 
 _Empty. Log ở đây khi Wyatt approve `RISK_WAIVER` để hạ tier dưới floor, hoặc skip test/gate với rationale._

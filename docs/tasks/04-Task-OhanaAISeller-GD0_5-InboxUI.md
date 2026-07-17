@@ -98,7 +98,8 @@ Spec 01 §12 marked `web/` là [UNVERIFIED] — framework choice defer. Tình tr
 **B.2 Inbox**
 - Port UX từ mockup lines 375–403 (`view === "inbox"`).
 - **Đổi semantics:** mockup renders `INIT_CONVS` (mock conversations). GĐ0.5 renders `PendingReplyOut[]` từ `GET /inbox`.
-- Mỗi row hiển thị: `customer_id` (as avatar+name), `draft_text` preview (2 lines), intent badge (color-coded: `refund/complaint` = red, `order_question` = yellow, `general` = green), confidence bar, status badge (`pending/approved/rejected`).
+- Mỗi row hiển thị: `customer_id` (as avatar+name), `draft_text` preview (2 lines), intent badge, confidence bar, status badge (`pending/approved/rejected`).
+- **Intent badge — AMENDED 2026-07-17 (Wyatt, tại ANCHOR P1).** Bản gốc yêu cầu color-coded (`refund/complaint`=red, `order_question`=yellow, `general`=green). Không thực hiện được: Astronixa design system KHÔNG có semantic palette — cả 6 family đều là hue (primary tím `#9744FB`, secondary xanh `#2E96FE`, tertiary magenta `#CA50FB`, accent cyan `#00F0FF`, neutral `#7C7481`, greyscale). Bịa hex ngoài `tokens.ts` sẽ phá single-point-of-change contract của DEC-OHANA-01 §U2. **Chốt:** phân biệt intent bằng **icon + label tiếng Việt** trên chip greyscale — accessible hơn màu đơn thuần (color-blind safe). `intentMeta()` để ngỏ để thêm màu nếu Astronixa bổ sung semantic palette sau.
 - Refresh: polling 10s (KHÔNG SSE — spec 01 §12 note "SSE parity chưa xác nhận"), Wyatt confirm sau nếu cần realtime.
 
 **B.3 Review card**
@@ -275,7 +276,7 @@ REVIEW: PASS ref=docs/reviews/04-Task-OhanaAISeller-GD0_5-InboxUI-phase-P0.json
 ### Phase P1 — 3 seller-facing screens
 
 <!-- ADP:PHASE P1 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 GOAL: Channel picker + inbox list + review card wire vào backend. E2E test PASS cho flow draft → approve → status='approved'. Design tokens frozen (U2 outcome).
 APPROACH:
   1. TDD gate: viết `tests/test_inbox_ui_e2e.py` với 3 test: (a) seed 1 PendingReply pending → GET `/api/inbox` với dev cookie → 200 + 1 row với đúng fields, (b) POST `/api/inbox/{id}/approve` → 200 + status flip trong DB, (c) POST `/api/inbox/{id}/reject` → 200 + status flip. Confirm RED (endpoints live nhưng chưa mounted).
@@ -287,11 +288,17 @@ APPROACH:
   7. `web/src/screens/ReviewCard.tsx`: nhận `reply_id` từ route param, render draft. 2 nút Duyệt (primary) + Từ chối (ghost). Reject confirm dialog. Success toast + navigate back.
   8. Confirm E2E gate GREEN.
   9. Commit `adp/04 phase-p1: 3 seller screens live-bind` qua adp-checkpoint.sh.
-ALLOWED_FILES: web/src/screens/*, web/src/lib/*, app/main.py (mount only), tests/test_inbox_ui_e2e.py
+AMENDED 2026-07-17 (Wyatt tại ANCHOR P1, 3 quyết định):
+  - ALLOWED_FILES thêm `web/src/App.tsx` + `web/src/App.css`. Lý do: glue tối thiểu không tránh được — không sửa App.tsx thì 3 screens không bao giờ render (không có gì wire chúng vào `#root`). Spec viết thiếu, không phải executor vượt rào.
+  - Step 2 ("mount `api.inbox` dưới `/api`") đã được P0 làm mất — brief P0 bảo mount. Hệ quả: 3 test đầu của `test_inbox_ui_e2e.py` GREEN ngay, KHÔNG RED được. TDD discipline không thoả ở phase này; Wyatt accept vì DoD §2.5 chỉ yêu cầu backend flow (đã đạt), GĐ0.5 = local demo.
+  - Intent badge: xem §3 B.2 AMENDED (Astronixa không có semantic palette).
+DEBT (Wyatt accept, spec riêng): React screens hiện **0% test coverage** — GATE này chỉ khoá HTTP contract mà screens bind vào, không khoá rendering/click-through. Xoá sạch `web/src/screens/*.tsx` thì GATE vẫn xanh. FE test harness (Vitest+RTL hoặc Playwright) = spec riêng; cần dep mới + config mới nên không nhét vào P1. Tới đó: Wyatt/Tân smoke browser thủ công theo §10 PC6 trước merge.
+ALLOWED_FILES: web/src/screens/*, web/src/lib/*, web/src/App.tsx, web/src/App.css, app/main.py (mount only), tests/test_inbox_ui_e2e.py
 GATE: .venv/bin/python -m pytest tests/test_inbox_ui_e2e.py -x -q
 GATE_FULL: .venv/bin/python -m pytest tests/test_web_scaffold.py tests/test_inbox_ui_e2e.py tests/test_tenant_isolation.py tests/test_policy_gate.py tests/test_orchestrator.py -x -q
 RETRY: 0/3
 RISK: medium
+REVIEW: PASS ref=docs/reviews/04-Task-OhanaAISeller-GD0_5-InboxUI-phase-P1.json
 <!-- /ADP -->
 
 ### Phase P2 — Admin wiki ingest UI
