@@ -220,14 +220,16 @@ RISK: low (finalized Wyatt 2026-07-16 — additive Wiki RAG, no auth/schema muta
 
 ### Phase 4 — Feature 2 API Q&A tools (Sub-task D)
 <!-- ADP:PHASE 4 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 GOAL: `bridge/ohana_client.py` gọi được platform API (verify=True); ≥1 read-tool (order_status) trả shape `{success, data}`.
-APPROACH: port REST client pattern; read-tools kind=READ; user_id/shop_id là handler arg riêng (R1.1).
-ALLOWED_FILES: bridge/ohana_client.py, tools/ohana_read.py, tools/registry.py
-GATE: pytest tests/test_ohana_tools.py -x -q
+APPROACH: port REST client pattern; read-tools kind=READ; user_id/shop_id là handler arg riêng (R1.1). PRE-002 unresolved — gate là contract-shape only qua httpx.MockTransport; real endpoint content backfill khi platform API spec landed.
+ALLOWED_FILES: bridge/, tools/ohana_read.py, tools/registry.py, tests/test_ohana_tools.py, tests/conftest.py, docs/reviews/, docs/tasks/01-Task-OhanaAISeller-GD0.md
+GATE: .venv/bin/python -m pytest tests/test_ohana_tools.py -x -q
+GATE_FULL: .venv/bin/python -m pytest tests/test_ohana_tools.py -x -q
+REVIEW: PASS ref=docs/reviews/01-Task-OhanaAISeller-GD0-phase-4.json
 RETRY: 0/3
-RISK: medium (finalized Wyatt 2026-07-16 — bridge/ overlap RISK_PATHS)
-BLOCKED_BY: PRE-002
+RISK: medium (finalized Wyatt 2026-07-16 — bridge/ overlap RISK_PATHS; ANCHOR confirm 2026-07-17 = "proceed with phase 4")
+BLOCKED_BY: PRE-002 (real endpoint content backfill only; contract-shape gate closes with mocks)
 <!-- /ADP -->
 
 12. `test_ohana_tools.py` (RED, mock API): order_status trả đúng shape.

@@ -4,5 +4,11 @@
     "red_exit": "1",
     "red_ts": "2026-07-17T08:21:34+0700",
     "files": "parsing/chunk.py,parsing/ingest.py,tools/registry.py,tools/wiki.py,api/admin.py"
+  },
+  "phase-4-ohana-tools": {
+    "acc_sha": "c4266da9d09fd4db60e808bdc857e0a64cf35e78b8832bb47a21f125f938e256",
+    "red_exit": "1",
+    "red_ts": "2026-07-17T08:48:05+0700",
+    "files": "bridge/ohana_client.py,tools/ohana_read.py"
   }
 }
