@@ -220,7 +220,8 @@ REVIEW: PASS ref=docs/reviews/05-Task-OhanaAISeller-ConfigEmbedder-F1-phase-P0.j
 ### Phase P1 — Wire OpenAIEmbedder + re-verify F1
 
 <!-- ADP:PHASE P1 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=b4a7119, gate_exit=0, duration=3s, review=PASS(judge=APPROVE,model=haiku,bound=7cfe51e5521f,tier=medium), ran=2026-07-18T00:31
 GOAL: `default_embedder()` chọn embedder theo env (key→real, no-key+dev→fake, no-key+prod→raise); deterministic gate verify selection-logic + dim-contract; live acceptance test (`-m live`) ingest→search với real OpenAIEmbedder soạn sẵn để Wyatt/Tân chạy.
 APPROACH:
   1. TDD gate: `tests/test_embedder_wiring.py` (deterministic, KHÔNG network): (a) monkeypatch `openai_api_key` set → `default_embedder()` trả instance `OpenAIEmbedder` (mock `AsyncOpenAI` để __init__ không cần key thật), (b) no key + `OHANA_ENV=dev` → `_DeterministicDevEmbedder`, (c) no key + `OHANA_ENV` unset → raise RuntimeError, (d) `OpenAIEmbedder.embed()` với mock client trả đúng shape `list[list[float]]` dim 1536. Confirm RED (factory hiện trả fake vô điều kiện).
