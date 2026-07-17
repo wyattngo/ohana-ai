@@ -1,0 +1,12 @@
+{
+  "verdict": "APPROVE",
+  "model": "output-evaluator@haiku",
+  "tier": "high",
+  "spec": "01-Task-OhanaAISeller-GD0",
+  "phase": "5",
+  "reasoning": "Phase 5 Feature 3 seller-copilot pipeline + policy gate is complete and correct. All 8 critical invariants verified: (1) auto-send path is the ONLY code path reaching the customer, guarded by policy_gate.decide() call in orchestrator.receive_and_draft — no side channel; (2) sensitive-intent blocklist (complaint, refund, price_negotiation, specific_order) wins over confidence=0.99 and shop_auto_enabled=True — both policy_gate.py precedence order and test_orchestrator.test_sensitive_intent_parks_and_never_sends confirm at gate + integration levels; (3) SENSITIVE_INTENTS is frozenset[str], .add()/.discard() raise AttributeError (test_sensitive_intents_frozen asserts); (4) pending_reply.shop_id baked from PendingReplyRepo(shop_scope=...) constructor, caller never passes shop_id to create(); (5) PendingReplyRepo.mark_decided scoped by WHERE shop_id == self._shop_scope AND reply_id == :reply_id AND status IN (pending, approved), S4 ownership seam prevents cross-shop approval; (6) webhook.py enabled=False by default returning 503, shop_id derived from oa_to_shop lookup NEVER from request body (R1.1 extended), TODO placeholder for Zalo signature verify + real shops table lookup; (7) inbox.py derives shop_id from auth.identity.Identity.shop_id via FastAPI dependency, never from URL/body/query; (8) MockZaloSender is GĐ0 default in bridge/zalo_sender.py — logs+records without network I/O, real HTTP sender deferred to PRE-004 clear. Precedence order (sensitive→low_conf→auto_disabled→send) matches spec §4 acceptance-blocking rule. Schema: Alembic 0002_pending_reply creates table with composite index (shop_id, status, created_at) supporting fair FIFO inbox queue. Error handling: PendingReplyRepo returns 0 for cross-shop/wrong/already-decided (no leak); inbox routes translate to 404 uniformly. Test coverage: test_policy_gate.py (6) + test_orchestrator.py (3) + test_tenant_isolation.py (3) = 12/12 PASS covering all decision branches + adversarial sensitivity + S4 cross-shop isolation. Full pytest 32/32. ruff + mypy clean. ALLOWED_FILES respected. PRE-004 acknowledged as deferred; webhook and sender correctly scaffold with TODO + mock. No financial risk (Ohana is not a wallet). Acceptance-blocking invariants all pass.",
+  "confidence": "high",
+  "concerns": [],
+  "diff_sha256": "c31f127444021440a9c5440a751311f8439c9444c477e30e2dc9f29658dacf95",
+  "stamped_at": "2026-07-17T09:06"
+}

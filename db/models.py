@@ -5,9 +5,10 @@ query layer by requiring shop scope on every SELECT (retrieval/pgvector.py enfor
 vector search; other repos will follow the same shape when they land). The tenant-isolation
 gate in tests/test_tenant_isolation.py is the contract.
 
-GĐ0 lands only the tables the Phase 2 gate exercises: `messages`, `embeddings`. The wider
-schema (shops, sellers, customers, conversations, pending_reply) lands in Phase 5 alongside
-the copilot/policy_gate work — keeping this migration to one concern (R1.10, R6 db pair).
+GĐ0 lands only the tables the Phase 2 gate exercises: `messages`, `embeddings`. Phase 5
+adds `pending_reply` for the F3 copilot park path (spec §3 Sub-task E). Wider schema
+(shops, sellers, customers, conversations) still deferred — Phase 5 uses free-form string
+ids for those relations since GĐ0 doesn't need normalized joins.
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import BigInteger, DateTime, Index, Text, func
+from sqlalchemy import BigInteger, DateTime, Float, Index, Text, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 _EMBED_DIM = 1536
@@ -66,3 +67,35 @@ class Embedding(Base):
     )
 
     __table_args__ = (Index("idx_emb_shop_ns", "shop_id", "namespace"),)
+
+
+class PendingReply(Base):
+    """A drafted reply parked for seller review (spec 01 §3 Sub-task E).
+
+    Ported shape from drnickv4's `pending_action` with the financial pieces stripped
+    (`requires_2fa`, `error_code` gone) and the ownership seam (S4) tightened: every
+    read/write MUST include `WHERE shop_id = :scope`. A seller for shop A can never see —
+    let alone approve — shop B's parked replies. The `PendingReplyRepo` in db/repos.py
+    is the ONLY sanctioned access path; ad-hoc raw SQL outside that repo is a S4 breach.
+
+    `status` transitions: pending → approved → sent | rejected. `expired` is a future
+    cron-driven state (deferred to Phase 3+ once TTLs land).
+    """
+
+    __tablename__ = "pending_reply"
+
+    reply_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    shop_id: Mapped[str] = mapped_column(Text, nullable=False)
+    conversation_id: Mapped[str] = mapped_column(Text, nullable=False)
+    customer_id: Mapped[str] = mapped_column(Text, nullable=False)
+    draft_text: Mapped[str] = mapped_column(Text, nullable=False)
+    intent: Mapped[str] = mapped_column(Text, nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    decided_by: Mapped[str | None] = mapped_column(Text, nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (Index("idx_pending_shop_status_created", "shop_id", "status", "created_at"),)

@@ -238,15 +238,16 @@ BLOCKED_BY: PRE-002 (real endpoint content backfill only; contract-shape gate cl
 
 ### Phase 5 — Feature 3 pipeline + policy gate (Sub-task E) — RISK
 <!-- ADP:PHASE 5 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 GOAL: webhook inbound → draft (F1+F2 context) → policy_gate quyết định → auto_send HOẶC park pending_reply; seller approve async → send. Intent nhạy cảm luôn park kể cả auto.
-APPROACH: orchestrator adapt async; policy_gate risk-scored; pending_reply shape (bỏ 2FA, ownership S4 theo shop_id); inbox UI.
-ALLOWED_FILES: api/webhook.py, agent/policy_gate.py, agent/orchestrator.py, db/models.py, db/migrations/, web/
-GATE: pytest tests/test_policy_gate.py -x -q
-GATE_FULL: pytest tests/test_policy_gate.py tests/test_orchestrator.py tests/test_tenant_isolation.py -q
+APPROACH: orchestrator adapt async; policy_gate risk-scored; pending_reply shape (bỏ 2FA, ownership S4 theo shop_id); inbox REST scaffold (UI framework deferred §12). PRE-004 unresolved — bridge/zalo_sender.py mock (logs, doesn't call Zalo), signature-verify path deferred. ANCHOR confirm 2026-07-17 = "proceed with phase 5" (per-step confirm collapsed into batch review at STOP boundary per Phase 2 pattern).
+ALLOWED_FILES: api/, agent/, bridge/zalo_sender.py, db/models.py, db/migrations/, db/repos.py, tests/test_policy_gate.py, tests/test_orchestrator.py, tests/conftest.py, docs/reviews/, docs/tasks/01-Task-OhanaAISeller-GD0.md
+GATE: .venv/bin/python -m pytest tests/test_policy_gate.py -x -q
+GATE_FULL: .venv/bin/python -m pytest tests/test_policy_gate.py tests/test_orchestrator.py tests/test_tenant_isolation.py -q
+REVIEW: PASS ref=docs/reviews/01-Task-OhanaAISeller-GD0-phase-5.json human=docs/reviews/01-Task-OhanaAISeller-GD0-phase-5-human.md
 RETRY: 0/3
 RISK: high (finalized Wyatt 2026-07-16 — draft→customer behavior + auto-send gate; per-step confirm + human review)
-BLOCKED_BY: PRE-004
+BLOCKED_BY: PRE-004 (real Zalo send-leg backfill only; contract gate closes with mock sender)
 <!-- /ADP -->
 
 14. `test_policy_gate.py` (RED): (a) confidence thấp → park; (b) intent=complaint → park kể cả auto_enabled; (c) confidence cao + safe intent + auto_enabled → send.

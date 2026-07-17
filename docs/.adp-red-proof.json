@@ -10,5 +10,11 @@
     "red_exit": "1",
     "red_ts": "2026-07-17T08:48:05+0700",
     "files": "bridge/ohana_client.py,tools/ohana_read.py"
+  },
+  "phase-5-copilot-pipeline": {
+    "acc_sha": "7f38e5834d767f78b82c41c0c2e469756766c7c8abf90e1ba3eff4d6fd265889",
+    "red_exit": "1",
+    "red_ts": "2026-07-17T08:59:10+0700",
+    "files": "agent/policy_gate.py,agent/orchestrator.py,db/models.py,db/repos.py,db/migrations/versions/0002_pending_reply.py,bridge/zalo_sender.py,api/webhook.py,api/inbox.py"
   }
 }
