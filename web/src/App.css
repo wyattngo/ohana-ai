@@ -171,6 +171,63 @@
   border-left: 4px solid var(--ohana-color-greyscale-50, #f2f2f2);
 }
 
+/* ---- Admin wiki ingest form (spec 04 Phase P2, AdminWikiIngest.tsx) ----------------------- */
+
+.admin-entry-link {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  z-index: 5;
+  background: none;
+  border: none;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: var(--ohana-weight-semibold, 600);
+  color: var(--ohana-color-greyscale-400, #797979);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: var(--ohana-weight-semibold, 600);
+  color: var(--ohana-color-greyscale-700, #2c2c2c);
+}
+
+.admin-textarea,
+.admin-input {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: var(--ohana-weight-regular, 400);
+  padding: 10px 12px;
+  border-radius: var(--ohana-radius-card, 16px);
+  border: 1px solid var(--ohana-color-greyscale-200, #b4b4b4);
+  background: #fff;
+  color: var(--ohana-color-greyscale-800, #151515);
+  resize: vertical;
+}
+
+.admin-textarea:focus,
+.admin-input:focus {
+  outline: 2px solid var(--ohana-color-primary-300, #cd97ff);
+  outline-offset: 1px;
+}
+
+.admin-field-hint {
+  font-size: 12px;
+  font-weight: var(--ohana-weight-regular, 400);
+  color: var(--ohana-color-greyscale-500, #5e5e5e);
+}
+
 /* ---- Misc ---------------------------------------------------------------------------------- */
 
 .spin {

@@ -30,7 +30,7 @@ import os
 from dataclasses import dataclass
 
 import jwt
-from fastapi import HTTPException, Request
+from fastapi import Depends, HTTPException, Request
 
 _ALLOWED_ALGOS = ["HS256"]
 
@@ -107,3 +107,23 @@ def identity_from_cookie(request: Request) -> Identity:
         return verify_token(token, secret=get_jwt_secret())
     except (jwt.InvalidTokenError, ValueError) as exc:
         raise HTTPException(status_code=401, detail="invalid_session_cookie") from exc
+
+
+def require_admin(identity: Identity = Depends(identity_from_cookie)) -> Identity:
+    """FastAPI dependency (spec 04 P0) — layers a role check on top of `identity_from_cookie`.
+    A missing/invalid session cookie still 401s (from the wrapped dependency, resolved first);
+    an authenticated identity whose `role != "admin"` gets 403 here.
+
+    Spec 04 §7 Phase P2 step 1 literally says "GET /api/admin/wiki/ingest với non-admin cookie
+    → 403", but the route this guards (`api/admin.py`) is POST-only — a GET there 405s before
+    ever reaching this dependency. The correct read is "POST with a non-admin cookie → 403",
+    which is what this function (and `tests/test_admin_ui.py`) actually implements.
+
+    403, not 404: this deliberately differs from `mock_authorize`'s and `api/inbox.py`'s "look
+    like it doesn't exist" shape, which is aimed at callers with NO valid session at all. An
+    authenticated seller hitting this route already knows they're logged in as a seller —
+    confirming the admin route exists leaks nothing beyond what they could already infer.
+    """
+    if identity.role != "admin":
+        raise HTTPException(status_code=403, detail="admin_role_required")
+    return identity

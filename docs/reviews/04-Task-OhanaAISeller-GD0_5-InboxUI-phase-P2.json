@@ -1,0 +1,48 @@
+{
+  "verdict": "APPROVE",
+  "model": "haiku",
+  "spec": "04-Task-OhanaAISeller-GD0_5-InboxUI",
+  "phase": "P2",
+  "tier": "medium",
+  "rounds": 2,
+  "summary": "Vòng 1 NEEDS_REVIEW với 3 finding: 1 blocker (main session sửa tests/test_inbox_ui_e2e.py lint ngoài ALLOWED_FILES), 1 major (min_length=1 vs spec 'min 100 chars'), 1 minor (app/main.py ngoài ALLOWED_FILES dù step 3 bắt mount ở đó). Blocker + minor: amend ALLOWED_FILES kèm rationale. Major: main session PHẢN BIỆN — caller là admin đã xác thực, ép 100 server-side không chặn rác chỉ chặn rác ngắn, đổi lại false-reject fact hợp lệ 21 ký tự; reviewer xem xét và RÚT finding. Vòng 2 verify amendment khớp code, không finding mới.",
+  "axes": {
+    "S1_auth_guard": {
+      "score": 5,
+      "note": "api/admin.py TRƯỚC P2 là unauthenticated (docstring cũ: 'Do NOT expose this route publicly until that gate lands'). P2 tạo gate + mount atomically. require_admin layer trên identity_from_cookie: cookie thiếu → 401 (dep resolve trước), cookie seller → 403, cookie admin → pass. Không có đường vòng — app/main.py mount chỉ một chỗ, có admin_dep. Route KHÔNG nằm trong _CSRF_EXEMPT_PATHS → CSRF vẫn áp. Client AdminWikiIngest.tsx gọi qua apiFetch (có X-CSRF-Token), không fetch trần."
+    },
+    "S2_fake_embedder_live_path": {
+      "score": 5,
+      "note": "Executor phát hiện agent/providers/openai_embedder.py phụ thuộc app/config.py — module CHƯA BAO GIỜ tồn tại (verify: không trên disk, git log --all rỗng, OpenAIEmbedder() → ModuleNotFoundError). Buộc dùng _DeterministicDevEmbedder hash-based làm live default. Main session thêm gate: embed() raise RuntimeError nếu OHANA_ENV != 'dev' + test adversarial, chứng minh RED→GREEN. Đóng failure mode silent-wrong: không gate thì ingest trả {'success': true, 'chunks': N} với vector rác → search_wiki trả chunk gần-ngẫu-nhiên → AI trả lời khách sai không stack trace. Gate đặt ở embed() không phải factory → app/main.py vẫn import được, màn P0/P1 không chết. Quét auth//app//api//bridge/ không còn pattern fallback-không-gate nào khác. Escalate ISSUE-016 severity high."
+    },
+    "S3_scope_allowed_files": {
+      "score": 5,
+      "note": "Sau amend, ALLOWED_FILES phủ hết diff. Thêm app/main.py (mount only) — spec tự mâu thuẫn: step 3 bắt mount ở đó nhưng ALLOWED_FILES quên liệt kê (P1 nhớ, P2 sót). Thêm tests/test_inbox_ui_e2e.py (lint-only) — main session sửa 1 dòng E501 lọt từ commit P1 b557e53 (GATE là pytest không phải ruff nên không ai bắt); giữ fix thay vì revert vì revert = cố ý để repo đỏ ruff. Không chạm agent/, bridge/, tools/registry.py, db/migrations/, api/inbox.py, api/webhook.py."
+    },
+    "S4_spec_fidelity": {
+      "score": 5,
+      "note": "Spec bug được flag không giấu: step 1 viết 'GET → 403' nhưng route POST-only (GET sẽ 405) — executor viết test đúng (POST → 403) + ghi rõ trong docstring. Step 4 (thêm ?role=admin vào mock_auth) đã có sẵn → executor KHÔNG edit no-op, verify bằng đọc code + curl. shop_id = PLATFORM_SHOP_ID do server default, client không gửi (giữ R1.1). §3 C amended: 100 ký tự = gợi ý UX client-side (MIN_TEXT_LENGTH disable submit), backend min_length=1 — reviewer đã rút finding sau phản biện, ISSUE-015 ghi revisit khi PRE-003 land."
+    },
+    "S5_test_quality": {
+      "score": 5,
+      "note": "TDD RED CÓ xảy ra (khác P1): route chưa mount → POST rơi vào static catch-all → 405, test assert 403/200 → FAIL đỏ thật, executor paste output. Test 3 (CSRF) executor tự khai 'trivially passed, không phải P2 RED gate' — trung thực, giữ làm regression check. 4 test dùng Postgres thật, fixture seeded_source_refs hard-delete on teardown (tránh lặp bug rò tenant của P1 — không có tests/conftest.py, mỗi file tự lo, xem ISSUE-014). Test embedder-gate chứng minh RED→GREEN, không tautology."
+    },
+    "S6_regression": {
+      "score": 5,
+      "note": "Full suite 46 passed exit=0 (P1 baseline 42 + 4 mới, cộng khớp). ruff check api/ tests/ auth/ app/ → All checks passed. pnpm build OK, 66.07 kB gzip JS. pending_reply = 0 sau suite (không rò). Mount order inbox → mock_auth → admin dưới /api, StaticFiles vẫn cuối → không shadow. _CSRF_EXEMPT_PATHS vẫn chỉ {'/api/mock/authorize'}. test_inbox_ui_e2e.py chỉ đổi 1 dòng lint, không đụng assert."
+    }
+  },
+  "findings": [],
+  "claims_verified": {
+    "require_admin_actually_blocks": true,
+    "embedder_gate_closes_hole": true,
+    "app_config_never_existed": true,
+    "tdd_red_happened": true,
+    "mock_auth_role_admin_preexisting": true,
+    "client_uses_apiFetch_with_csrf": true
+  },
+  "ship_opinion_on_fake_embedder": "Ship P2 với embedder giả ĐÃ GATE — scope P2 là auth guard, không phải embedding pipeline. Gate RuntimeError ngoài dev chặn vector rác chạm RAG. ISSUE-016 (build app/config.py → wire OpenAIEmbedder thật → re-verify F1 end-to-end) chặn F1 dùng cho khách THẬT, nhưng không chặn GĐ0.5 (PRE-003 vốn chưa land wiki thật).",
+  "notes_for_human": "Reviewer vòng 1 phân loại min_length=1 là 'validation bypass vulnerability'; main session phản biện (caller là admin đã xác thực, ép 100 không chặn rác chỉ chặn rác ngắn, false-reject fact hợp lệ 21 ký tự) và reviewer RÚT finding — judge đánh giá lập luận, không cố chấp cũng không rubber-stamp. Đối lập với vòng P0 nơi cùng judge approve một lỗ cross-tenant vì tin docstring tự khai. Khác biệt là prompt: nêu đích danh lần miss + cấm coi docstring là bằng chứng.",
+  "diff_sha256": "9cf5238fa540a612b536f41bbe7a2658f3e40d04a9f60b46dd32f60b9a235d2e",
+  "stamped_at": "2026-07-17T18:36"
+}

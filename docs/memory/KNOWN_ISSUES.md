@@ -133,6 +133,33 @@ _Empty. Log ở đây khi port drnickv4 phát hiện bug nhưng defer fix per sp
 - **Why not blocking:** DoD §2.5 chỉ yêu cầu backend flow `draft → approve → status flip` (đã đạt, 42/42 test xanh). GĐ0.5 = local demo Wyatt/Tân, chưa có seller thật. Thêm harness = dep mới (`vitest`/`playwright`) + config mới → phase riêng đúng nghĩa, không nhét vào P1.
 - **Action:** (1) Wyatt/Tân smoke browser thủ công theo spec 04 §10 PC6 TRƯỚC khi merge `feat/gd0_5-inbox-ui` — session P1 không có browser harness nên KHÔNG verify được rendering/click-through/polling/`document.cookie` parsing. (2) Mở spec riêng cho FE test harness: Vitest+RTL (nhẹ, test component) hoặc Playwright (nặng, test click-through thật) — quyết lúc scope. Ưu tiên trước khi có seller thật (spec 05 real login).
 
+### ISSUE-016 — Embedder THẬT là dead code: `app/config.py` chưa bao giờ tồn tại → F1 wiki-RAG chưa từng chạy với embedding thật
+- **Origin:** phát hiện lúc executor P2 wire `api/admin.py` mount (spec 04) 2026-07-17
+- **Discovered:** 2026-07-17 · session spec-04-P2
+- **Severity:** **high** (không chặn GĐ0.5 vì PRE-003 chưa land, nhưng chặn F1 thật)
+- **Status:** OPEN — chờ quyết định build `app/config.py`
+- **Detail:** `agent/providers/openai_embedder.py::OpenAIEmbedder.__init__` gọi vô điều kiện `app.config.get_settings()`. **`app/config.py` không tồn tại trên disk VÀ không có trong git history** (verify: `git log --all -- app/config.py` rỗng). `OpenAIEmbedder()` → `ModuleNotFoundError: No module named 'app.config'`. Cùng vấn đề với `agent/providers/openai_client.py`. Đây là dead code port từ drnickv4, chưa bao giờ wire vào `app/main.py` — liên quan ISSUE-010 nhưng rộng hơn: không chỉ "runtime-import blocked", mà là **không có embedder chạy được nào trong repo**.
+- **Hệ quả:** spec 01 Phase 3 tick F1 wiki-RAG DONE với gate `test_wiki_rag.py` 2/2 — nhưng gate đó dùng `FakeEmbedder` inline. Nghĩa là **F1 chưa từng chạy với embedding thật một lần nào**. P2 mount `api/admin.py` phải dùng `_DeterministicDevEmbedder` (hash-based) làm live default vì không có lựa chọn khác.
+- **Đã mitigate (P2):** `_DeterministicDevEmbedder.embed()` raise `RuntimeError` nếu `OHANA_ENV != "dev"` + test `test_dev_embedder_refuses_to_run_outside_dev`. Không gate thì ingest sẽ trả `{"success": true, "chunks": N}` với vector rác → `search_wiki` trả chunk gần-ngẫu-nhiên → AI trả lời khách sai mà không ai thấy stack trace (silent-wrong, tệ hơn crash — vi phạm priority #1 "safety → user trust"). Gate đặt ở `embed()` chứ không ở `default_embedder()` để `app/main.py` vẫn import được (màn P0/P1 không chết theo).
+- **Action:** (1) Quyết build `app/config.py` (Settings: `OPENAI_API_KEY`, embed model/dim, `OHANA_JWT_SECRET`, `DATABASE_URL`) — hiện 3 chỗ tự đọc env riêng lẻ (`db/session.py`, `auth/identity.py`, `bridge/ohana_client.py`) đều ghi chú "no app.config coupling until Phase 3+". (2) Wire `OpenAIEmbedder` thật vào `default_embedder()`, xoá `_DeterministicDevEmbedder`. (3) Re-verify F1 end-to-end với embedding thật + wiki thật (PRE-003). **Phải xong TRƯỚC khi tuyên bố F1 dùng được cho khách thật.**
+
+### ISSUE-015 — Ngưỡng `min 100 chars` cho wiki ingest là phỏng đoán, chưa có dữ liệu
+- **Origin:** spec 04 §3 C · reviewer P2 flag backend `min_length=1` lệch spec
+- **Discovered:** 2026-07-17 · session spec-04-P2
+- **Severity:** low
+- **Status:** OPEN — revisit khi PRE-003 land
+- **Detail:** Spec ghi textarea "min 100 chars". Wyatt/main session chốt đó là **gợi ý UX client-side**, backend giữ `min_length=1`. Lý do: caller là admin đã xác thực (vốn ingest được nội dung tuỳ ý ≥100 ký tự) → ép 100 server-side không chặn rác, chỉ chặn rác ngắn, đổi lại từ chối fact hợp lệ ngắn (`"Freeship đơn từ 400k."` = 21 ký tự).
+- **Action:** Khi PRE-003 land wiki thật, đo độ dài doc điển hình → quyết có cần ngưỡng server-side không, và nếu có thì bao nhiêu. Nếu vẫn không cần → xoá `MIN_TEXT_LENGTH` client cho khỏi gây nhầm.
+
+### ISSUE-014 — Test suite không có cleanup tập trung; row rò rỉ khi test crash giữa chừng
+- **Origin:** phát hiện lúc smoke browser P1 (Wyatt xác nhận 3 màn chạy) 2026-07-17
+- **Discovered:** 2026-07-17 · session spec-04-P1 · tìm thấy 1 row mồ côi `shop_id='shop_a', status='pending', draft="I'm not sure."` trong `pending_reply` trước khi chạy suite
+- **Severity:** low
+- **Status:** OPEN
+- **Detail:** Không có `tests/conftest.py`, không có autouse cleanup. Chỉ `tests/test_inbox_ui_e2e.py` có teardown fixture (`seeded_replies`, executor P1 tự thêm sau khi tự bắt được bug). Các file dùng `shop_a`/`shop_b` (`test_orchestrator.py`, `test_policy_gate.py`, `test_tenant_isolation.py`, `test_ohana_tools.py`, `test_wiki_rag.py`) không dọn. Suite chạy trọn vẹn thì rows về 0, nhưng test crash/interrupt giữa chừng sẽ để lại row.
+- **Why not blocking:** Suite hiện xanh 42/42, rows=0 sau full run. Row rò rỉ **không làm vỡ test nào** vì tenant isolation che: inbox của `fixture-shop-001` không bao giờ thấy row `shop_a`. ⚠️ Chính điều này là rủi ro thật — feature (tenant scope) đang che giấu test pollution, nên lỗi chỉ lộ khi 2 test tình cờ dùng chung `shop_id` (đúng cái đã xảy ra ở P1 với `fixture-shop-001`).
+- **Action:** Thêm `tests/conftest.py` với autouse fixture truncate `pending_reply` (+ các bảng test khác) giữa các test, hoặc transaction-rollback pattern. Gộp vào spec FE test harness (ISSUE-012) hoặc làm riêng. Est. 30 phút.
+
 ### ISSUE-013 — `web/.oxlintrc.json` thiếu ignorePatterns cho `web/dist/`
 - **Origin:** spec 04 phase P0 (config gap) · phát hiện lúc P1
 - **Discovered:** 2026-07-17 · session spec-04-P1

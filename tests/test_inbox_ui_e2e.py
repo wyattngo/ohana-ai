@@ -61,7 +61,9 @@ async def seeded_replies():
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
     try:
         async with session_factory() as session:
-            await session.execute(delete(PendingReply).where(PendingReply.reply_id.in_(created_ids)))
+            await session.execute(
+                delete(PendingReply).where(PendingReply.reply_id.in_(created_ids))
+            )
             await session.commit()
     finally:
         await engine.dispose()

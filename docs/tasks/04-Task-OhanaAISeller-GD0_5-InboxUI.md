@@ -123,7 +123,8 @@ Spec 01 §12 marked `web/` là [UNVERIFIED] — framework choice defer. Tình tr
 
 **What:** Form đơn giản cho ingest doc vào `platform_wiki` namespace.
 
-- 2 field: textarea `text` (min 100 chars), input `source_ref` (freeform, ví dụ `"policy-v1"`, `"shipping-faq"`).
+- 2 field: textarea `text`, input `source_ref` (freeform, ví dụ `"policy-v1"`, `"shipping-faq"`).
+- **`min 100 chars` — AMENDED 2026-07-17 (tại ANCHOR P2).** Bản gốc ghi "min 100 chars" cho textarea; reviewer đọc thành data contract và flag backend `min_length=1` là "validation bypass". **Không sửa backend.** Lý do: caller của route này là **admin đã xác thực** — người vốn đã ingest được nội dung tuỳ ý dài ≥100 ký tự. Ép 100 server-side không chặn rác, chỉ chặn rác NGẮN, đổi lại từ chối fact hợp lệ (`"Freeship đơn từ 400k."` = 21 ký tự là mục wiki chính đáng). Lợi ích ~0, chi phí là false-reject dữ liệu thật. **Chốt:** `100` là **gợi ý UX client-side** (`MIN_TEXT_LENGTH` disable nút submit, chống paste nhầm), backend giữ `min_length=1`. Ngưỡng thật (nếu cần) chỉ xác định được khi PRE-003 land wiki thật và biết độ dài doc điển hình — xem ISSUE-015.
 - 1 button `Ingest`.
 - Trên submit: `POST /admin/wiki/ingest` với `{ text, source_ref, shop_id: "platform_wiki" }` (hardcode `PLATFORM_SHOP_ID` = shared namespace per spec 01 Phase 3).
 - Response: hiển thị `chunks: N` và toast success. Trên error: hiển thị message.
@@ -305,7 +306,7 @@ REVIEW: PASS ref=docs/reviews/04-Task-OhanaAISeller-GD0_5-InboxUI-phase-P1.json
 ### Phase P2 — Admin wiki ingest UI
 
 <!-- ADP:PHASE P2 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 GOAL: `/admin/wiki` page render form → POST `/api/admin/wiki/ingest` → chunks count feedback. Guard role=admin.
 APPROACH:
   1. TDD gate: `tests/test_admin_ui.py` với 2 test: (a) GET `/api/admin/wiki/ingest` với non-admin cookie → 403, (b) POST với admin cookie + valid text → 200 + `chunks > 0`. Confirm RED.
@@ -315,11 +316,17 @@ APPROACH:
   5. `web/src/screens/AdminWikiIngest.tsx`: form với 2 field + submit button. Show `chunks: N` on success. Error toast on fail.
   6. Confirm gate GREEN.
   7. Commit `adp/04 phase-p2: admin wiki ingest UI` qua adp-checkpoint.sh.
-ALLOWED_FILES: web/src/screens/AdminWikiIngest.tsx, web/src/lib/api.ts (edit), api/admin.py (edit), api/mock_auth.py (edit), auth/identity.py (edit), tests/test_admin_ui.py
+ALLOWED_FILES: web/src/screens/AdminWikiIngest.tsx, web/src/App.tsx, web/src/App.css, web/src/lib/api.ts (edit), api/admin.py (edit), api/mock_auth.py (edit), auth/identity.py (edit), app/main.py (mount only), tests/test_admin_ui.py, tests/test_inbox_ui_e2e.py (lint-only)
 GATE: .venv/bin/python -m pytest tests/test_admin_ui.py -x -q
 GATE_FULL: .venv/bin/python -m pytest tests/ -x -q -m 'not live'
 RETRY: 0/3
-RISK: low
+RISK: medium
+REVIEW: PASS ref=docs/reviews/04-Task-OhanaAISeller-GD0_5-InboxUI-phase-P2.json
+AMENDED 2026-07-17 (tại ANCHOR P2):
+  - RISK low → **medium**: floor rule v1.3 (ALLOWED_FILES ∩ RISK_PATHS ≠ ∅). `auth/identity.py` khớp `auth/` trong manifest RISK_PATHS → floor = medium. Spec gốc propose `low` là SAI (spec-gen rule: overlap ⇒ propose tối thiểu medium). Nâng tier, không hạ — hạ mới cần RISK_WAIVER của Wyatt. Thực chất: P2 thêm `require_admin()` (auth logic thật) + mount `api/admin.py` (guard sai = unauth wiki ingest) → medium đúng bản chất, không chỉ đúng hình thức.
+  - ALLOWED_FILES thêm `web/src/App.tsx` + `web/src/App.css` — cùng lý do P1 (glue để wire màn mới vào shell). Xem §7 P1 AMENDED.
+  - ALLOWED_FILES thêm `app/main.py (mount only)` — step 3 của CHÍNH block này bảo "Mount router under `/api` prefix trong `app/main.py`" nhưng ALLOWED_FILES lại quên liệt kê (P1 nhớ, P2 sót). Spec tự mâu thuẫn; sửa spec cho khớp bước của chính nó.
+  - ALLOWED_FILES thêm `tests/test_inbox_ui_e2e.py (lint-only)` — main session sửa 1 dòng E501 (dòng `delete(...)` quá 100 ký tự) lọt từ P1. Reviewer bắt đúng là vượt scope. Giữ fix thay vì revert vì: lint error đó ĐÃ ship ở commit P1 (`b557e53`) do GATE là pytest chứ không phải ruff — revert = cố ý để lại repo đỏ ruff. Giới hạn rõ "lint-only": KHÔNG đổi assert/logic nào.
 <!-- /ADP -->
 
 ---

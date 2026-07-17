@@ -8,11 +8,13 @@ Mount order matters: API routers are included BEFORE the `web/dist` static mount
 matches routes in registration order and `StaticFiles(html=True)` at `/` is a catch-all — if
 it were mounted first, it would shadow every `/api/*` request.
 
-Only `api/inbox.py` and the new dev-only `api/mock_auth.py` are mounted at P0. `api/admin.py`
-mounting is spec 04 Phase P2's concern (it lands together with the `require_admin` guard —
-mounting it unguarded now would expose an unauthenticated wiki-ingest endpoint through the
-live app before that guard exists). `api/webhook.py` needs a concrete `Drafter` — no
-implementation of that protocol exists yet in `agent/` (spec 01 shipped the orchestrator
+`api/inbox.py` and `api/mock_auth.py` are mounted since P0. `api/admin.py` is mounted here as
+of spec 04 Phase P2, gated by `auth.identity.require_admin` on its one route — it never lands
+unguarded (P0's note above was the reason it waited). The embedder wired in is
+`api/admin.py`'s `default_embedder()`, a deterministic GD0.5 placeholder — see that function's
+docstring for why the real `agent/providers/openai_embedder.OpenAIEmbedder` isn't used yet (no
+`app/config.py` exists anywhere in this repo). `api/webhook.py` needs a concrete `Drafter` —
+no implementation of that protocol exists yet in `agent/` (spec 01 shipped the orchestrator
 against the protocol, not a drafter) — so wiring it here would mean inventing throwaway glue
 outside this phase's scope; deferred to whichever phase adds a real drafter.
 """
@@ -28,9 +30,16 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response as StarletteResponse
 
+from api.admin import build_router as build_admin_router
+from api.admin import default_embedder
 from api.inbox import build_router as build_inbox_router
 from api.mock_auth import build_router as build_mock_auth_router
-from auth.identity import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, identity_from_cookie
+from auth.identity import (
+    CSRF_COOKIE_NAME,
+    CSRF_HEADER_NAME,
+    identity_from_cookie,
+    require_admin,
+)
 from db.session import make_session_factory
 
 app = FastAPI(title="Ohana AI Seller", version="0.1.0")
@@ -42,6 +51,10 @@ app.include_router(
     prefix="/api",
 )
 app.include_router(build_mock_auth_router(), prefix="/api")
+app.include_router(
+    build_admin_router(default_embedder(), _session_factory, require_admin),
+    prefix="/api",
+)
 
 
 @app.get("/health")

@@ -27,6 +27,11 @@ export interface MockAuthorizeResult {
   role: string;
 }
 
+export interface WikiIngestResult {
+  success: boolean;
+  chunks: number;
+}
+
 export class ApiError extends Error {
   readonly status: number;
 
@@ -90,4 +95,19 @@ export async function mockAuthorize(role: "seller" | "admin" = "seller"): Promis
     method: "POST",
   });
   return (await resp.json()) as MockAuthorizeResult;
+}
+
+/** `POST /api/admin/wiki/ingest` (admin-only, spec 04 §7 Phase P2) — ingests raw text into the
+ * shared `_platform` wiki namespace. This client never sends a `shop_id`: the backend defaults
+ * it server-side to `PLATFORM_SHOP_ID` (`parsing/ingest.py`) — that constant names a shared
+ * namespace, not tenant data (spec 04 §10 PC2 distinguishes this from the R1.22 tenant-scope
+ * invariant every other call in this file respects). Requires an admin-role session
+ * (`auth.identity.require_admin`); a seller cookie gets `ApiError(403)`. */
+export async function postWikiIngest(text: string, sourceRef: string): Promise<WikiIngestResult> {
+  const resp = await apiFetch("/api/admin/wiki/ingest", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, source_ref: sourceRef }),
+  });
+  return (await resp.json()) as WikiIngestResult;
 }
