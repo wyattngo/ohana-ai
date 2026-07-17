@@ -222,10 +222,12 @@ Wyatt confirm proposed tiers:
 
 ## Follow-up actions
 
-- [ ] Wyatt ping Tân về Astronixa brand kit (không blocking P0).
-- [ ] Session sau invoke `drnick-coder` để execute P0 với DEC này làm input.
-- [ ] Spec 05 (real login flow) — schedule khi PRE-004 backfill có timeline.
-- [ ] Spec 06 (staging deploy) — schedule khi PRE-004 landed.
+- [x] ~~Wyatt ping Tân về Astronixa brand kit~~ — **RESOLVED 2026-07-17.** Wyatt cấp Figma `JRoD28RIxiEfSEgVqDZLNJ` ("OHANA (Copy)", có quyền edit → Dev Mode MCP đọc được). Tokens đã pull + freeze vào `web/src/lib/tokens.ts`. Bản gốc `BWiqSWjMPYtpX0ui79hgNg` chỉ view-only → MCP từ chối.
+- [x] ~~Session sau invoke `drnick-coder` để execute P0~~ — **DONE 2026-07-17.** Spec 04 đóng cả 3 phase (P0 `3e07293` · P1 `b557e53` · P2 `58820b1`) trong 1 session.
+- [ ] **ISSUE-016 (high) — build `app/config.py`.** Phát hiện lúc P2: `agent/providers/openai_embedder.py` import `app.config` (module chưa bao giờ tồn tại) → embedder thật là dead code → **F1 wiki-RAG chưa từng chạy với embedding thật**. Ảnh hưởng cả §U4 (`get_jwt_secret` đang tự đọc env vì không có Settings) — cùng một gốc. Phải xong trước khi F1 dùng cho khách thật.
+- [ ] Spec 05 (real login flow) — schedule khi PRE-004 backfill có timeline. **Hard-block:** xoá `api/mock_auth.py` (dev cookie fixture) trước staging. ⚠️ Gate này KHÔNG cover `get_jwt_secret()` — hàm đó sống tiếp sau spec 05; đã gate riêng trên `OHANA_ENV` ở P0.
+- [ ] Spec 06 (staging deploy) — schedule khi PRE-004 landed. Kèm: thêm CI Node build step → bỏ commit `web/dist/` (P0 deviation #3), đổi cookie `secure=True`.
+- [ ] Spec FE test harness (ISSUE-012) — React screens hiện 0% coverage; GATE chỉ khoá HTTP contract.
 
 ---
 

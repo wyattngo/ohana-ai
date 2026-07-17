@@ -1,0 +1,46 @@
+{
+  "verdict": "APPROVE",
+  "model": "haiku",
+  "spec": "04-Task-OhanaAISeller-GD0_5-InboxUI",
+  "phase": "P1",
+  "tier": "medium",
+  "rounds": 2,
+  "summary": "Vòng 1 NEEDS_REVIEW với 3 major finding hợp lệ (TDD gate không khoá React screens; App.tsx ngoài ALLOWED_FILES; badge không color-coded). Cả 3 đưa lên Wyatt — quyết bằng người, KHÔNG sửa code: accept debt + amend ALLOWED_FILES + amend §3 B.2. Vòng 2 verify amendment khớp code thật (badge dùng greyscale-100/700 + icon + label VI đúng như spec mới; ALLOWED_FILES phủ hết diff; ISSUE-012 khai debt trung thực — xoá screens gate vẫn xanh, đã verify). Không finding mới.",
+  "axes": {
+    "S1_tdd_gate_integrity": {
+      "score": 4,
+      "note": "TDD RED không xảy ra — root cause: brief P0 bảo mount api/inbox.py trong khi spec §7 P1 step 2 giao mount cho P1, nên contract đã live trước khi P1 viết React. Discipline không thoả ở phase này. Wyatt accept: DoD §2.5 chỉ yêu cầu backend flow (đạt), GĐ0.5 = local demo. Debt explicit trong ISSUE-012 + spec DEBT block, kèm action bắt smoke browser theo §10 PC6 trước merge."
+    },
+    "S2_security_tenant": {
+      "score": 5,
+      "note": "credentials:'include' + CSRF double-submit wired thật (apiFetch đọc ohana_csrf cookie, echo X-CSRF-Token; middleware compare_digest). Zero hardcoded shop_id — backend derive từ JWT. Zero API key trong src lẫn dist. draft_text render bằng JSX text interpolation, không dangerouslySetInnerHTML/innerHTML → không XSS surface trên nội dung AI sinh. Amendment không chạm security logic."
+    },
+    "S3_scope_allowed_files": {
+      "score": 5,
+      "note": "ALLOWED_FILES amended thêm web/src/App.tsx + web/src/App.css — glue tối thiểu, không có đường nào khác wire 3 screens vào #root. Verify mọi file trong diff (trừ web/dist rebuilt) đều nằm trong ALLOWED_FILES mới. Không chạm agent/, bridge/, tools/registry.py, db/migrations/, api/inbox.py. Không build sớm P2 admin screen, không có orders/payments/analytics/plans."
+    },
+    "S4_spec_fidelity": {
+      "score": 5,
+      "note": "§3 B.2 amended: bỏ yêu cầu color-coded, chốt icon + label VI trên chip greyscale. Verify code khớp: .badge dùng var(--ohana-color-greyscale-100/700), Inbox.tsx render IntentIcon + intentLabel. Astronixa xác nhận không có semantic palette (6 family đều hue). ReviewCard read-only, không textarea/re-compose (HITL giữ nguyên). Không render conversation history (DEC §U5). Toast copy trung thực — nói rõ CHƯA gửi khách vì worker chưa có (PRE-004)."
+    },
+    "S5_test_quality": {
+      "score": 4,
+      "note": "4 test dùng Postgres thật, không mock DB (đúng CLAUDE.md §7). Fixture seeded_replies hard-delete on teardown — executor tự tìm và sửa bug rò seeded rows vào tenant chung fixture-shop-001 làm vỡ test P0, trước khi report GREEN. Test 4 (CSRF-missing→403) là adversarial thật. Hạn chế đã ghi debt: zero import từ web/src/screens/ — xoá screens gate vẫn xanh (verified)."
+    },
+    "S6_regression": {
+      "score": 5,
+      "note": "Full suite 42 passed exit=0 (P0 baseline 38 + 4 mới, cộng khớp). Không test cũ nào bị sửa/xoá/làm yếu. test_web_scaffold.py còn nguyên và vẫn xanh nhờ fixture teardown."
+    }
+  },
+  "findings": [],
+  "executor_claims_verified": {
+    "tdd_red_did_not_happen": true,
+    "app_tsx_edit_is_necessary_glue": true,
+    "tokens_lack_semantic_palette": true,
+    "list_pending_filters_out_decided_rows": false,
+    "csrf_actually_wired": true
+  },
+  "notes_for_human": "list_pending() filter status='pending' KHÔNG phải bug — reviewer kết luận đó là contract đúng (queue chờ duyệt tự rút sau khi quyết). Spec §10 PC6 viết 'row status = approved' mơ hồ, có thể đọc thành 'row còn hiển thị'; implementation đúng, wording spec nên siết ở lần sửa sau. Chưa ai verify rendering/click-through/polling/document.cookie trong browser thật — session P1 không có browser harness (xem ISSUE-012 action).",
+  "diff_sha256": "985b9d445b0858c46b6ca25526e22614940be41793aa53212f3299ef5a284fc1",
+  "stamped_at": "2026-07-17T17:56"
+}

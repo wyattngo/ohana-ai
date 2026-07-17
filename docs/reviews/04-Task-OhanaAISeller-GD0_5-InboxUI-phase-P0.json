@@ -1,0 +1,41 @@
+{
+  "verdict": "APPROVE",
+  "model": "haiku",
+  "spec": "04-Task-OhanaAISeller-GD0_5-InboxUI",
+  "phase": "P0",
+  "tier": "medium",
+  "rounds": 3,
+  "summary": "Vòng 1 APPROVE nhưng MISS fail-open ở get_jwt_secret() (dev fallback literal nuôi cả verify path — mint fail-closed + verify fail-open = R1.22 cross-tenant bypass). Sau khi fix + thêm test adversarial, vòng 2 trace lại attack scenario và confirm fail-closed cả 2 path, quét không thấy fail-open cùng class ở auth//app.main/api.mock_auth, tự bắt được docstring stale. Vòng 3 confirm docstring khớp code. Verdict cuối bind vào diff sau cả 3 lần sửa.",
+  "axes": {
+    "S1_security": {
+      "score": 5,
+      "note": "Dev-guard fail-closed per-request (OHANA_ENV unset -> 404). Cookie flags khớp DEC-OHANA-01 U4 (httpOnly, secure=False localhost, samesite=lax, 24h). CSRF double-submit dùng compare_digest, exempt duy nhất /api/mock/authorize (bootstrap mint cả 2 cookie). get_jwt_secret() fallback gate trên OHANA_ENV == dev, raise RuntimeError ngoài dev -> mint + verify gated identically, hết asymmetry. StaticFiles mount cuối, không shadow /api."
+    },
+    "S2_tenant_isolation": {
+      "score": 5,
+      "note": "identity_from_cookie() derive shop_id từ verified HS256 JWT, không đọc body/query/header. build_inbox_router(_session_factory, identity_from_cookie) mount /api giữ repo scope tại construction. Zero hardcoded shop_id trong web/src. Fix JWT secret đóng đường forge cookie bằng fallback public."
+    },
+    "S3_contract_fidelity": {
+      "score": 5,
+      "note": "tokens.ts khớp DEC-OHANA-01 U2 chính xác: 6 palette x 10 shade (primary #9744fb, secondary #3366ff, tertiary #ca50fb, accent #00f0ff, neutral #7c7481, greyscale #5e5e5e), gradient 3-stop, toast #43038f, Inter 400/600, radii pill 100px / nav 50px. Không scope creep — P0 shell only, screens ở P1."
+    },
+    "S4_test_quality": {
+      "score": 5,
+      "note": "6 tests, path thật không mock: GET / -> 200 + root div; GET /api/inbox no cookie -> 401; POST mock/authorize -> cookie + fixture JSON; OHANA_ENV unset -> 404 (adversarial); auth -> cookie -> inbox -> 200 + [] qua real Postgres scoped repo; get_jwt_secret ngoài dev -> RuntimeError (adversarial). RED->GREEN chứng minh cho test thứ 6."
+    },
+    "S5_regression": {
+      "score": 5,
+      "note": "Diff nằm trong ALLOWED_FILES: web/, app/main.py, auth/identity.py, api/mock_auth.py, tests/test_web_scaffold.py. RISK_PATHS không chạm: agent/{orchestrator,policy_gate}.py, tools/registry.py, bridge/*, db/migrations/*. GATE_FULL exit=0 (18), full suite exit=0 (38)."
+    }
+  },
+  "findings": [],
+  "acked_deviations_verified": {
+    "dev_guard_fail_closed": true,
+    "only_inbox_mounted": true,
+    "dist_committed_with_rationale": true,
+    "fifth_test_valuable": true
+  },
+  "notes_for_human": "Reviewer vòng 1 approve một lỗ tenant-bypass với S2=5/5 vì tin docstring tự khai 'NOT production-safe'. Auto-verdict là first-pass, không thay human review — data point cho DEC-019 tier policy. Cân nhắc siết prompt output-evaluator: docstring/comment không phải bằng chứng.",
+  "diff_sha256": "ee8e9f6b888f435dce08ee965ff217f217c9b458f4c76c78f58b631b1388de0e",
+  "stamped_at": "2026-07-17T17:24"
+}

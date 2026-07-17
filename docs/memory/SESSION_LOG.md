@@ -126,3 +126,33 @@
   2. Tick REVIEW_QUEUE entries [ ] khi review batch xong.
   3. Khi PRE-002 clear → open follow-up spec: F2 read-tools real endpoints backfill.
   4. Khi PRE-004 clear → open follow-up spec: MockZaloSender → ZaloAPISender + signature verify + send-on-approve worker + inbox UI framework choice.
+
+---
+
+## 2026-07-17 — Spec 04 GĐ0.5 Inbox UI: 3/3 phase DONE trong 1 session
+
+- **Bối cảnh:** Wyatt share mockup `~/Downloads/seller_ai_copilot_demo.jsx` (744 LOC React) + hỏi có build tiếp cho GĐ0+1 được không. Audit: shape UX đúng cho F3 nhưng 4 blocker (client-side Anthropic key leak, no tenant scoping, auto-send thay vì park→approve, ~60% feature là GĐ2+/GĐ3+). → Dùng làm UX blueprint, KHÔNG copy code.
+- **Làm gì:**
+  - Spec 04 `docs/tasks/04-Task-OhanaAISeller-GD0_5-InboxUI.md` (spec-generator v2.3, 14-section) — resolve spec 01 §12 `[UNVERIFIED] web/`.
+  - `DEC-OHANA-01-web-framework.md` — Wyatt-sign 5 quyết định (U1 Vite+React SPA · U2 Astronixa Figma design system · U3 local-dev-only · U4 dev cookie fixture · U5 defer conversation history).
+  - P0 `3e07293`/`45c2ae0` · P1 `b557e53`/`99b9bed` · P2 `58820b1`/`cc14193`. STATE_HASH cuối `d24a4f182225`. Overall ADP 12/22 (55%).
+- **Quyết định:**
+  - Brand kit: Astronixa Figma `JRoD28RIxiEfSEgVqDZLNJ` (bản copy có quyền edit; bản gốc view-only → MCP từ chối). Component reuse policy: CHỈ primitives — Ohana AI Seller ≠ Ohana Social super-app.
+  - P2 nâng RISK `low → medium` theo floor rule (ALLOWED_FILES chạm `auth/`). Spec gốc propose `low` là sai.
+  - Intent badge: icon + label VI thay color-coded — Astronixa KHÔNG có semantic palette; không bịa hex (spec §3 B.2 amended).
+  - `min 100 chars` = gợi ý UX client-side, backend `min_length=1` — caller là admin đã xác thực; ép 100 không chặn rác, chỉ false-reject fact hợp lệ ngắn (ISSUE-015).
+- **Bugs tìm + fix trong session (không nằm trong spec):**
+  - `get_jwt_secret()` (P0) — dev fallback công khai nuôi cả path VERIFY → deploy quên secret = cross-tenant bypass. Gate trên `OHANA_ENV` + test. **Reviewer vòng 1 đã APPROVE lỗ này** vì tin docstring "NOT production-safe".
+  - `_DeterministicDevEmbedder` (P2) — cùng pattern, silent-wrong RAG. Gate + test.
+  - Orphan uvicorn từ executor P1 chiếm cổng 8000 (18 phút).
+- **Blockers surfaced:**
+  - **ISSUE-016 (HIGH)** — `app/config.py` chưa bao giờ tồn tại → `OpenAIEmbedder` dead code → **F1 wiki-RAG chưa từng chạy với embedding thật**, dù spec 01 Phase 3 tick DONE (gate dùng FakeEmbedder). CLAUDE.md đã sửa cho trung thực.
+  - ISSUE-012 (React 0% coverage — GATE không khoá deliverable của P1) · ISSUE-013 (oxlint noise) · ISSUE-014 (không có `tests/conftest.py`, row rò khi test crash — tenant isolation đang CHE test pollution) · ISSUE-015.
+- **Lỗi của main session (ghi để không lặp):** brief P0 bảo mount `api/inbox.py` trong khi spec giao cho P1 → P1 mất TDD RED (ISSUE-012). Brief phải TRÍCH spec, không tự liệt kê lại scope. Đã thành anti-pattern §7.
+- **Verify thật:** Wyatt smoke browser 3 màn seller (`127.0.0.1:8010`, seed 3 draft) → xác nhận chạy. Đây là thứ DUY NHẤT chứng minh UI sống — GATE không bắt được nếu React vỡ.
+- **Meta sync (session này):** CLAUDE.md dòng 5 + §1 stack + §2 trạng thái/shipped surface + §6 layout (fix `api/chat.py` không tồn tại → `api/inbox.py`) + §7 thêm 2 anti-pattern. DEC-OHANA-01 follow-up checklist. Test 46 passed verified.
+- **Next:**
+  1. Merge `feat/gd0_5-inbox-ui` → main (chưa merge, chưa push, 37+ commits ahead).
+  2. Tick REVIEW_QUEUE entries khi Wyatt review batch xong.
+  3. **ISSUE-016 trước khi tuyên bố F1 dùng được** — build `app/config.py` → wire `OpenAIEmbedder` → re-verify F1 end-to-end.
+  4. Spec FE test harness (ISSUE-012) trước khi có seller thật.
