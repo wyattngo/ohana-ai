@@ -54,6 +54,35 @@ class Settings(BaseSettings):
     # deliberately opts models in.
     reasoning_models: frozenset[str] = frozenset()
 
+    # ---- P2 (spec 05 §7 Phase P2) — consolidate the remaining direct `os.environ.get(...)`
+    # reads into this one Settings surface. Pure refactor: these three fields exist so
+    # `auth/identity.py get_jwt_secret()` and `db/session.py get_database_url()` have
+    # somewhere to source from — they do NOT change what either function returns for a given
+    # env. Both functions build a FRESH `Settings()` per call rather than going through the
+    # `@lru_cache`d `get_settings()` below; see `get_jwt_secret()`'s docstring for why routing
+    # a security-relevant read through the process-wide cache is unsafe (stale env across
+    # tests/requests) — that reasoning is why these three fields are listed here but never
+    # read via `get_settings()` anywhere in the codebase.
+
+    # `OHANA_JWT_SECRET`. None when unset — absence is a real, meaningful state that
+    # `get_jwt_secret()` branches on (dev literal fallback vs raise), not a value to paper
+    # over with a default.
+    ohana_jwt_secret: str | None = None
+
+    # `OHANA_ENV`. None when unset (matches the pre-P2 `os.environ.get("OHANA_ENV")` shape,
+    # which also yielded `None`, not `"production"` or any other literal). Every caller
+    # already treats "anything other than exactly the string 'dev'" as non-dev, so `None`
+    # compares equal to that "not dev" bucket without needing its own default.
+    ohana_env: str | None = None
+
+    # `DATABASE_URL`. Literal default matches `db/session.py`'s pre-P2 `_DEFAULT_URL` exactly
+    # — local dev Postgres, same `ohana`/`ohana`/`ohana` used throughout
+    # `docs/tasks/01-Task-OhanaAISeller-GD0.md` pre-flight checks. Unlike the two fields
+    # above, pydantic-settings' own default mechanism reproduces
+    # `os.environ.get("DATABASE_URL", _DEFAULT_URL)` exactly — no `is None` branch needed in
+    # the caller.
+    database_url: str = "postgresql+psycopg://ohana:ohana@localhost:5432/ohana"
+
 
 @lru_cache
 def get_settings() -> Settings:

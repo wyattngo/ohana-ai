@@ -242,7 +242,7 @@ AMENDED 2026-07-18 (tại ANCHOR P1, Wyatt chọn "chấp nhận deviation"): §
 ### Phase P2 — OPTIONAL: Consolidate env-reading (Wyatt quyết cắt/giữ)
 
 <!-- ADP:PHASE P2 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 GOAL: `get_jwt_secret()` + `db/session.py get_database_url()` đọc qua `Settings`; ZERO đổi behavior (fail-closed-outside-dev của jwt secret giữ nguyên); mọi test cũ xanh.
 APPROACH:
   1. TDD: KHÔNG viết test mới — dùng test hiện có làm regression guard. Confirm `test_jwt_secret_refuses_public_fallback` + `test_web_scaffold` + tenant-isolation xanh TRƯỚC refactor (baseline).
@@ -256,6 +256,8 @@ GATE: .venv/bin/python -m pytest tests/test_web_scaffold.py tests/test_config.py
 GATE_FULL: .venv/bin/python -m pytest tests/ -x -q -m 'not live'
 RETRY: 0/3
 RISK: medium
+REVIEW: PASS ref=docs/reviews/05-Task-OhanaAISeller-ConfigEmbedder-F1-phase-P2.json
+NOTE 2026-07-18: Path 1 (fresh `Settings()` per call, KHÔNG `get_settings()` cached) — né cache-staleness trap trên security path `get_jwt_secret()`. Behavior-preserving: 3 nhánh fail-closed byte-identical, db default khớp `_DEFAULT_URL` cũ. Executor prove test security còn bắt được revert (xóa nhánh raise → test FAILED). Không cần chạm test file / conftest.py (brief lo path 2/3 — path 1 né được).
 <!-- /ADP -->
 
 > **P2 là OPTIONAL.** Nếu Wyatt cắt tại spec approval → mark P2 `CANCELLED` + rationale "3 chỗ đọc env hoạt động đúng, refactor rủi ro auth > lợi ích gọn". Spec vẫn DONE với P0+P1.
