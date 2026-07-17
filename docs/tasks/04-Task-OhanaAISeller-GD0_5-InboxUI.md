@@ -306,7 +306,8 @@ REVIEW: PASS ref=docs/reviews/04-Task-OhanaAISeller-GD0_5-InboxUI-phase-P1.json
 ### Phase P2 — Admin wiki ingest UI
 
 <!-- ADP:PHASE P2 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=58820b1, gate_exit=0, duration=2s, review=PASS(judge=APPROVE,model=haiku,bound=9cf5238fa540,tier=medium), ran=2026-07-17T18:36
 GOAL: `/admin/wiki` page render form → POST `/api/admin/wiki/ingest` → chunks count feedback. Guard role=admin.
 APPROACH:
   1. TDD gate: `tests/test_admin_ui.py` với 2 test: (a) GET `/api/admin/wiki/ingest` với non-admin cookie → 403, (b) POST với admin cookie + valid text → 200 + `chunks > 0`. Confirm RED.
