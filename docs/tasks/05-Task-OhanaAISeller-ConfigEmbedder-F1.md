@@ -199,7 +199,8 @@ grep -nE "pydantic-settings|openai>" pyproject.toml   # Expected: cả 2 present
 ### Phase P0 — `app/config.py` Settings foundation
 
 <!-- ADP:PHASE P0 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=897ba1f, gate_exit=0, duration=11s, review=PASS(judge=APPROVE,model=haiku,bound=5165de25e1ed,tier=medium), ran=2026-07-17T23:40
 GOAL: `app/config.py` với `Settings(BaseSettings)` + `get_settings()` lru_cache phủ 4 field 2 provider cần; **`OpenAIEmbedder()` import được (hết ModuleNotFoundError — F1 path unblocked)**; gate `test_config.py` PASS.
 AMENDED 2026-07-17 (tại ANCHOR P0): GOAL gốc còn đòi "`OpenAIClient()` import được" — SAI. Executor tìm ra `openai_client.py:28` còn import `from app import alert_service` (module `app/alert_service.py` cũng chưa bao giờ tồn tại — ISSUE-010 đã ghi CẢ 2, audit spec 05 của tôi rớt nửa alert_service). `OpenAIClient` là LLM client (F2/F3) — **out scope spec 05** (§3 Out of scope), F1 KHÔNG cần nó. `app/config.py` unblock nửa config; alert_service là blocker riêng cho LLM-client spec sau. Executor encode đúng: `test_openai_client_import_blocked_by_unported_alert_service` là `xfail(strict=True)` — flip thành hard-fail khi ai đó port alert_service, không rot. F1 deliverable (OpenAIEmbedder import) đạt thật.
 APPROACH:
