@@ -276,7 +276,8 @@ REVIEW: PASS ref=docs/reviews/04-Task-OhanaAISeller-GD0_5-InboxUI-phase-P0.json
 ### Phase P1 — 3 seller-facing screens
 
 <!-- ADP:PHASE P1 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=b557e53, gate_exit=0, duration=1s, review=PASS(judge=APPROVE,model=haiku,bound=985b9d445b08,tier=medium), ran=2026-07-17T17:56
 GOAL: Channel picker + inbox list + review card wire vào backend. E2E test PASS cho flow draft → approve → status='approved'. Design tokens frozen (U2 outcome).
 APPROACH:
   1. TDD gate: viết `tests/test_inbox_ui_e2e.py` với 3 test: (a) seed 1 PendingReply pending → GET `/api/inbox` với dev cookie → 200 + 1 row với đúng fields, (b) POST `/api/inbox/{id}/approve` → 200 + status flip trong DB, (c) POST `/api/inbox/{id}/reject` → 200 + status flip. Confirm RED (endpoints live nhưng chưa mounted).
