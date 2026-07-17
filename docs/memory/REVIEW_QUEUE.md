@@ -8,3 +8,4 @@ Revert 1 lệnh kèm sẵn (evidence commit revert riêng nếu cần).
 - [ ] 2026-07-16T23:15 · 02-Task-Phase1-Bootstrap-Fork-DrNickV4 phase-1.2 · tier=medium · review=PASS(judge=APPROVE,model=output-evaluator@haiku,bound=b05123cff661,tier=medium) · commit=598ce55 · revert: git revert 598ce55
 - [ ] 2026-07-16T23:27 · 02-Task-Phase1-Bootstrap-Fork-DrNickV4 phase-1.3 · tier=medium · review=PASS(judge=APPROVE,model=output-evaluator@haiku,bound=8eee59e6309d,tier=medium) · commit=cd6b812 · revert: git revert cd6b812
 - [ ] 2026-07-17T07:43 · 01-Task-OhanaAISeller-GD0 phase-1 · tier=medium · review=PASS(judge=APPROVE,model=output-evaluator@haiku,bound=50349fe23478,tier=medium) · commit=299f4c8 · revert: git revert 299f4c8
+- [ ] 2026-07-17T08:27 · 01-Task-OhanaAISeller-GD0 phase-3 · tier=low · review=PASS(judge=APPROVE,model=output-evaluator@haiku,bound=30857328e051,tier=low) · commit=a19dafc · revert: git revert a19dafc
