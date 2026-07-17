@@ -2,7 +2,7 @@
 
 > **Sub-project của workspace `localhost/`.** Router level 0 tại `../CLAUDE.md`.
 > Owner: Tân (dev lead) · Approver: Wyatt Ngo (fractional CTO)
-> Last updated: 2026-07-17 · Status: **SPEC 01 = 100% DONE (Phase 1–5 shipped)** — F1 wiki-RAG + F2 API Q&A (mock endpoints) + F3 policy-gate/pending_reply/inbox scaffold all landed; PRE-002/003/004 backfill deferred until source landed.
+> Last updated: 2026-07-17 · Status: **SPEC 01 + SPEC 04 = 100% DONE** — F1 wiki-RAG pipeline (⚠️ embedder THẬT chưa wire — ISSUE-016) + F2 API Q&A (mock endpoints) + F3 policy-gate/pending_reply + seller UI 4 màn (Vite SPA, Wyatt smoke browser OK 2026-07-17). PRE-002/003/004 backfill deferred until source landed.
 
 ---
 
@@ -12,7 +12,8 @@
 |---|---|
 | Project | Ohana AI Seller (GĐ0 MVP) |
 | Kind | AI copilot cho seller social-commerce VN (Zalo/FB/IG) |
-| Stack | Python 3.11 / FastAPI / PostgreSQL + pgvector / Alembic — **fork chọn lọc từ `drnickv4/`**. Redis chưa wire (Phase 3+). |
+| Stack (backend) | Python 3.11 / FastAPI / PostgreSQL + pgvector / Alembic — **fork chọn lọc từ `drnickv4/`**. Redis chưa wire (Phase 3+). |
+| Stack (web/) | Vite 8 + React 19 + TypeScript + pnpm + lucide-react (spec 04 / DEC-OHANA-01 §U1). **Node ≥ 20 bắt buộc** — system default trên máy Wyatt là v16, dùng `nvm use v23.6.1` trước mọi lệnh pnpm. Build: `cd web && pnpm install && pnpm build` → `web/dist/` (committed, chưa có CI Node step). |
 | Repo | `ohana-ai` (init) — branch `main`, phases 1–5 shipped, no remote configured |
 | Duration | 3–4 tuần, Zalo-only |
 | Priority order | safety → user trust → stability → growth (KHÔNG dùng fintech Survival Framework) |
@@ -22,12 +23,20 @@
 
 ## 2. Trạng thái hiện tại
 
-- ✅ **Spec 01 = 100% (5/5 phases DONE)** · Overall ADP 9/9 phase gate-passed (100%).
-- Spec canonical: `docs/tasks/01-Task-OhanaAISeller-GD0.md` — tất cả phase blocks ở STATUS: DONE với EVIDENCE stamped.
-- Latest STATE_HASH: `1b5cf0eabdfd` @ phase-5 close (2026-07-17).
-- **Shipped surface:**
+- ✅ **Spec 01 = 100% (5/5)** · ✅ **Spec 02 = 100% (4/4)** · ✅ **Spec 04 = 100% (3/3)** · ⏳ Spec 03 = 0/10 (4 BLOCKED). **Overall ADP 12/22 phase gate-passed (55%)** — dashboard: `bash .claude/tools/adp-status.sh`.
+- Spec canonical: `docs/tasks/01-Task-OhanaAISeller-GD0.md` (GĐ0 backend) + `docs/tasks/04-Task-OhanaAISeller-GD0_5-InboxUI.md` (GĐ0.5 UI). Mọi phase block DONE đều có EVIDENCE stamped.
+- Latest STATE_HASH: `d24a4f182225` @ spec 04 phase-P2 close (2026-07-17).
+- Branch `feat/gd0_5-inbox-ui` — **chưa merge, chưa push** (37+ commits ahead of `origin/main`).
+- Test suite: **46 passed** (`.venv/bin/python -m pytest tests/ -q -m 'not live'`), ruff sạch.
+- **Shipped surface — GĐ0.5 UI (spec 04, 2026-07-17):**
+  - P0 (medium) — `web/` Vite+React+TS scaffold, `web/src/lib/tokens.ts` (Astronixa tokens frozen), `auth/identity.py identity_from_cookie()` + `get_jwt_secret()` fail-closed, CSRF double-submit middleware trong `app/main.py`, `api/mock_auth.py` `POST /api/mock/authorize` (dev-only, `?role=admin`), gate `test_web_scaffold.py` 6/6.
+  - P1 (medium) — 3 màn seller `web/src/screens/{ChannelPicker,Inbox,ReviewCard}.tsx` + `web/src/lib/api.ts` (CSRF tập trung trong `apiFetch`), state-based routing (KHÔNG react-router), gate `test_inbox_ui_e2e.py` 4/4. **Wyatt smoke browser xác nhận chạy thật.**
+  - P2 (medium — nâng từ low theo floor rule vì chạm `auth/`) — `auth/identity.py require_admin()`, `api/admin.py` guard + mount (trước đó route này KHÔNG xác thực), `web/src/screens/AdminWikiIngest.tsx`, gate `test_admin_ui.py` 4/4.
+  - Routes mounted trong `app/main.py`: `/api/inbox` (3), `/api/mock/authorize` (dev-only), `/api/admin/wiki/ingest` (require_admin), `StaticFiles(web/dist)` ở `/` **mount CUỐI** (catch-all — mount trước sẽ che `/api/*`). `api/webhook.py` **vẫn chưa mount** (thiếu concrete `Drafter` impl).
+  - Design system: Astronixa "OHANA" Figma `JRoD28RIxiEfSEgVqDZLNJ` — 6 palette × 10 shade, Inter, CTA gradient 3-stop. **KHÔNG có semantic palette** (danger/warning/success) → intent badge dùng icon + label VI, xem DEC-OHANA-01 §U2.
+- **Shipped surface — GĐ0 backend (spec 01):**
   - Phase 2 (RISK:high) — `auth/identity.py` HS256, `db/{models,session,repos}.py` tenant-first + Alembic 0001, `retrieval/pgvector.py PgvectorRetriever(shop_scope=)` SQL-level hard filter, gate `tests/test_tenant_isolation.py` 3/3.
-  - Phase 3 (low) — `parsing/{chunk,ingest}.py`, `tools/{registry,wiki}.py`, `api/admin.py` ingest, gate `test_wiki_rag.py` 2/2 (happy + adversarial ns iso).
+  - Phase 3 (low) — `parsing/{chunk,ingest}.py`, `tools/{registry,wiki}.py`, `api/admin.py` ingest, gate `test_wiki_rag.py` 2/2 (happy + adversarial ns iso). ⚠️ **Gate chạy bằng `FakeEmbedder` inline — F1 CHƯA TỪNG chạy với embedder thật.** `agent/providers/openai_embedder.py` là dead code (import `app.config` — module chưa bao giờ tồn tại). Xem **ISSUE-016 (high)**: build `app/config.py` → wire `OpenAIEmbedder` → re-verify F1 end-to-end TRƯỚC khi tuyên bố F1 dùng được cho khách thật.
   - Phase 4 (medium) — `bridge/ohana_client.py` R1.1-extended REST client (verify=True hardcoded), `tools/ohana_read.py order_status`, gate `test_ohana_tools.py` 10/10 (MockTransport).
   - Phase 5 (RISK:high) — `agent/{policy_gate,orchestrator}.py`, `db/models.py PendingReply` + Alembic 0002, `bridge/zalo_sender.py MockZaloSender`, `api/{webhook,inbox}.py` scaffolds, gate `test_policy_gate + test_orchestrator + test_tenant_isolation` 12/12.
 - **Blocking backfill (không chặn gate — chặn real-endpoint content):**
@@ -71,7 +80,7 @@ Chuyển sang project này khi user nhắc:
 
 <!-- ADP:MANIFEST -->
 GATE_RUNNER: .venv/bin/python -m pytest -q -x
-RISK_PATHS: agent/orchestrator.py, agent/policy_gate.py, tools/registry.py, bridge/, auth/, db/migrations, api/webhook.py, api/chat.py
+RISK_PATHS: agent/orchestrator.py, agent/policy_gate.py, tools/registry.py, bridge/, auth/, db/migrations, api/webhook.py, api/inbox.py, api/admin.py
 SPEC_DIR: docs/tasks
 EXECUTOR_SKILL: drnick-coder
 CHECKPOINT_PREFIX: adp
@@ -83,7 +92,7 @@ Xem `docs/adr/hook-contract.md` + `MODEL.md` bundle export cho contract chi ti�
 
 ---
 
-## 6. Layout dự kiến (sau khi bootstrap)
+## 6. Layout thực tế (verified 2026-07-17 sau spec 04)
 
 ```
 ohana-ai/
@@ -104,19 +113,30 @@ ohana-ai/
 │   ├── wiki.py            F1 search_wiki
 │   └── ohana_read.py      F2 order/shipping/product/account
 ├── api/
-│   ├── admin.py           Wiki ingest
-│   ├── webhook.py         Zalo inbound
-│   └── chat.py            Seller chat/inbox
+│   ├── admin.py           Wiki ingest (require_admin — spec 04 P2)
+│   ├── inbox.py           Seller inbox (list/approve/reject) — KHÔNG phải chat.py
+│   ├── mock_auth.py       Dev-only authorize (guard OHANA_ENV=="dev")
+│   └── webhook.py         Zalo inbound (chưa mount — thiếu concrete Drafter)
 ├── db/
 │   ├── models.py          Tenant-first (shop_id everywhere)
 │   └── migrations/        Alembic
-├── web/                   Seller inbox UI (framework TBD)
+├── web/                   Seller UI — Vite 8 + React 19 + TS (DEC-OHANA-01 §U1)
+│   ├── src/
+│   │   ├── App.tsx          Shell + state-based screen switching (KHÔNG react-router)
+│   │   ├── lib/
+│   │   │   ├── api.ts       Typed client — apiFetch() bọc CSRF + credentials
+│   │   │   ├── intent.ts    Intent/status badge metadata (icon + label VI)
+│   │   │   └── tokens.ts    Astronixa tokens frozen → CSS vars --ohana-*
+│   │   └── screens/         ChannelPicker · Inbox · ReviewCard · AdminWikiIngest
+│   └── dist/              Build output — COMMITTED (chưa có CI Node step)
 ├── tests/
 ├── .claude/               (port từ drnickv4/ khi bootstrap)
 └── docs/
-    ├── tasks/             Spec ADP (01-Task-OhanaAISeller-GD0.md đã có)
+    ├── tasks/             Spec ADP (01 GĐ0 · 02 bootstrap · 03 backfill · 04 GĐ0.5 UI)
+    ├── decisions/         DEC-OHANA-NN (01 = web framework + brand kit)
+    ├── reviews/           Review artifact JSON (diff-bound, adp-review.sh stamp)
     ├── briefs/            Project-specific briefs
-    └── memory/            SESSION_LOG, DECISIONS, KNOWN_ISSUES
+    └── memory/            SESSION_LOG, DECISIONS, KNOWN_ISSUES, REVIEW_QUEUE
 ```
 
 ---
@@ -131,6 +151,13 @@ ohana-ai/
 🚫 Copy `db/models.py` từ DrNick — single-tenant, phải viết lại tenant-first.
 🚫 Skip TDD gate (test ĐỎ trước khi impl) cho phase RISK: high (Phase 2, Phase 5).
 🚫 Self-certify DONE mà không qua `adp-checkpoint.sh` (spine quyết, không phải LLM).
+
+🚫 **Dev/placeholder fallback (secret, embedder, sender, mock) KHÔNG gate trên `OHANA_ENV == "dev"`.** Fallback phải fail-LOUD ngoài dev. Docstring `"NOT production-safe"` KHÔNG làm nó an toàn — nó chỉ chứng minh tác giả biết mà vẫn để đó. Đã dính 2 lần trong spec 04:
+  - `auth/identity.py get_jwt_secret()` (P0) — fallback literal công khai trong git nuôi CẢ path verify → deploy quên set secret thì mint route 404 đúng nhưng attacker vẫn forge cookie với `shop_id` bất kỳ = **cross-tenant bypass** (R1.22). Mint fail-closed + verify fail-open KHÔNG phải cặp an toàn.
+  - `api/admin.py _DeterministicDevEmbedder` (P2) — hash vector giả sẽ khiến ingest trả `{"success": true, "chunks": N}` trong khi ghi vector vô nghĩa → `search_wiki` trả chunk gần-ngẫu-nhiên → **AI trả lời khách sai, không stack trace**. Silent-wrong tệ hơn crash.
+  Quy tắc: nếu một fallback chỉ đúng ở dev, gate nó trên cùng tín hiệu dev — và test cái gate đó (xem `test_jwt_secret_refuses_public_fallback`, `test_dev_embedder_refuses_to_run_outside_dev`).
+
+🚫 **Brief cho executor tự liệt kê lại scope thay vì TRÍCH spec.** Brief P0 (spec 04) bảo mount `api/inbox.py` trong khi spec §7 giao việc đó cho P1 → tới P1 thì endpoint đã live, test không RED được, TDD discipline vỡ (ISSUE-012). Brief phải quote spec block, không paraphrase — paraphrase là chỗ scope trôi.
 
 ---
 
