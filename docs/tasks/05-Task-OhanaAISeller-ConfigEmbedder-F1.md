@@ -18,7 +18,7 @@
 | Spec type | Full (14-section, Ohana-adapted — §4 priority filter, KHÔNG Survival Framework) |
 | Workflow mode | IMPLEMENT |
 | inherited_from | — (Branch B, audit-grounded 2026-07-17) |
-| RISK proposed | P0=medium · P1=medium (ứng viên high — Wyatt cân) · P2=medium — Wyatt finalize |
+| RISK finalized | P0=medium · P1=medium · P2=medium (Wyatt lock 2026-07-17, §14 Q3). No RISK_WAIVER. |
 
 > **Priority order (Ohana):** safety → user trust → stability → growth. §4 dùng bộ này.
 
@@ -368,13 +368,13 @@ adp/05 phase-p2: consolidate env-reading qua Settings   (nếu không cắt)
 
 ---
 
-## §14 — Open Questions (Wyatt lock trước execute)
+## §14 — Open Questions — LOCKED 2026-07-17 (Wyatt directive "lock q1-q4 rồi execute")
 
-- **Q1 — Embedding model.** Pin `text-embedding-3-small` (1536, no migration)? Hay Wyatt muốn `text-embedding-3-large` (3072, cần migration + reindex — scope riêng)? **Recommend small** cho GĐ0.5 (rẻ, đủ tốt, khớp column).
-- **Q2 — P2 (consolidate env-reading) làm hay cắt?** Recommend **làm** (gọn 3-chỗ-đọc-env thành 1) nhưng chấp nhận cắt nếu Wyatt thấy refactor auth rủi ro. Nếu cắt → P2 CANCELLED, spec DONE với P0+P1.
-- **Q3 — RISK tier P1.** Tôi propose medium; ứng viên high (embedder ở F1 answer path). GĐ0.5 chưa có khách thật + 2 lớp safety gate → medium đủ? Wyatt cân.
-- **Q4 — OPENAI_API_KEY cho live acceptance.** Ai cung cấp + chạy PC7? Không có key thật thì DoD #5 không tick được → ISSUE-016 giữ OPEN dù code xong. Cần Wyatt/Tân confirm có key.
+- **Q1 — Embedding model → `text-embedding-3-small` (1536).** Khớp `Embedding.embedding Vector(1536)` hiện tại → **KHÔNG Alembic migration**. Đổi model khác dim = scope riêng (§8).
+- **Q2 — P2 (consolidate env-reading) → LÀM (giữ).** Migrate `get_jwt_secret`/`db/session` env-reading qua Settings. Ràng buộc: KHÔNG đổi ngữ nghĩa fail-closed của jwt secret (§7 P2 approach).
+- **Q3 — RISK tier finalized:** P0 = **medium** (config foundation sẽ giữ secret ở P2 — over-protect dù floor mechanical là low), P1 = **medium**, P2 = **medium**. Không phase nào high: GĐ0.5 chưa có khách thật + 2 lớp safety gate (factory raise + `_DeterministicDevEmbedder` raise-outside-dev) chặn silent-wrong. Không RISK_WAIVER.
+- **Q4 — OPENAI_API_KEY cho live acceptance → handoff Wyatt/Tân.** ⚠️ **KHÔNG block code execution:** P0/P1/P2 + deterministic gate chạy không cần key thật (P1 mock `AsyncOpenAI`). CHỈ PC7 (`test_wiki_rag_live.py -m live`, DoD #5) cần real key. **ISSUE-016 giữ OPEN cho tới khi Wyatt/Tân chạy PC7 PASS** — code xong ≠ F1 verified. Executor viết `test_wiki_rag_live.py` sẵn + để lệnh chạy ở ANCHOR P1.
 
 ---
 
-*Spec 05. Ohana ADP v2.3. Chờ Wyatt duyệt + finalize RISK (Q1–Q4) trước khi execute P0.*
+*Spec 05. Ohana ADP v2.3. Q1–Q4 LOCKED 2026-07-17. RISK finalized (P0/P1/P2 = medium). Executing.*
