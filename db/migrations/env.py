@@ -1,9 +1,6 @@
-"""Alembic environment — Phase 1.3 placeholder (empty tree).
+"""Alembic environment — Phase 2 wires `db.models.Base.metadata` for tenant-first schema.
 
-At Phase 2 this file gets rewritten to target `db.models.Base.metadata` after tenant-first
-schema lands. For now, `alembic current` / `alembic upgrade head` operate on an empty tree
-so CI DB-migrate step passes without models. Reads DATABASE_URL from env directly (no
-app.config dependency until Phase 3+).
+Reads DATABASE_URL from env directly (no app.config dependency until Phase 3+).
 """
 
 from __future__ import annotations
@@ -13,10 +10,11 @@ import os
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+from db.models import Base
+
 config = context.config
 
-# No models yet — empty MetaData until Phase 2 lands db.models.Base.
-target_metadata = None
+target_metadata = Base.metadata
 
 # Env vars override the (missing) [alembic] url so `alembic current` doesn't require the .ini
 # to hardcode secrets. Falls back to a localhost DSN so the command doesn't crash in dev.

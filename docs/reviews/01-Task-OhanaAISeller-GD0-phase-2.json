@@ -1,0 +1,12 @@
+{
+  "verdict": "APPROVE",
+  "model": "output-evaluator@haiku",
+  "tier": "high",
+  "spec": "01-Task-OhanaAISeller-GD0",
+  "phase": "2",
+  "reasoning": "Phase 2 correctly implements tenant-first architecture across all three isolation layers. Step 6: db/models.py has shop_id NOT NULL on both Message and Embedding tables with proper shop-scoped indexes; Alembic 0001 creates them coherently. Step 7: auth/identity.py validates that ALL three JWT claims (sub, shop_id, role) are present and non-empty, rejects missing shop_id outright—shop_id never sourced from request body, only verified JWT. Step 8: retrieval/pgvector.py adds required shop_scope constructor parameter and executes SQL-level WHERE filters (shop_id == scope, namespace IN (...), embedding IS NOT NULL) BEFORE ORDER/LIMIT (no post-filter risk), preventing R1.22 leak where nearer out-of-scope vectors could outrank in-scope ones. The GATE (test_tenant_isolation.py) adversarially exercises all three layers: (1) SQL WHERE isolation, (2) pgvector nearer-but-cross-shop rejection, (3) JWT shop_id claim validation + rejection of missing shop_id. No hardcoded secrets, no identity-from-body patterns, clean async code, algorithm pinned to HS256 (Phase 3+ RS256 deferred appropriately). Minor non-issues: HS256 only (documented GĐ0→Phase 3+), shops/customers/conversations deferred to Phase 5 (correct scope).",
+  "confidence": "high",
+  "concerns": [],
+  "diff_sha256": "0e1e61c9f89f841e52208ec026258efbd7b62d35e013f25bf3567f7c790423e1",
+  "stamped_at": "2026-07-17T08:17"
+}
