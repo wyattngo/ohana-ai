@@ -242,7 +242,8 @@ AMENDED 2026-07-18 (tại ANCHOR P1, Wyatt chọn "chấp nhận deviation"): §
 ### Phase P2 — OPTIONAL: Consolidate env-reading (Wyatt quyết cắt/giữ)
 
 <!-- ADP:PHASE P2 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=196a4c4, gate_exit=0, duration=3s, review=PASS(judge=APPROVE,model=haiku,bound=7720c55af005,tier=medium), ran=2026-07-18T00:58
 GOAL: `get_jwt_secret()` + `db/session.py get_database_url()` đọc qua `Settings`; ZERO đổi behavior (fail-closed-outside-dev của jwt secret giữ nguyên); mọi test cũ xanh.
 APPROACH:
   1. TDD: KHÔNG viết test mới — dùng test hiện có làm regression guard. Confirm `test_jwt_secret_refuses_public_fallback` + `test_web_scaffold` + tenant-isolation xanh TRƯỚC refactor (baseline).
