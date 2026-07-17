@@ -184,12 +184,11 @@ RISK: medium (finalized Wyatt 2026-07-16 — chạm agent/ + .claude/hooks/ tron
 
 ### Phase 2 — Multi-tenancy foundation (Sub-task B) — RISK
 <!-- ADP:PHASE 2 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 GOAL: JWT verify trả `(user_id, shop_id, role)`; mọi bảng có `shop_id`; retrieval namespace filter SQL-level include shop_id; adversarial test: hàng out-of-shop bị loại.
 APPROACH: models tenant-first; Alembic 0001; auth/identity mở rộng claim; Retriever.search bắt buộc shop scope (no default).
-ALLOWED_FILES: auth/identity.py, auth/jwt.py, db/models.py, db/migrations/, retrieval/
-GATE: pytest tests/test_tenant_isolation.py -x -q
-GATE_FULL: pytest tests/test_tenant_isolation.py tests/test_retrieval.py -q
+ALLOWED_FILES: auth/, db/models.py, db/session.py, db/__init__.py, db/migrations/, retrieval/, tests/test_tenant_isolation.py, tests/conftest.py
+GATE_FULL: .venv/bin/python -m pytest tests/test_tenant_isolation.py -x -q
 RETRY: 0/3
 RISK: high (finalized Wyatt 2026-07-16 — thay đổi auth + schema behavior; per-step confirm + human review artifact required)
 <!-- /ADP -->
