@@ -15,6 +15,8 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from agent.providers.openai_embedder import OpenAIEmbedder
+from app.config import get_settings
 from auth.identity import Identity
 from parsing.ingest import PLATFORM_SHOP_ID, ingest_wiki
 
@@ -26,29 +28,21 @@ class _EmbedderProto(Protocol):
 
 
 class _DeterministicDevEmbedder:
-    """GD0.5 placeholder embedder — the live default `app/main.py` wires via `default_embedder()`
-    below, NOT a test-only fixture.
-
-    `agent/providers/openai_embedder.py` already has a real `OpenAIEmbedder`, but its
-    `__init__` unconditionally calls `app.config.get_settings()` — a module that does not
-    exist anywhere in this repo (verified: no `app/config.py` on disk or in git history). It
-    is dead/orphaned code carried over from the drnickv4 port and was never wired into
-    `app/main.py`. There is also no `OPENAI_API_KEY` configured in this dev environment.
-    Wiring the real embedder here would crash `app/main.py` at import time — taking down the
-    already-shipped P0/P1 screens along with it — for a phase whose actual scope is the admin
-    AUTH guard, not the embedding pipeline.
+    """GD0.5 placeholder embedder — only selected by `default_embedder()` below when there is no
+    `OPENAI_API_KEY` AND `OHANA_ENV=dev`. Since spec 05 Phase P1, `app/config.py` exists and
+    `agent.providers.openai_embedder.OpenAIEmbedder` is the default whenever a key IS configured
+    (any env) — this class is now the no-key dev fallback, not the unconditional default.
 
     Deterministic hash-based vectors, same shape `tests/test_wiki_rag.py`'s `FakeEmbedder`
     already uses to gate the ingest/search round-trip without a network call. This exercises
     the real storage/HTTP contract (chunk count, DB rows) for real; it is NOT representative
-    of real semantic search quality. Swap for
-    `agent.providers.openai_embedder.OpenAIEmbedder` once `app/config.py` exists and PRE-003
-    backfill lands real wiki content — flagged in the P2 ANCHOR report, not left silently as
-    the permanent embedder.
+    of real semantic search quality — `tests/test_wiki_rag_live.py` (`@pytest.mark.live`) is the
+    real-embedding acceptance check (ISSUE-016), run manually with a real key.
 
-    Refuses to run outside dev (see `embed`). A docstring saying "placeholder" does not make a
-    placeholder safe — the same reasoning that gated `auth.identity.get_jwt_secret`'s dev
-    fallback on `OHANA_ENV` applies here.
+    Refuses to run outside dev (see `embed`) — defense in depth: even if selection logic above
+    ever mis-picks this class outside dev, `embed()` itself still refuses. A docstring saying
+    "placeholder" does not make a placeholder safe — the same reasoning that gated
+    `auth.identity.get_jwt_secret`'s dev fallback on `OHANA_ENV` applies here.
     """
 
     async def embed(self, texts: list[str]) -> list[list[float]]:
@@ -57,14 +51,14 @@ class _DeterministicDevEmbedder:
         # {"success": true, "chunks": N} while writing semantically meaningless vectors, so
         # `search_wiki` would then feed near-random chunks to the drafter and the AI would
         # answer a customer confidently from the wrong source. Nobody sees a stack trace; they
-        # see a plausible wrong reply. Raising here keeps `app/main.py` importable (P0/P1
-        # screens stay up) and confines the blast radius to this one route.
+        # see a plausible wrong reply. Raising here (not in `default_embedder()` — see that
+        # function's docstring) keeps `app/main.py` importable (P0/P1 screens stay up) and
+        # confines the blast radius to this one route.
         if os.environ.get("OHANA_ENV") != "dev":
             raise RuntimeError(
                 "Wiki ingest is unavailable: no real embedder is configured "
-                "(agent/providers/openai_embedder.py needs app/config.py, which does not exist). "
-                "Refusing to write placeholder vectors outside dev — they would silently "
-                "corrupt wiki-RAG answers."
+                "(no OPENAI_API_KEY outside dev). Refusing to write placeholder vectors "
+                "outside dev — they would silently corrupt wiki-RAG answers."
             )
         out: list[list[float]] = []
         for t in texts:
@@ -76,8 +70,32 @@ class _DeterministicDevEmbedder:
 
 
 def default_embedder() -> _EmbedderProto:
-    """Factory `app/main.py` calls at wiring time — see `_DeterministicDevEmbedder` docstring
-    for why this isn't the real OpenAI embedder yet."""
+    """Factory `app/main.py` calls at wiring time (spec 05 §3 Sub-task B). Env-selecting:
+
+    - `OPENAI_API_KEY` set (any env, incl. dev) -> real `OpenAIEmbedder` (ISSUE-016 fix).
+    - No key (any env) -> `_DeterministicDevEmbedder`.
+
+    **Deviation from spec §3 B's proposed pseudocode, flagged at ANCHOR:** the spec's factory
+    sketch raises `RuntimeError` directly in this function for the "no key + not dev" branch.
+    This function deliberately does NOT do that — `app/main.py` calls `default_embedder()` at
+    MODULE IMPORT time (`app.include_router(build_admin_router(default_embedder(), ...))` runs
+    at import, before even `/health` is defined), not per-request. Raising here would crash the
+    entire app's import — every route (health check, inbox, static SPA), not just wiki ingest —
+    on any deploy that's missing `OHANA_ENV=dev` without a key configured yet. Confirmed via
+    `pytest tests/ -m 'not live'`: with the eager raise, collection itself fails
+    (`ERROR collecting tests/test_smoke.py`) before a single test runs.
+
+    That also contradicts this codebase's established convention: env gates are checked
+    PER-REQUEST, never baked in at import/build time (see `api/mock_auth.py::_is_dev_env`'s
+    docstring, same reasoning). The safety property spec actually wants — never silently write
+    placeholder vectors outside dev — is fully preserved: `_DeterministicDevEmbedder.embed()`
+    already raises on first real use outside dev (unchanged since before this phase; see its
+    docstring). This factory just doesn't ALSO raise a step earlier, at construction, where the
+    only caller happens to run at import time.
+    """
+    settings = get_settings()
+    if settings.openai_api_key:
+        return OpenAIEmbedder()
     return _DeterministicDevEmbedder()
 
 

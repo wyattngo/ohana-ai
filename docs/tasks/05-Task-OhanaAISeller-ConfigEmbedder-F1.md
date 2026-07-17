@@ -199,8 +199,10 @@ grep -nE "pydantic-settings|openai>" pyproject.toml   # Expected: cả 2 present
 ### Phase P0 — `app/config.py` Settings foundation
 
 <!-- ADP:PHASE P0 -->
-STATUS: TODO
-GOAL: `app/config.py` với `Settings(BaseSettings)` + `get_settings()` lru_cache phủ 4 field 2 provider cần; `OpenAIEmbedder()` + `OpenAIClient()` import được (hết ModuleNotFoundError); gate `test_config.py` PASS.
+STATUS: DONE
+EVIDENCE: commit=897ba1f, gate_exit=0, duration=11s, review=PASS(judge=APPROVE,model=haiku,bound=5165de25e1ed,tier=medium), ran=2026-07-17T23:40
+GOAL: `app/config.py` với `Settings(BaseSettings)` + `get_settings()` lru_cache phủ 4 field 2 provider cần; **`OpenAIEmbedder()` import được (hết ModuleNotFoundError — F1 path unblocked)**; gate `test_config.py` PASS.
+AMENDED 2026-07-17 (tại ANCHOR P0): GOAL gốc còn đòi "`OpenAIClient()` import được" — SAI. Executor tìm ra `openai_client.py:28` còn import `from app import alert_service` (module `app/alert_service.py` cũng chưa bao giờ tồn tại — ISSUE-010 đã ghi CẢ 2, audit spec 05 của tôi rớt nửa alert_service). `OpenAIClient` là LLM client (F2/F3) — **out scope spec 05** (§3 Out of scope), F1 KHÔNG cần nó. `app/config.py` unblock nửa config; alert_service là blocker riêng cho LLM-client spec sau. Executor encode đúng: `test_openai_client_import_blocked_by_unported_alert_service` là `xfail(strict=True)` — flip thành hard-fail khi ai đó port alert_service, không rot. F1 deliverable (OpenAIEmbedder import) đạt thật.
 APPROACH:
   1. TDD gate: viết `tests/test_config.py`: (a) `get_settings()` trả Settings với `openai_embed_model == "text-embedding-3-small"` default, (b) `openai_api_key` None khi env unset (không raise), (c) đọc `OPENAI_API_KEY` từ env khi set, (d) `from agent.providers.openai_embedder import OpenAIEmbedder` không raise ImportError. Confirm RED (app/config.py chưa có → import fail).
   2. Tạo `app/config.py`: `Settings(BaseSettings)` (pydantic-settings), 4 field + default `text-embedding-3-small`, `get_settings()` `@lru_cache`. `model_config = SettingsConfigDict(env_prefix="", ...)` map `OPENAI_API_KEY` → `openai_api_key`.
@@ -212,12 +214,14 @@ GATE: .venv/bin/python -m pytest tests/test_config.py -x -q
 GATE_FULL: .venv/bin/python -m pytest tests/test_config.py tests/test_wiki_rag.py tests/test_tenant_isolation.py -x -q
 RETRY: 0/3
 RISK: medium
+REVIEW: PASS ref=docs/reviews/05-Task-OhanaAISeller-ConfigEmbedder-F1-phase-P0.json
 <!-- /ADP -->
 
 ### Phase P1 — Wire OpenAIEmbedder + re-verify F1
 
 <!-- ADP:PHASE P1 -->
-STATUS: TODO
+STATUS: DONE
+EVIDENCE: commit=b4a7119, gate_exit=0, duration=3s, review=PASS(judge=APPROVE,model=haiku,bound=7cfe51e5521f,tier=medium), ran=2026-07-18T00:31
 GOAL: `default_embedder()` chọn embedder theo env (key→real, no-key+dev→fake, no-key+prod→raise); deterministic gate verify selection-logic + dim-contract; live acceptance test (`-m live`) ingest→search với real OpenAIEmbedder soạn sẵn để Wyatt/Tân chạy.
 APPROACH:
   1. TDD gate: `tests/test_embedder_wiring.py` (deterministic, KHÔNG network): (a) monkeypatch `openai_api_key` set → `default_embedder()` trả instance `OpenAIEmbedder` (mock `AsyncOpenAI` để __init__ không cần key thật), (b) no key + `OHANA_ENV=dev` → `_DeterministicDevEmbedder`, (c) no key + `OHANA_ENV` unset → raise RuntimeError, (d) `OpenAIEmbedder.embed()` với mock client trả đúng shape `list[list[float]]` dim 1536. Confirm RED (factory hiện trả fake vô điều kiện).
@@ -231,12 +235,15 @@ GATE: .venv/bin/python -m pytest tests/test_embedder_wiring.py -x -q
 GATE_FULL: .venv/bin/python -m pytest tests/ -x -q -m 'not live'
 RETRY: 0/3
 RISK: medium
+REVIEW: PASS ref=docs/reviews/05-Task-OhanaAISeller-ConfigEmbedder-F1-phase-P1.json
+AMENDED 2026-07-18 (tại ANCHOR P1, Wyatt chọn "chấp nhận deviation"): §3 B pseudocode đề xuất `default_embedder()` RAISE khi no-key+non-dev. Executor phát hiện `app/main.py:55` gọi `default_embedder()` lúc IMPORT (không per-request) → raise ở factory crash CẢ app (mọi route, không chỉ wiki-ingest). Thay bằng: factory KHÔNG raise, no-key→`_DeterministicDevEmbedder`, dựa vào `embed()` raise-outside-dev. Safety property GIỮ NGUYÊN — verify độc lập: `parsing/ingest.py` gọi `embed()` (line 19) TRƯỚC mọi `s.add`/`commit` (line 25-34) → raise short-circuit trước DB write, không partial-state. Khớp convention per-request của codebase (`api/mock_auth.py::_is_dev_env`). Reviewer + Wyatt + main-session verify đồng thuận deviation TỐT HƠN spec (crash-1-route vs crash-cả-app, seller UI vẫn sống khi thiếu key). Pseudocode §3 B vốn ghi "đề xuất — Wyatt xem", không frozen.
 <!-- /ADP -->
 
 ### Phase P2 — OPTIONAL: Consolidate env-reading (Wyatt quyết cắt/giữ)
 
 <!-- ADP:PHASE P2 -->
-STATUS: TODO
+STATUS: DONE
+EVIDENCE: commit=196a4c4, gate_exit=0, duration=3s, review=PASS(judge=APPROVE,model=haiku,bound=7720c55af005,tier=medium), ran=2026-07-18T00:58
 GOAL: `get_jwt_secret()` + `db/session.py get_database_url()` đọc qua `Settings`; ZERO đổi behavior (fail-closed-outside-dev của jwt secret giữ nguyên); mọi test cũ xanh.
 APPROACH:
   1. TDD: KHÔNG viết test mới — dùng test hiện có làm regression guard. Confirm `test_jwt_secret_refuses_public_fallback` + `test_web_scaffold` + tenant-isolation xanh TRƯỚC refactor (baseline).
@@ -250,6 +257,8 @@ GATE: .venv/bin/python -m pytest tests/test_web_scaffold.py tests/test_config.py
 GATE_FULL: .venv/bin/python -m pytest tests/ -x -q -m 'not live'
 RETRY: 0/3
 RISK: medium
+REVIEW: PASS ref=docs/reviews/05-Task-OhanaAISeller-ConfigEmbedder-F1-phase-P2.json
+NOTE 2026-07-18: Path 1 (fresh `Settings()` per call, KHÔNG `get_settings()` cached) — né cache-staleness trap trên security path `get_jwt_secret()`. Behavior-preserving: 3 nhánh fail-closed byte-identical, db default khớp `_DEFAULT_URL` cũ. Executor prove test security còn bắt được revert (xóa nhánh raise → test FAILED). Không cần chạm test file / conftest.py (brief lo path 2/3 — path 1 né được).
 <!-- /ADP -->
 
 > **P2 là OPTIONAL.** Nếu Wyatt cắt tại spec approval → mark P2 `CANCELLED` + rationale "3 chỗ đọc env hoạt động đúng, refactor rủi ro auth > lợi ích gọn". Spec vẫn DONE với P0+P1.

@@ -1,0 +1,47 @@
+{
+  "verdict": "APPROVE",
+  "model": "haiku",
+  "spec": "05-Task-OhanaAISeller-ConfigEmbedder-F1",
+  "phase": "P0",
+  "tier": "medium",
+  "rounds": 1,
+  "summary": "app/config.py Settings foundation đúng + đủ 4 field (openai_api_key None-default, openai_embed_model=text-embedding-3-small khớp dim 1536, openai_model, reasoning_models frozenset support membership). lru_cache + autouse cache_clear fixture chặn stale-cache tautology (đúng class bug ISSUE-016). Executor tìm ra gap audit bỏ sót: openai_client.py:28 import app.alert_service (chưa port) → OpenAIClient vẫn vỡ; xử trung thực bằng xfail(strict=True) thay vì tạo bừa module ngoài scope. Không scope creep. 52 passed + 1 xfail, safety gate cũ nguyên, ruff sạch.",
+  "axes": {
+    "S1_settings_correct": {
+      "score": 5,
+      "note": "4 field đúng type/default. openai_embed_model=text-embedding-3-small (1536, khớp db/models _EMBED_DIM, Q1 locked). openai_model=gpt-4o-mini (model thật, không placeholder). reasoning_models=frozenset() support `in` O(1). Không env_file (tránh dotenv stale-state trap)."
+    },
+    "S2_lru_cache_test_isolation": {
+      "score": 5,
+      "note": "@lru_cache trên get_settings(). Autouse fixture _clear_settings_cache() clear trước+sau MỖI test. Test env-mutating thêm cache_clear() explicit. Đây chính là cái chặn tautology mà cả spec sinh ra để chống. Verified độc lập."
+    },
+    "S3_scope_allowed_files": {
+      "score": 5,
+      "note": "Diff ⊆ {app/config.py, tests/test_config.py}. KHÔNG tạo app/alert_service.py (ngoài ALLOWED_FILES). KHÔNG wire embedder / sửa api/admin.py (đó là P1). Docs do main session amend, không phải executor."
+    },
+    "S4_xfail_honesty": {
+      "score": 5,
+      "note": "Verified: openai_client.py:28 `from app import alert_service`, app/alert_service.py thiếu thật (git history rỗng). xfail(strict=True) đúng semantic — XPASS sẽ FAIL suite → buộc xoá xfail khi port alert_service, không rot. Xử trung thực (report + xfail) thay vì tạo bừa module force-green. GOAL đã AMENDED bỏ OpenAIClient clause cho khớp."
+    },
+    "S5_test_quality": {
+      "score": 5,
+      "note": "7 test (6 pass + 1 xfail), không tautology. Test (d) import OpenAIEmbedder thật (exercise ISSUE-016 root cause). Test env-mapping verify empirical pydantic-settings behavior, không assume. Không mock DB."
+    },
+    "S6_regression_safety": {
+      "score": 5,
+      "note": "52 passed + 1 xfailed verified độc lập (46 baseline + 6 pass + 1 xfail). Safety gate cũ 2 passed (test_dev_embedder_refuses_to_run_outside_dev + test_jwt_secret_refuses_public_fallback) — P0 không chạm admin/auth, không regress. ruff All checks passed. Không sk- literal thật (match 'Task-Ohana' trong docstring, false positive)."
+    }
+  },
+  "findings": [],
+  "claims_verified": {
+    "four_fields_present_correct_types": true,
+    "embed_model_default_1536_match": true,
+    "lru_cache_cleared_in_tests": true,
+    "alert_service_genuinely_missing": true,
+    "xfail_strict_correct": true,
+    "no_scope_creep": true
+  },
+  "notes_for_human": "Executor tìm ra gap audit spec 05 của main session bỏ sót (alert_service half của ISSUE-010). Đây là lý do reviewer + executor độc lập có giá trị: audit người viết spec không hoàn hảo. ISSUE-010 đã update PARTIAL (config half resolved, alert_service half còn OPEN cho LLM-client spec). OpenAIClient (F2/F3) out scope spec 05.",
+  "diff_sha256": "5165de25e1edcb5a629860e364cfbefcdf74f46fd44f54de37de357dadde9de2",
+  "stamped_at": "2026-07-17T23:40"
+}

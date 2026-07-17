@@ -16,21 +16,33 @@ verification path. No new trust surface is added — a forged/missing/expired co
 identical `verify_token` rejection as a forged header token, just re-shaped as a 401 HTTP
 response instead of a raised exception.
 
-`get_jwt_secret()` reads `OHANA_JWT_SECRET` from env — same "no `app.config` coupling until
-Phase 3+" convention as `db/session.py` and `bridge/ohana_client.py`. Its literal dev
-fallback is gated on `OHANA_ENV == "dev"` and raises anywhere else; the reasoning for that
-gate (mint fail-closed + verify fail-open is not a safe pair) is on the function itself.
-Phase 3+ config wire should make this a required Settings field and drop the fallback
-entirely once staging exists.
+`get_jwt_secret()` reads `OHANA_JWT_SECRET` via `app.config.Settings` (spec 05 Phase P2 —
+migrated off the direct `os.environ.get(...)` it used before; `db/session.py` got the same
+treatment). Its literal dev fallback is gated on `OHANA_ENV == "dev"` and raises anywhere
+else; the reasoning for that gate (mint fail-closed + verify fail-open is not a safe pair) is
+on the function itself.
+
+P2 deliberately builds a FRESH `Settings()` per call instead of going through the
+`@lru_cache`d `app.config.get_settings()`. `app/main.py` calls `default_embedder()` at
+IMPORT time (spec 05 P1), which calls `get_settings()` and caches whatever env happened to
+be present at first import of that module — in a test process, that can be before any test's
+`monkeypatch.setenv/delenv` runs. Routing this security gate through that same cache would
+mean `test_jwt_secret_refuses_public_fallback_outside_dev`'s `monkeypatch.delenv(...)` could
+silently no-op against an already-cached instance, which is exactly the "gate looks green but
+isn't actually exercising the fail-closed path" failure ISSUE-016 already burned this repo on
+once (there, a mocked embedder; here, it would be a stale cache). A fresh `Settings()` has no
+shared state to go stale — it reads `os.environ` at construction, same as the pre-P2 direct
+read did on every call.
 """
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 
 import jwt
 from fastapi import Depends, HTTPException, Request
+
+from app.config import Settings
 
 _ALLOWED_ALGOS = ["HS256"]
 
@@ -73,7 +85,8 @@ def verify_token(token: str, *, secret: str) -> Identity:
 
 
 def get_jwt_secret() -> str:
-    """`OHANA_JWT_SECRET` from env. The literal dev fallback applies ONLY when
+    """`OHANA_JWT_SECRET` via a fresh `Settings()` (see module docstring for why fresh, not
+    the cached `get_settings()`). The literal dev fallback applies ONLY when
     `OHANA_ENV == "dev"`; anywhere else a missing secret raises rather than silently signing
     with a value that is public in git.
 
@@ -84,10 +97,10 @@ def get_jwt_secret() -> str:
     cross-tenant read (R1.22). Mint fail-closed + verify fail-open is not a safe pair, so the
     fallback is gated on the same dev signal as the mint route.
     """
-    secret = os.environ.get("OHANA_JWT_SECRET")
-    if secret:
-        return secret
-    if os.environ.get("OHANA_ENV") != "dev":
+    settings = Settings()
+    if settings.ohana_jwt_secret:
+        return settings.ohana_jwt_secret
+    if settings.ohana_env != "dev":
         raise RuntimeError(
             "OHANA_JWT_SECRET is required outside dev — refusing the public dev fallback."
         )

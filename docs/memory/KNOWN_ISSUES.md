@@ -96,9 +96,10 @@
 - **Origin:** phase 1.2 target-3 (drnickv4 port)
 - **Discovered:** 2026-07-16 · phase-1.2/target-3 session
 - **Severity:** low (Phase 1.2 test bằng py_compile, không runtime-import; roadmap Phase 3+)
-- **Status:** DEFERRED (Phase 3+ hoặc khi cần import providers runtime)
-- **Detail:** `agent/providers/openai_client.py` imports `from app import alert_service` + `from app.config import get_settings`. `agent/providers/openai_embedder.py` imports `from app.config import get_settings`. Ohana chưa port `app/config.py` hoặc `app/alert_service.py` (spec 02 §3 IN scope = agent/embedder/providers/retrieval/parsing/storage; app/ mở rộng defer). test_ports dùng `py_compile` (parse-only, không runtime resolve) nên GATE_MODULE + GATE_FULL cả 2 pass. Rắc rối chỉ xuất hiện khi thực tế `from agent.providers.openai_client import OpenAIClient` được gọi — sẽ ImportError.
-- **Action Phase 3+:** port `app/config.py` (pydantic-settings BaseSettings với env keys `openai_api_key`, `openai_model`, `openai_embed_model`, `reasoning_models`), port `app/alert_service.py` (fire-and-forget 429 counter — có thể stub thành no-op ở MVP).
+- **Status:** ⏳ PARTIAL — `app/config.py` half RESOLVED bởi spec 05 P0 (2026-07-17); `app/alert_service.py` half còn OPEN.
+- **Detail:** `agent/providers/openai_client.py` imports `from app import alert_service` (line 28) + `from app.config import get_settings` (line 13). `agent/providers/openai_embedder.py` imports chỉ `from app.config import get_settings`. test_ports dùng `py_compile` (parse-only) nên GATE pass dù runtime-import vỡ.
+- **Cập nhật 2026-07-17 (spec 05 P0):** `app/config.py` đã build (Settings 4 field). Hệ quả: `OpenAIEmbedder` (F1) giờ import + instantiate được — nửa embedder của ISSUE-010 + toàn bộ ISSUE-016 config-half GIẢI QUYẾT. NHƯNG `OpenAIClient` (LLM chat, F2/F3) VẪN vỡ vì `app/alert_service.py` chưa port. Encode ở `tests/test_config.py::test_openai_client_import_blocked_by_unported_alert_service` (`xfail(strict=True)` — flip hard-fail khi port xong, không rot).
+- **Action còn lại:** port `app/alert_service.py` (fire-and-forget 429 counter — stub no-op OK ở MVP) — thuộc **LLM-client wiring spec** (F2/F3, cùng lúc wire `OpenAIClient` + concrete `Drafter` + webhook mount, gated PRE-004). KHÔNG thuộc spec 05 (F1 không cần LLM client). Khi làm: xoá xfail ở test_config.py.
 
 ### ISSUE-011 — DrNick milestone/spec lore residue in ported agent/ files (audit gap)
 - **Origin:** spec 01 Phase 1 close audit (2026-07-16)

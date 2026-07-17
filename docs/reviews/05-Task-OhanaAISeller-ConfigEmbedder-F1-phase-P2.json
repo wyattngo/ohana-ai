@@ -1,0 +1,47 @@
+{
+  "verdict": "APPROVE",
+  "model": "haiku",
+  "spec": "05-Task-OhanaAISeller-ConfigEmbedder-F1",
+  "phase": "P2",
+  "tier": "medium",
+  "rounds": 1,
+  "summary": "Pure refactor gom env-reading: get_jwt_secret() + get_database_url() đọc qua Settings() FRESH (không get_settings() cached) → né hoàn toàn cache-staleness trap trên security path. 3 nhánh fail-closed byte-identical (secret có→return, no-secret+non-dev→raise, no-secret+dev→literal). db default khớp _DEFAULT_URL cũ byte-by-byte. Test security còn bắt được revert (không tautology). Diff ⊆ 3 ALLOWED_FILES, zero scope creep. Main-session verify runtime độc lập: 57 passed + 1 deselected + 1 xfail (bằng P1, zero regress) — bù cho S6 reviewer không chạy được gate.",
+  "axes": {
+    "S1_failclosed_semantics": {
+      "score": 5,
+      "note": "get_jwt_secret() 3 nhánh giữ nguyên thứ tự + điều kiện + message raise. Chỉ đổi nguồn (os.environ → Settings().ohana_jwt_secret/ohana_env). R1.22 gate nguyên vẹn."
+    },
+    "S2_cache_staleness_avoided": {
+      "score": 5,
+      "note": "auth/identity.py:14 + db/session.py:27 dùng Settings() FRESH mỗi call, KHÔNG get_settings() cached. app/config.py không có env_file → Settings() đọc os.environ lúc construct, y hệt os.environ.get() cũ. Executor prove empirical: poison cache qua import app.main rồi setenv sau → get_jwt_secret() vẫn thấy value mới, cached get_settings() stay stale."
+    },
+    "S3_security_test_meaningful": {
+      "score": 5,
+      "note": "test_jwt_secret_refuses_public_fallback_outside_dev: delenv cả 2 → get_jwt_secret() → Settings() fresh đọc env unset → nhánh raise chạy → RuntimeError. Executor prove bằng revert: xóa nhánh raise → test FAILED (DID NOT RAISE), restore → pass. Không tautology."
+    },
+    "S4_db_url_preserved": {
+      "score": 5,
+      "note": "database_url field default = 'postgresql+psycopg://ohana:ohana@localhost:5432/ohana' — verify byte-identical với _DEFAULT_URL cũ (git show HEAD:db/session.py). Không còn ref _DEFAULT_URL lơ lửng trong code (chỉ trong comment tài liệu)."
+    },
+    "S5_scope": {
+      "score": 5,
+      "note": "Diff đúng {app/config.py, auth/identity.py, db/session.py}. Path 1 (fresh Settings) né được nhu cầu chạm test file / conftest.py mà brief lo. Không chạm embedder/api.admin/LLM client."
+    },
+    "S6_regression": {
+      "score": 5,
+      "note": "Main-session verify runtime độc lập: full -m 'not live' = 57 passed + 1 deselected + 1 xfailed, bằng P1 (zero regress). ruff sạch. test_dev_embedder_refuses_to_run_outside_dev + full test_web_scaffold 7 passed. (Reviewer chấm S6=4 vì không chạy được gate — bù bằng verify này.)"
+    }
+  },
+  "findings": [],
+  "claims_verified": {
+    "failclosed_3_branches_exact": true,
+    "uses_fresh_Settings_not_cached": true,
+    "no_env_file_so_fresh_reads_env": true,
+    "security_test_catches_revert": true,
+    "db_default_matches_old": true,
+    "no_scope_creep": true
+  },
+  "notes_for_human": "P2 = phase cuối spec 05. Executor tự flag 1 process deviation trung thực: implement trước khi chụp baseline pass-count, reconstruct qua git stash sau (kết quả khớp, không hại). Path 1 (fresh Settings) là lời giải sạch cho cache-staleness — behavior-preserving + trong scope + né trap. Sau checkpoint: spec 05 = 3/3 code-complete NHƯNG ISSUE-016 vẫn OPEN cho tới DoD #5 live acceptance (Wyatt/Tân chạy pytest -m live real key).",
+  "diff_sha256": "7720c55af005d2b2b7c75b9e273169d9c285587a56723b16b087eae0b7dc327f",
+  "stamped_at": "2026-07-18T00:58"
+}
