@@ -2,7 +2,7 @@
 
 > **Sub-project của workspace `localhost/`.** Router level 0 tại `../CLAUDE.md`.
 > Owner: Tân (dev lead) · Approver: Wyatt Ngo (fractional CTO)
-> Last updated: 2026-07-17 · Status: **SPEC 01 + SPEC 04 = 100% DONE** — F1 wiki-RAG pipeline (⚠️ embedder THẬT chưa wire — ISSUE-016) + F2 API Q&A (mock endpoints) + F3 policy-gate/pending_reply + seller UI 4 màn (Vite SPA, Wyatt smoke browser OK 2026-07-17). PRE-002/003/004 backfill deferred until source landed.
+> Last updated: 2026-07-18 · Status: **SPEC 01 + 04 + 05 = 100% DONE** — F1 wiki-RAG pipeline + `OpenAIEmbedder` thật đã wire (spec 05) nhưng ⚠️ **chưa nghiệm thu live** (DoD #5 chờ `pytest -m live` real key — ISSUE-016 vẫn OPEN) + F2 API Q&A (mock endpoints) + F3 policy-gate/pending_reply + seller UI 4 màn (Vite SPA, Wyatt smoke browser OK). PRE-002/003/004 backfill deferred until source landed.
 
 ---
 
@@ -23,11 +23,16 @@
 
 ## 2. Trạng thái hiện tại
 
-- ✅ **Spec 01 = 100% (5/5)** · ✅ **Spec 02 = 100% (4/4)** · ✅ **Spec 04 = 100% (3/3)** · ⏳ Spec 03 = 0/10 (4 BLOCKED). **Overall ADP 12/22 phase gate-passed (55%)** — dashboard: `bash .claude/tools/adp-status.sh`.
+- ✅ **Spec 01 = 100% (5/5)** · ✅ **Spec 02 = 100% (4/4)** · ✅ **Spec 04 = 100% (3/3)** · ✅ **Spec 05 = 100% (3/3)** · ⏳ Spec 03 = 0/10 (4 BLOCKED). **Overall ADP 15/25 phase gate-passed (60%)** — dashboard: `bash .claude/tools/adp-status.sh`.
 - Spec canonical: `docs/tasks/01-Task-OhanaAISeller-GD0.md` (GĐ0 backend) + `docs/tasks/04-Task-OhanaAISeller-GD0_5-InboxUI.md` (GĐ0.5 UI). Mọi phase block DONE đều có EVIDENCE stamped.
-- Latest STATE_HASH: `d24a4f182225` @ spec 04 phase-P2 close (2026-07-17).
-- Branch `feat/gd0_5-inbox-ui` — **chưa merge, chưa push** (37+ commits ahead of `origin/main`).
-- Test suite: **46 passed** (`.venv/bin/python -m pytest tests/ -q -m 'not live'`), ruff sạch.
+- Latest STATE_HASH: `56a5efec8bba` @ spec 05 phase-P2 close (2026-07-18).
+- `main` — spec 04 + 05 **đã merge (`--no-ff`)**, **chưa push** origin (harness chặn `git push` — Wyatt chạy tay).
+- Test suite: **57 passed + 1 deselected (live) + 1 xfail** (`.venv/bin/python -m pytest tests/ -q -m 'not live'`), ruff sạch. `xfail` = `OpenAIClient` chưa import được (`app/alert_service.py` chưa port — ISSUE-010, out scope F1).
+- **Shipped surface — Config + Embedder thật (spec 05, 2026-07-18):**
+  - P0 (medium) — `app/config.py` `Settings(BaseSettings)` + `get_settings()` lru_cache (4 field: `openai_api_key`, `openai_embed_model="text-embedding-3-small"` 1536-dim, `openai_model`, `reasoning_models`). `OpenAIEmbedder` hết `ModuleNotFoundError`. gate `test_config.py`.
+  - P1 (medium) — `api/admin.py default_embedder()` env-selecting: key→`OpenAIEmbedder` thật; no-key→`_DeterministicDevEmbedder` (raise-outside-dev ở `embed()`, KHÔNG ở factory — vì `app/main.py` gọi lúc import). gate `test_embedder_wiring.py` (offline, inject fake client) + `test_wiki_rag_live.py` (`@pytest.mark.live`, DoD #5).
+  - P2 (medium) — `get_jwt_secret()` + `db/session.py get_database_url()` đọc qua `Settings()` **fresh mỗi call** (KHÔNG `get_settings()` cached — né cache-staleness trên security path). Fail-closed byte-identical.
+  - ⚠️ **ISSUE-016 vẫn OPEN**: code xong, F1 chưa nghiệm thu live. `pytest tests/test_wiki_rag_live.py -m live` cần real key + Wyatt/Tân chạy.
 - **Shipped surface — GĐ0.5 UI (spec 04, 2026-07-17):**
   - P0 (medium) — `web/` Vite+React+TS scaffold, `web/src/lib/tokens.ts` (Astronixa tokens frozen), `auth/identity.py identity_from_cookie()` + `get_jwt_secret()` fail-closed, CSRF double-submit middleware trong `app/main.py`, `api/mock_auth.py` `POST /api/mock/authorize` (dev-only, `?role=admin`), gate `test_web_scaffold.py` 6/6.
   - P1 (medium) — 3 màn seller `web/src/screens/{ChannelPicker,Inbox,ReviewCard}.tsx` + `web/src/lib/api.ts` (CSRF tập trung trong `apiFetch`), state-based routing (KHÔNG react-router), gate `test_inbox_ui_e2e.py` 4/4. **Wyatt smoke browser xác nhận chạy thật.**
@@ -36,7 +41,7 @@
   - Design system: Astronixa "OHANA" Figma `JRoD28RIxiEfSEgVqDZLNJ` — 6 palette × 10 shade, Inter, CTA gradient 3-stop. **KHÔNG có semantic palette** (danger/warning/success) → intent badge dùng icon + label VI, xem DEC-OHANA-01 §U2.
 - **Shipped surface — GĐ0 backend (spec 01):**
   - Phase 2 (RISK:high) — `auth/identity.py` HS256, `db/{models,session,repos}.py` tenant-first + Alembic 0001, `retrieval/pgvector.py PgvectorRetriever(shop_scope=)` SQL-level hard filter, gate `tests/test_tenant_isolation.py` 3/3.
-  - Phase 3 (low) — `parsing/{chunk,ingest}.py`, `tools/{registry,wiki}.py`, `api/admin.py` ingest, gate `test_wiki_rag.py` 2/2 (happy + adversarial ns iso). ⚠️ **Gate chạy bằng `FakeEmbedder` inline — F1 CHƯA TỪNG chạy với embedder thật.** `agent/providers/openai_embedder.py` là dead code (import `app.config` — module chưa bao giờ tồn tại). Xem **ISSUE-016 (high)**: build `app/config.py` → wire `OpenAIEmbedder` → re-verify F1 end-to-end TRƯỚC khi tuyên bố F1 dùng được cho khách thật.
+  - Phase 3 (low) — `parsing/{chunk,ingest}.py`, `tools/{registry,wiki}.py`, `api/admin.py` ingest, gate `test_wiki_rag.py` 2/2 (happy + adversarial ns iso). Gate deterministic chạy bằng `FakeEmbedder` inline. **Spec 05 đã wire `OpenAIEmbedder` thật** (`app/config.py` landed, `default_embedder()` env-selecting) — nhưng ⚠️ **F1 chưa nghiệm thu với embedding thật**: DoD #5 (`tests/test_wiki_rag_live.py -m live`, real OPENAI_API_KEY) chờ Wyatt/Tân chạy tay. **ISSUE-016 (high) vẫn OPEN** cho tới lúc đó — code-complete ≠ F1-verified.
   - Phase 4 (medium) — `bridge/ohana_client.py` R1.1-extended REST client (verify=True hardcoded), `tools/ohana_read.py order_status`, gate `test_ohana_tools.py` 10/10 (MockTransport).
   - Phase 5 (RISK:high) — `agent/{policy_gate,orchestrator}.py`, `db/models.py PendingReply` + Alembic 0002, `bridge/zalo_sender.py MockZaloSender`, `api/{webhook,inbox}.py` scaffolds, gate `test_policy_gate + test_orchestrator + test_tenant_isolation` 12/12.
 - **Blocking backfill (không chặn gate — chặn real-endpoint content):**

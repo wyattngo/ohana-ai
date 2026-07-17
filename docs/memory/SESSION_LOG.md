@@ -156,3 +156,23 @@
   2. Tick REVIEW_QUEUE entries khi Wyatt review batch xong.
   3. **ISSUE-016 trước khi tuyên bố F1 dùng được** — build `app/config.py` → wire `OpenAIEmbedder` → re-verify F1 end-to-end.
   4. Spec FE test harness (ISSUE-012) trước khi có seller thật.
+
+---
+
+## 2026-07-18 — Spec 05 Config+Embedder: 3/3 phase DONE + merge main
+
+- **Bối cảnh:** Phát hiện ISSUE-016 (high) lúc spec 04 P2 — F1 wiki-RAG tick DONE từ spec 01 Phase 3 nhưng CHƯA TỪNG chạy với embedder thật (gate dùng FakeEmbedder; `app/config.py` chưa bao giờ tồn tại → `OpenAIEmbedder` dead code). Dựng spec 05 để vá.
+- **Làm gì (3 phase, mỗi phase qua reviewer gate + adp-checkpoint):**
+  - P0 `897ba1f`/`7c54278` — `app/config.py` Settings(BaseSettings) + get_settings() lru_cache (4 field). `OpenAIEmbedder` hết ModuleNotFoundError. Executor tìm ra gap audit main-session bỏ sót: `openai_client.py:28` còn import `app.alert_service` (cũng chưa port) → `OpenAIClient` vẫn vỡ; xử bằng `xfail(strict=True)` thay vì tạo bừa module. GOAL P0 amended (bỏ clause OpenAIClient — F2/F3 out scope).
+  - P1 `b4a7119`/`2736a21` — `default_embedder()` env-selecting (key→OpenAIEmbedder thật, no-key→placeholder). Deviation an toàn Wyatt duyệt: raise dời từ factory sang `embed()` vì `app/main.py:55` gọi factory lúc import → raise ở factory crash cả app; verify độc lập embed() raise TRƯỚC DB write nên safety giữ nguyên. `test_wiki_rag_live.py` (`@pytest.mark.live`) = DoD #5.
+  - P2 `196a4c4`/`aef81d8` — gom `get_jwt_secret`/`get_database_url` đọc qua `Settings()` FRESH (không get_settings() cached) → né cache-staleness trap trên security path. Executor prove test fail-closed còn bắt được revert (xóa nhánh raise → test FAILED).
+  - Merge `a557fc2` (`--no-ff`) spec 05 → main. STATE_HASH cuối `56a5efec8bba`. ADP 15/25 (60%).
+- **Quyết định (Wyatt lock §14):** Q1 model = `text-embedding-3-small` (1536, no migration) · Q2 P2 = làm · Q3 RISK P0/P1/P2 = medium · Q4 live acceptance = Wyatt/Tân chạy tay (không block code).
+- **⚠️ ISSUE-016 VẪN OPEN:** spec 05 = code-complete, KHÔNG phải F1-verified. DoD #5 live acceptance (`pytest tests/test_wiki_rag_live.py -m live` real OPENAI_API_KEY) chưa chạy. Cả spec thiết kế để checkpoint không tự-tuyên-bố F1 dùng được — tránh lặp lại chính bẫy ISSUE-016. Đóng khi live PASS.
+- **Bài học lặp lại từ spec 04, xử đúng:** placeholder/dev-fallback phải gate env + fail-loud (đã thành anti-pattern §7). Reviewer tự động (Haiku) sau khi siết prompt tiếp tục tốt: bắt gap alert_service, đồng ý deviation an toàn, verify test không tautology.
+- **Meta sync (session này):** CLAUDE.md line 5 + §2 (status spec 05, F1 note "đã wire chờ live", shipped surface spec 05, STATE_HASH, test 57 passed) + workspace router `../CLAUDE.md`. KNOWN_ISSUES ISSUE-016 → CODE-COMPLETE (live pending), ISSUE-010 → PARTIAL.
+- **Next:**
+  1. **Wyatt/Tân chạy DoD #5 live acceptance** với real key → đóng ISSUE-016.
+  2. **Push** `main` lên origin (harness chặn `git push` cả session — Wyatt chạy tay). Toàn bộ spec 04+05 chưa lên remote.
+  3. LLM-client wiring spec (F2/F3) — port `app/alert_service.py` + wire `OpenAIClient` + concrete `Drafter` + mount webhook (gated PRE-004). Xóa xfail test_config khi xong.
+  4. Spec FE test harness (ISSUE-012) + conftest.py cleanup (ISSUE-014) trước khi có seller thật.

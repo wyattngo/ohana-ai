@@ -138,11 +138,15 @@ _Empty. Log ở đây khi port drnickv4 phát hiện bug nhưng defer fix per sp
 - **Origin:** phát hiện lúc executor P2 wire `api/admin.py` mount (spec 04) 2026-07-17
 - **Discovered:** 2026-07-17 · session spec-04-P2
 - **Severity:** **high** (không chặn GĐ0.5 vì PRE-003 chưa land, nhưng chặn F1 thật)
-- **Status:** OPEN — chờ quyết định build `app/config.py`
-- **Detail:** `agent/providers/openai_embedder.py::OpenAIEmbedder.__init__` gọi vô điều kiện `app.config.get_settings()`. **`app/config.py` không tồn tại trên disk VÀ không có trong git history** (verify: `git log --all -- app/config.py` rỗng). `OpenAIEmbedder()` → `ModuleNotFoundError: No module named 'app.config'`. Cùng vấn đề với `agent/providers/openai_client.py`. Đây là dead code port từ drnickv4, chưa bao giờ wire vào `app/main.py` — liên quan ISSUE-010 nhưng rộng hơn: không chỉ "runtime-import blocked", mà là **không có embedder chạy được nào trong repo**.
-- **Hệ quả:** spec 01 Phase 3 tick F1 wiki-RAG DONE với gate `test_wiki_rag.py` 2/2 — nhưng gate đó dùng `FakeEmbedder` inline. Nghĩa là **F1 chưa từng chạy với embedding thật một lần nào**. P2 mount `api/admin.py` phải dùng `_DeterministicDevEmbedder` (hash-based) làm live default vì không có lựa chọn khác.
-- **Đã mitigate (P2):** `_DeterministicDevEmbedder.embed()` raise `RuntimeError` nếu `OHANA_ENV != "dev"` + test `test_dev_embedder_refuses_to_run_outside_dev`. Không gate thì ingest sẽ trả `{"success": true, "chunks": N}` với vector rác → `search_wiki` trả chunk gần-ngẫu-nhiên → AI trả lời khách sai mà không ai thấy stack trace (silent-wrong, tệ hơn crash — vi phạm priority #1 "safety → user trust"). Gate đặt ở `embed()` chứ không ở `default_embedder()` để `app/main.py` vẫn import được (màn P0/P1 không chết theo).
-- **Action:** (1) Quyết build `app/config.py` (Settings: `OPENAI_API_KEY`, embed model/dim, `OHANA_JWT_SECRET`, `DATABASE_URL`) — hiện 3 chỗ tự đọc env riêng lẻ (`db/session.py`, `auth/identity.py`, `bridge/ohana_client.py`) đều ghi chú "no app.config coupling until Phase 3+". (2) Wire `OpenAIEmbedder` thật vào `default_embedder()`, xoá `_DeterministicDevEmbedder`. (3) Re-verify F1 end-to-end với embedding thật + wiki thật (PRE-003). **Phải xong TRƯỚC khi tuyên bố F1 dùng được cho khách thật.**
+- **Status:** ⏳ CODE-COMPLETE (spec 05 P0+P1+P2, 2026-07-18) — **live acceptance CHƯA chạy → vẫn OPEN**. Đóng khi DoD #5 PASS.
+- **Detail:** `agent/providers/openai_embedder.py::OpenAIEmbedder.__init__` gọi vô điều kiện `app.config.get_settings()`. `app/config.py` không tồn tại (git history rỗng). `OpenAIEmbedder()` → `ModuleNotFoundError`. Dead code port từ drnickv4.
+- **Hệ quả:** spec 01 Phase 3 tick F1 DONE với gate `test_wiki_rag.py` 2/2 — nhưng gate đó dùng `FakeEmbedder` inline. **F1 chưa từng chạy với embedding thật một lần nào.**
+- **Cập nhật 2026-07-18 (spec 05 — GIẢI QUYẾT nửa CODE):**
+  - P0: `app/config.py` Settings landed → `OpenAIEmbedder` hết ModuleNotFoundError.
+  - P1: `default_embedder()` env-selecting → có `OPENAI_API_KEY` thì dùng `OpenAIEmbedder` thật (`_DeterministicDevEmbedder` giữ lại cho dev-no-key, raise-outside-dev nguyên). `tests/test_wiki_rag_live.py` (`@pytest.mark.live`) soạn sẵn = DoD #5.
+  - P2: env-reading gom qua `Settings()` fresh.
+  - **CÒN LẠI (lý do vẫn OPEN):** `tests/test_wiki_rag_live.py -m live` CHƯA chạy với real `OPENAI_API_KEY` — không ai chứng minh F1 trả chunk đúng với embedding thật. Cả spec 05 thiết kế để checkpoint KHÔNG tự-tuyên-bố cái này (tránh lặp lại chính bẫy ISSUE-016).
+- **Action còn lại:** Wyatt/Tân chạy `OPENAI_API_KEY=sk-... DATABASE_URL=<pg> .venv/bin/python -m pytest tests/test_wiki_rag_live.py -m live -x -q` → PASS → log vào SESSION_LOG → chuyển ISSUE-016 RESOLVED + xoá cảnh báo F1 trong CLAUDE.md. **Phải xong TRƯỚC khi tuyên bố F1 dùng được cho khách thật.** (PRE-003 wiki thật là bước content riêng, không chặn live acceptance — verify được với sample doc.)
 
 ### ISSUE-015 — Ngưỡng `min 100 chars` cho wiki ingest là phỏng đoán, chưa có dữ liệu
 - **Origin:** spec 04 §3 C · reviewer P2 flag backend `min_length=1` lệch spec
