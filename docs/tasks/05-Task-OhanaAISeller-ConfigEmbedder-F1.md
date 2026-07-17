@@ -199,8 +199,9 @@ grep -nE "pydantic-settings|openai>" pyproject.toml   # Expected: cả 2 present
 ### Phase P0 — `app/config.py` Settings foundation
 
 <!-- ADP:PHASE P0 -->
-STATUS: TODO
-GOAL: `app/config.py` với `Settings(BaseSettings)` + `get_settings()` lru_cache phủ 4 field 2 provider cần; `OpenAIEmbedder()` + `OpenAIClient()` import được (hết ModuleNotFoundError); gate `test_config.py` PASS.
+STATUS: IN_PROGRESS
+GOAL: `app/config.py` với `Settings(BaseSettings)` + `get_settings()` lru_cache phủ 4 field 2 provider cần; **`OpenAIEmbedder()` import được (hết ModuleNotFoundError — F1 path unblocked)**; gate `test_config.py` PASS.
+AMENDED 2026-07-17 (tại ANCHOR P0): GOAL gốc còn đòi "`OpenAIClient()` import được" — SAI. Executor tìm ra `openai_client.py:28` còn import `from app import alert_service` (module `app/alert_service.py` cũng chưa bao giờ tồn tại — ISSUE-010 đã ghi CẢ 2, audit spec 05 của tôi rớt nửa alert_service). `OpenAIClient` là LLM client (F2/F3) — **out scope spec 05** (§3 Out of scope), F1 KHÔNG cần nó. `app/config.py` unblock nửa config; alert_service là blocker riêng cho LLM-client spec sau. Executor encode đúng: `test_openai_client_import_blocked_by_unported_alert_service` là `xfail(strict=True)` — flip thành hard-fail khi ai đó port alert_service, không rot. F1 deliverable (OpenAIEmbedder import) đạt thật.
 APPROACH:
   1. TDD gate: viết `tests/test_config.py`: (a) `get_settings()` trả Settings với `openai_embed_model == "text-embedding-3-small"` default, (b) `openai_api_key` None khi env unset (không raise), (c) đọc `OPENAI_API_KEY` từ env khi set, (d) `from agent.providers.openai_embedder import OpenAIEmbedder` không raise ImportError. Confirm RED (app/config.py chưa có → import fail).
   2. Tạo `app/config.py`: `Settings(BaseSettings)` (pydantic-settings), 4 field + default `text-embedding-3-small`, `get_settings()` `@lru_cache`. `model_config = SettingsConfigDict(env_prefix="", ...)` map `OPENAI_API_KEY` → `openai_api_key`.
@@ -212,6 +213,7 @@ GATE: .venv/bin/python -m pytest tests/test_config.py -x -q
 GATE_FULL: .venv/bin/python -m pytest tests/test_config.py tests/test_wiki_rag.py tests/test_tenant_isolation.py -x -q
 RETRY: 0/3
 RISK: medium
+REVIEW: PASS ref=docs/reviews/05-Task-OhanaAISeller-ConfigEmbedder-F1-phase-P0.json
 <!-- /ADP -->
 
 ### Phase P1 — Wire OpenAIEmbedder + re-verify F1
