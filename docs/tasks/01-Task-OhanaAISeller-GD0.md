@@ -166,7 +166,8 @@ PRE-005: Confirm channel đầu = Zalo OA (memory: recommended, chưa Wyatt lock
 
 ### Phase 1 — Bootstrap repo + port engine (Sub-task A)
 <!-- ADP:PHASE 1 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=299f4c8, gate_exit=0, duration=0s, review=PASS(judge=APPROVE,model=output-evaluator@haiku,bound=50349fe23478,tier=medium), ran=2026-07-17T07:43
 GOAL: Repo `ohana-ai` chạy được `uvicorn app.main:app`; llm_client + embedder + retrieval + parsing port sạch, test smoke pass; financial modules KHÔNG có mặt.
 APPROACH: Copy module generic; strip import ONFA/money; giữ CI + guardrail + ADP. Reviewer subagent port kèm. Delegated to spec 02 (4 sub-phases 1.0/1.1/1.2/1.3 all DONE, tagged phase-1-bootstrap).
 ALLOWED_FILES: agent/, retrieval/, parsing/, storage/, app/, tests/, .claude/, pyproject.toml, .python-version, .gitignore, .github/, alembic.ini, db/, docs/memory/, docs/reviews/, Dockerfile
