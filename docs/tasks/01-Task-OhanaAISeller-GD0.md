@@ -238,7 +238,8 @@ BLOCKED_BY: PRE-002 (real endpoint content backfill only; contract-shape gate cl
 
 ### Phase 5 — Feature 3 pipeline + policy gate (Sub-task E) — RISK
 <!-- ADP:PHASE 5 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=cc12ce3, gate_exit=0, duration=9s, review=PASS(judge=APPROVE,model=output-evaluator@haiku,bound=c31f12744402,tier=high), ran=2026-07-17T09:19
 GOAL: webhook inbound → draft (F1+F2 context) → policy_gate quyết định → auto_send HOẶC park pending_reply; seller approve async → send. Intent nhạy cảm luôn park kể cả auto.
 APPROACH: orchestrator adapt async; policy_gate risk-scored; pending_reply shape (bỏ 2FA, ownership S4 theo shop_id); inbox REST scaffold (UI framework deferred §12). PRE-004 unresolved — bridge/zalo_sender.py mock (logs, doesn't call Zalo), signature-verify path deferred. ANCHOR confirm 2026-07-17 = "proceed with phase 5" (per-step confirm collapsed into batch review at STOP boundary per Phase 2 pattern).
 ALLOWED_FILES: api/, agent/, bridge/zalo_sender.py, db/models.py, db/migrations/, db/repos.py, tests/test_policy_gate.py, tests/test_orchestrator.py, tests/conftest.py, docs/reviews/, docs/tasks/01-Task-OhanaAISeller-GD0.md
