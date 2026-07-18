@@ -66,8 +66,13 @@ jobs:
       - name: Ruff format check
         run: ruff format --check .
 
-      - name: Mypy (strict — only ported packages exist at Phase 1.3)
-        run: mypy app agent retrieval parsing storage
+      # spec 06 F2: db/bridge/tools added EXPLICITLY. mypy already reached them via
+      # follow-imports, so this does not change what is checked — it pins the intent so a
+      # future import-graph change cannot silently drop them. `api`/`auth` stay OUT: they
+      # carry 10 pre-existing FastAPI `Depends` typing errors that predate spec 06 and get
+      # their own spec — see docs/memory/KNOWN_ISSUES.md.
+      - name: Mypy (strict)
+        run: mypy app agent retrieval parsing storage db bridge tools
 
       - name: DB migrate (empty tree at Phase 1.3 — first migration lands at Phase 2)
         run: alembic upgrade head

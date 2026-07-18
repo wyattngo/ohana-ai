@@ -9,6 +9,7 @@ JWT) — spec 04 Phase P2 is that gate: `require_admin` below, mounted together 
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from typing import Protocol
 
 from fastapi import APIRouter, Depends
@@ -113,14 +114,15 @@ class WikiIngestResponse(BaseModel):
 def build_router(
     embedder: _EmbedderProto,
     session_factory: async_sessionmaker[AsyncSession],
-    admin_dep: object,  # dependency → Identity; 403s non-admin (auth.identity.require_admin)
+    # See api/inbox.py for why this is a typed callable and not `object`.
+    admin_dep: Callable[..., Identity],  # 403s non-admin (auth.identity.require_admin)
 ) -> APIRouter:
     router = APIRouter(prefix="/admin", tags=["admin"])
 
     @router.post("/wiki/ingest", response_model=WikiIngestResponse)
     async def wiki_ingest(
         req: WikiIngestRequest,
-        _admin: Identity = Depends(admin_dep),  # type: ignore[valid-type]
+        _admin: Identity = Depends(admin_dep),
     ) -> WikiIngestResponse:
         n = await ingest_wiki(
             session_factory,

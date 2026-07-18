@@ -17,8 +17,10 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import UTC, datetime
+from typing import Any, cast
 
 from sqlalchemy import select, update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import Conversation, PendingReply
@@ -133,6 +135,9 @@ class PendingReplyRepo:
                 decided_at=datetime.now(UTC),
             )
         )
-        result = await self._session.execute(stmt)
+        # `AsyncSession.execute` is typed as returning `Result`, but a DML statement always
+        # yields a `CursorResult` — that is the only variant carrying `rowcount`, and the
+        # rowcount is what tells the caller whether the reply belonged to THIS shop.
+        result = cast("CursorResult[Any]", await self._session.execute(stmt))
         await self._session.commit()
         return int(result.rowcount or 0)

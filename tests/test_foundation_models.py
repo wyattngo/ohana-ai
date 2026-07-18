@@ -37,27 +37,14 @@ def _uid(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:8]}"
 
 
-async def _fresh_engine():
-    """Engine + schema sạch. Dùng chung shape với tests/test_tenant_isolation.py."""
-    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-
-    from db.models import Base
-
-    engine = create_async_engine(DATABASE_URL, echo=False)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
-    return engine, async_sessionmaker(engine, expire_on_commit=False)
-
-
 @pytest.mark.asyncio
-async def test_core_entities_exist_and_are_tenant_scoped() -> None:
+async def test_core_entities_exist_and_are_tenant_scoped(fresh_db) -> None:
     """3 thực thể lõi tồn tại, mang shop_id NOT NULL, và query scope shop A không thấy shop B."""
     from sqlalchemy import select
 
     from db.models import Conversation, Customer, OrderDraft
 
-    engine, session_factory = await _fresh_engine()
+    engine, session_factory = await fresh_db()
     cust_a, cust_b = _uid("cust"), _uid("cust")
     conv_a, conv_b = _uid("conv"), _uid("conv")
 
@@ -104,7 +91,7 @@ async def test_core_entities_exist_and_are_tenant_scoped() -> None:
 
 
 @pytest.mark.asyncio
-async def test_cross_shop_reference_rejected_by_database() -> None:
+async def test_cross_shop_reference_rejected_by_database(fresh_db) -> None:
     """Conversation của shop A trỏ Customer của shop B ⇒ DB PHẢI từ chối (composite FK).
 
     Đây là test quan trọng nhất của F0: nó chứng minh tenant integrity được cưỡng chế ở tầng
@@ -112,7 +99,7 @@ async def test_cross_shop_reference_rejected_by_database() -> None:
     """
     from db.models import Conversation, Customer
 
-    engine, session_factory = await _fresh_engine()
+    engine, session_factory = await fresh_db()
     cust_b = _uid("cust")
 
     async with session_factory() as s:
@@ -131,14 +118,14 @@ async def test_cross_shop_reference_rejected_by_database() -> None:
 
 
 @pytest.mark.asyncio
-async def test_pending_reply_orphan_columns_now_have_fk() -> None:
+async def test_pending_reply_orphan_columns_now_have_fk(fresh_db) -> None:
     """`pending_reply.conversation_id` / `.customer_id` không còn là Text mồ côi.
 
     Trước F0, hai cột này trỏ vào hư không mà DB vẫn nhận. Sau F0, id không tồn tại ⇒ reject.
     """
     from db.models import PendingReply
 
-    engine, session_factory = await _fresh_engine()
+    engine, session_factory = await fresh_db()
 
     with pytest.raises(IntegrityError):
         async with session_factory() as s:
@@ -159,12 +146,12 @@ async def test_pending_reply_orphan_columns_now_have_fk() -> None:
 
 
 @pytest.mark.asyncio
-async def test_conversation_repo_scopes_by_shop() -> None:
+async def test_conversation_repo_scopes_by_shop(fresh_db) -> None:
     """Repo mới theo pattern `_shop_scope` của PendingReplyRepo: lọc shop_id ở tầng SQL."""
     from db.models import Conversation, Customer
     from db.repos import ConversationRepo
 
-    engine, session_factory = await _fresh_engine()
+    engine, session_factory = await fresh_db()
     cust_a, cust_b = _uid("cust"), _uid("cust")
     conv_a = _uid("conv")
 
@@ -196,14 +183,14 @@ async def test_conversation_repo_scopes_by_shop() -> None:
 
 
 @pytest.mark.asyncio
-async def test_order_draft_status_defaults_to_draft() -> None:
+async def test_order_draft_status_defaults_to_draft(fresh_db) -> None:
     """OrderDraft là chỗ chứa đơn AI trích chờ seller duyệt — mặc định phải là 'draft',
     KHÔNG phải trạng thái nào hàm ý đã xác nhận (guardrail §1.3: AI không tự chốt đơn)."""
     from sqlalchemy import select
 
     from db.models import Conversation, Customer, OrderDraft
 
-    engine, session_factory = await _fresh_engine()
+    engine, session_factory = await fresh_db()
     cust, conv, od = _uid("cust"), _uid("conv"), _uid("od")
 
     async with session_factory() as s:

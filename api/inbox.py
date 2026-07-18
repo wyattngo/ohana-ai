@@ -15,6 +15,8 @@ API idempotent and cheap; make the actual outbound send an isolated retryable st
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator, Callable
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -35,17 +37,22 @@ class PendingReplyOut(BaseModel):
 
 def build_router(
     session_factory: async_sessionmaker[AsyncSession],
-    identity_dep: object,  # FastAPI dependency callable → Identity (wired by app.main)
+    # Typed as the callable it actually is. It was `object`, which made every
+    # `Depends(identity_dep)` an arg-type error and forced four `type: ignore` comments —
+    # and those carried the WRONG code (`valid-type`), so they suppressed nothing while
+    # themselves being flagged as unused. One accurate annotation removes all of it.
+    identity_dep: Callable[..., Identity],  # FastAPI dependency → Identity (wired by app.main)
 ) -> APIRouter:
     router = APIRouter(prefix="/inbox", tags=["inbox"])
 
-    async def _session() -> AsyncSession:  # yielded per-request
+    # An async generator, not a coroutine returning a session — the annotation has to say so.
+    async def _session() -> AsyncIterator[AsyncSession]:  # yielded per-request
         async with session_factory() as s:
-            yield s  # type: ignore[misc]
+            yield s
 
     @router.get("", response_model=list[PendingReplyOut])
     async def list_pending(
-        identity: Identity = Depends(identity_dep),  # type: ignore[valid-type]
+        identity: Identity = Depends(identity_dep),
         session: AsyncSession = Depends(_session),
     ) -> list[PendingReplyOut]:
         repo = PendingReplyRepo(session, shop_scope=identity.shop_id)
@@ -66,7 +73,7 @@ def build_router(
     @router.post("/{reply_id}/approve")
     async def approve(
         reply_id: str,
-        identity: Identity = Depends(identity_dep),  # type: ignore[valid-type]
+        identity: Identity = Depends(identity_dep),
         session: AsyncSession = Depends(_session),
     ) -> dict[str, str]:
         repo = PendingReplyRepo(session, shop_scope=identity.shop_id)
@@ -82,7 +89,7 @@ def build_router(
     @router.post("/{reply_id}/reject")
     async def reject(
         reply_id: str,
-        identity: Identity = Depends(identity_dep),  # type: ignore[valid-type]
+        identity: Identity = Depends(identity_dep),
         session: AsyncSession = Depends(_session),
     ) -> dict[str, str]:
         repo = PendingReplyRepo(session, shop_scope=identity.shop_id)

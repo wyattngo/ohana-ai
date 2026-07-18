@@ -1,0 +1,42 @@
+{
+  "verdict": "APPROVE",
+  "model": "output-evaluator (haiku) — first-pass auto-verdict",
+  "phase": "F2",
+  "spec": "06-Task-OhanaAISeller-Foundation",
+  "claims_verified": [
+    {
+      "id": "C1",
+      "verified": true,
+      "evidence": "TRỌNG ĐIỂM: chuyển 2 test file sang fixture fresh_db KHÔNG xoá/nới assert nào; fixture drop_all+create_all mỗi lần gọi; teardown dispose kể cả khi test raise (trước đây dispose bị bỏ qua khi assert fail → rò pool)"
+    },
+    {
+      "id": "C2",
+      "verified": true,
+      "evidence": "FIX THẬT không phải suppress: Callable[..., Identity] khớp đúng chữ ký identity_from_cookie (auth/identity.py:110) + require_admin (:125); _session() -> AsyncIterator đúng ngữ nghĩa async generator; xoá 5 type:ignore không che lỗi nào"
+    },
+    {
+      "id": "C3",
+      "verified": true,
+      "evidence": "cast CursorResult đúng — UPDATE trả CursorResult, .rowcount chỉ có ở đó; mark_decided VẪN giữ WHERE shop_id == _shop_scope (tenant scope không rơi khi refactor)"
+    },
+    {
+      "id": "C4",
+      "verified": true,
+      "evidence": "app/alert_service.py THẬT SỰ không tồn tại (glob 0 match) → type:ignore khai đúng sự thật ISSUE-010, không phải suppress mù; module vẫn unimportable nên xfail còn hiệu lực"
+    },
+    {
+      "id": "C5",
+      "verified": true,
+      "evidence": "ci.yml mypy MỞ RỘNG (+db bridge tools), không thu hẹp; api/auth cố ý ở ngoài với lý do ghi rõ"
+    },
+    {
+      "id": "C6",
+      "verified": true,
+      "evidence": "69 test function; không test nào bị xoá/skip mới; xfail duy nhất là cái có sẵn cho ISSUE-010 (strict=True nên sẽ XPASS khi fix)"
+    }
+  ],
+  "findings": [],
+  "summary": "6/6 verified. Fixture refactor giữ nguyên mọi assertion. Sửa type ở api/ là fix thật (khai đúng callable) chứ không suppress. Tenant scope không rơi. mypy 12 -> 0, CI mypy xanh lần đầu.",
+  "diff_sha256": "12ddec027ac128c68294498e4374c81cf271fe2561ea585ab9441ff6cf478889",
+  "stamped_at": "2026-07-18T13:35"
+}

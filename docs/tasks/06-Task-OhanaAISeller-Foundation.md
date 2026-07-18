@@ -222,15 +222,18 @@ BLOCKED_BY: (đã gỡ) F0 ✅ DONE — Conversation/Customer đã tồn tại
 
 ### Phase F2 — Test/CI foundation
 <!-- ADP:PHASE F2 -->
-STATUS: TODO
-GOAL: `tests/conftest.py` cung cấp fixture DB + factory tenant-scoped dùng chung; toàn suite xanh qua conftest; mypy trong CI phủ thêm `db api auth bridge tools`; ISSUE-014 đóng.
-APPROACH: conftest dùng `DATABASE_URL` (khớp service pgvector sẵn có trong ci.yml), fixture tạo/dọn schema, factory sinh row có `shop_id`. Mở rộng dòng mypy ci.yml:70. Nếu mypy strict bới ra lỗi type trong `db api auth bridge tools` → **sửa type, KHÔNG hạ strict** (hạ strict = mất chính cái vừa mua).
-ALLOWED_FILES: tests/conftest.py, tests/, .github/workflows/ci.yml, pyproject.toml, docs/reviews/, docs/tasks/06-Task-OhanaAISeller-Foundation.md
+STATUS: IN_PROGRESS
+GOAL: `tests/conftest.py` cung cấp fixture DB dùng chung (ISSUE-014 đóng); mypy **XANH** trên `app agent retrieval parsing storage db bridge tools`; nợ type còn lại thu gọn đúng `api/`.
+APPROACH: conftest dùng `DATABASE_URL` (khớp service pgvector sẵn có trong ci.yml), fixture dựng/dọn schema. 2 test mới của spec này bỏ helper `_fresh_engine`/`_fresh` trùng lặp, chuyển sang fixture chung. **KHÔNG mass-refactor test cũ** — đổi test đang xanh chỉ để "cho đẹp" là rủi ro không được trả công.
+  **Amendment 2026-07-18 (Wyatt chọn b2).** Phát hiện khi audit: (a) `mypy` của CI **đã exit=1 trên `main`** trước spec này — 12 lỗi, không do F0/F1; (b) thêm `db bridge tools` vào lệnh mypy là **no-op** vì mypy đã follow-imports vào chúng (đó là lý do `db/repos.py` hiện ra trong CI hiện tại). Nên "mở rộng scope" một mình KHÔNG mua được gì. Thay vào đó sửa đúng 2 lỗi nằm trong scope: `db/repos.py:138` (`Result` vs `CursorResult` — của mình) và `agent/providers/openai_client.py:28` (`app.alert_service` chưa port = **ISSUE-010**, module hiện không import nổi, đã `xfail` trong test → dùng `type: ignore` CÓ ghi rõ ISSUE-010, không phải suppress mù). 10 lỗi còn lại đều ở `api/` (FastAPI `Depends` typing) → **spec riêng**, KHÔNG kéo vào F2.
+ALLOWED_FILES: tests/, .github/workflows/ci.yml, pyproject.toml, db/repos.py, agent/providers/openai_client.py, api/inbox.py, api/admin.py, docs/reviews/, docs/tasks/06-Task-OhanaAISeller-Foundation.md
+  **Amendment 2 (Wyatt duyệt b2+ — 2026-07-18).** Đính chính của tôi: b2 như khai ban đầu BẤT KHẢ THI — bỏ `api` khỏi *lệnh* mypy không loại nó khỏi *việc kiểm*, vì `app/main.py` import `api/inbox.py` nên follow-imports vẫn kéo vào (đúng cái no-op tôi vừa chỉ ra cho `db bridge tools`, chiều ngược lại). Hoá ra 10 lỗi `api/` là **một root cause**: `identity_dep: object` / `admin_dep: object` khiến mọi `Depends(...)` sai arg-type, cộng 5 `# type: ignore[valid-type]` **sai mã lỗi** (suppress không đúng thứ đang nổ, lại bị đếm là unused). Sửa đúng ~6 dòng: khai `Callable[..., Identity]` + `_session() -> AsyncIterator[AsyncSession]`, xoá ignore thừa. **Sửa type thật, KHÔNG suppress** — đúng nguyên tắc F2 đặt ra. Kết quả: mypy 12 → **0**.
 GATE: .venv/bin/python -m pytest tests/ -q -m 'not live' -x
-GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && .venv/bin/mypy app agent retrieval parsing storage db api auth bridge tools && .venv/bin/ruff check . && .venv/bin/ruff format --check .
+GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && .venv/bin/mypy app agent retrieval parsing storage db bridge tools && .venv/bin/ruff check . && .venv/bin/ruff format --check .
 RETRY: 0/3
-RISK: low (proposed — tests/ + .github/ KHÔNG giao RISK_PATHS. Nhưng nó đổi điều kiện gate của CI ⇒ Wyatt có thể nâng medium)
-BLOCKED_BY: F1
+RISK: medium (NÂNG từ low theo FLOOR RULE, không phải phán đoán: amendment b2+ kéo api/inbox.py + api/admin.py — cả hai trong RISK_PATHS — vào ALLOWED_FILES, nên floor ép ≥ medium. Spine chặn checkpoint cho tới khi sửa. Yêu cầu của medium đã thoả: ANCHOR confirm = Wyatt duyệt b2+ trước khi tôi sửa api/; reviewer gate = APPROVE 6/6 claim. Nội dung sửa vẫn là annotation thuần, không đổi hành vi runtime.)
+REVIEW: PASS ref=docs/reviews/06-F2-auto-verdict.json
+BLOCKED_BY: (đã gỡ) F1 ✅ DONE
 <!-- /ADP -->
 
 12. `tests/conftest.py` + factory; refactor test hiện có sang fixture chung **chỉ khi không đổi ý nghĩa assert**.

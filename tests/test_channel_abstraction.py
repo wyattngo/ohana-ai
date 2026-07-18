@@ -34,18 +34,6 @@ def _uid(p: str) -> str:
     return f"{p}_{uuid.uuid4().hex[:8]}"
 
 
-async def _fresh():
-    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-
-    from db.models import Base
-
-    engine = create_async_engine(DATABASE_URL, echo=False)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
-    return engine, async_sessionmaker(engine, expire_on_commit=False)
-
-
 def test_zalo_adapter_satisfies_channel_protocol() -> None:
     """Adapter Zalo phải thoả Protocol chung — và `bridge/zalo_sender.ZaloSender` giữ nguyên
     chữ ký (Spec 03c sẽ thay MockZaloSender bằng sender thật, không được vỡ contract)."""
@@ -86,7 +74,7 @@ def test_core_does_not_hardcode_channel_names() -> None:
 
 
 @pytest.mark.asyncio
-async def test_resolve_conversation_creates_and_reuses_tenant_scoped_rows() -> None:
+async def test_resolve_conversation_creates_and_reuses_tenant_scoped_rows(fresh_db) -> None:
     """`(channel, external_user_id)` → Customer + Conversation THẬT, scoped theo shop.
 
     Gọi 2 lần cùng external_user_id phải trả CÙNG id (idempotent), không đẻ row trùng —
@@ -97,7 +85,7 @@ async def test_resolve_conversation_creates_and_reuses_tenant_scoped_rows() -> N
     from channels.identity import resolve_conversation
     from db.models import Conversation, Customer
 
-    engine, session_factory = await _fresh()
+    engine, session_factory = await fresh_db()
     ext = _uid("zalo_user")
 
     async with session_factory() as s:
@@ -129,7 +117,7 @@ async def test_resolve_conversation_creates_and_reuses_tenant_scoped_rows() -> N
 
 
 @pytest.mark.asyncio
-async def test_brand_new_channel_routes_end_to_end_without_touching_core() -> None:
+async def test_brand_new_channel_routes_end_to_end_without_touching_core(fresh_db) -> None:
     """Bằng chứng MẠNH của phase này (test grep source ở trên chỉ là bằng chứng yếu).
 
     Dựng một kênh mà core chưa từng nghe tên — "fakechan" — rồi chạy hết luồng:
@@ -150,7 +138,7 @@ async def test_brand_new_channel_routes_end_to_end_without_touching_core() -> No
     from channels.base import InboundMessage
     from db.models import Conversation, Customer, PendingReply
 
-    engine, session_factory = await _fresh()
+    engine, session_factory = await fresh_db()
 
     class FakeChannel:
         """Một kênh tưởng tượng. Core chưa từng biết nó tồn tại."""
@@ -215,7 +203,7 @@ async def test_brand_new_channel_routes_end_to_end_without_touching_core() -> No
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_requires_real_conversation_id() -> None:
+async def test_orchestrator_requires_real_conversation_id(fresh_db) -> None:
     """Shim đã gỡ: `conversation_id` là tham số BẮT BUỘC.
 
     Trước F1, thiếu nó thì orchestrator âm thầm mượn `customer_id` — sau F0 việc đó
