@@ -155,7 +155,8 @@ PRE-G03: Xác nhận hệ quả xfail.
 
 ### Phase G0 — Together client + config
 <!-- ADP:PHASE G0 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=a6a0814, gate_exit=0, duration=3s, review=PASS(judge=APPROVE,model=output-evaluator (haiku) — 3 rounds,bound=164b9cf5803e,tier=medium), ran=2026-07-19T01:51
 GOAL: `TogetherClient` implement `LLMClient`, trỏ Together base_url, model + key từ `Settings`; `OpenAIClient` hết coupling module-level `alert_service` (hành vi 429 KHÔNG đổi); `tests/test_config.py` xfail cập nhật cho khớp thực tế mới.
 APPROACH: `OpenAIClient.__init__` nhận `on_rate_limit: Callable[[], Awaitable[None]] | None = None`; `_create` gọi hook nếu có rồi **re-raise nguyên** (không nuốt, không retry — giữ y hệt hành vi cũ). Bỏ `from app import alert_service` + `type: ignore` kèm nó (F2 thêm ignore đó, giờ thành thừa). `TogetherClient(OpenAIClient)` đặt `base_url="https://api.together.xyz/v1"` + `api_key=settings.together_api_key` + `model=settings.together_model`. `app/config.py` += 2 field. **KHÔNG port `alert_service`** — ISSUE-010 vẫn OPEN cho phần alerting.
 ALLOWED_FILES: agent/providers/openai_client.py, agent/providers/together_client.py, app/config.py, tests/test_together_client.py, tests/test_config.py, docs/reviews/, docs/tasks/07-Task-OhanaAISeller-GeneralChat.md
