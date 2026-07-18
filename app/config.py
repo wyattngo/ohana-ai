@@ -54,6 +54,27 @@ class Settings(BaseSettings):
     # deliberately opts models in.
     reasoning_models: frozenset[str] = frozenset()
 
+    # ---- G0 (spec 07 §7 Phase G0) — Together AI, provider cho General Chat.
+    #
+    # Together nói OpenAI-compatible wire format, nên `TogetherClient` chỉ là `OpenAIClient`
+    # trỏ base_url khác — không nhân bản 380 dòng adapter.
+
+    # `TOGETHER_API_KEY`. None khi chưa set — cùng dáng với `openai_api_key` ở trên. Giá trị
+    # KHÔNG bao giờ được log/echo/trả về qua API.
+    #
+    # ⚠️ Đã kiểm bằng test, không phải suy đoán: thiếu key thì `TogetherClient()` ném
+    # `openai.OpenAIError` ngay lúc DỰNG object, KHÔNG phải lúc gọi API (SDK openai validate
+    # credentials trong `AsyncOpenAI.__init__`). Nghĩa là G1 **không được** dựng client ở
+    # module scope của `app/main.py` — làm vậy thì deploy quên set key = app không boot nổi,
+    # thay vì chỉ endpoint chat hỏng. Dựng lazy trong request handler / dependency.
+    together_api_key: str | None = None
+
+    # `TOGETHER_MODEL`. Default = model Wyatt ký ở spec 07 §14 (PRE-G02). Có default để đổi
+    # model là sửa env chứ không sửa code — Roadmap §8.2 cấm hardcode model id ở call site.
+    # Đổi default ở đây KHÔNG kéo theo migration nào (khác `openai_embed_model`): chat model
+    # không đụng cột vector.
+    together_model: str = "Qwen/Qwen2.5-72B-Instruct-Turbo"
+
     # ---- P2 (spec 05 §7 Phase P2) — consolidate the remaining direct `os.environ.get(...)`
     # reads into this one Settings surface. Pure refactor: these three fields exist so
     # `auth/identity.py get_jwt_secret()` and `db/session.py get_database_url()` have

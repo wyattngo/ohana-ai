@@ -85,13 +85,18 @@ def test_settings_shape_satisfies_openai_client_needs() -> None:
     assert hasattr(settings.reasoning_models, "__contains__")  # supports `model in ...`
 
 
-@pytest.mark.xfail(
-    reason="ISSUE-010: app/alert_service.py never ported (openai_client.py:28 `from app import "
-    "alert_service`) — separate from app.config, out of P0 ALLOWED_FILES. Remove this xfail "
-    "once that module lands; XPASS (strict) will force that cleanup instead of it going unnoticed.",
-    strict=True,
-)
-def test_openai_client_import_blocked_by_unported_alert_service() -> None:
+def test_openai_client_imports_without_alert_service() -> None:
+    """ĐẢO CHIỀU ở spec 07 G0. Trước đó test này là `xfail(strict=True)` ghi nhận sự thật
+    ngược lại: `from app import alert_service` ở module level làm cả `openai_client` không
+    import nổi (ISSUE-010, `app/alert_service.py` chưa từng được port).
+
+    G0 đổi coupling đó thành hook tiêm vào (`on_rate_limit`), nên import giờ phải SẠCH. Giữ
+    test thay vì xoá: nó là canh gác chống ai đó vô tình thêm lại một import module-level vào
+    thứ chưa tồn tại.
+
+    ISSUE-010 **vẫn OPEN** — G0 gỡ coupling, KHÔNG port `alert_service`. Hôm nay 429 không
+    được đếm ở đâu cả trừ khi caller tiêm hook.
+    """
     from agent.providers.openai_client import OpenAIClient  # noqa: F401
 
 

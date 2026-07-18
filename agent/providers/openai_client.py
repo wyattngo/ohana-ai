@@ -6,7 +6,8 @@ Vision (FR2) + tool-calls (FR4) bám vào cùng adapter này ở M2/M4; M1 chỉ
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator
+import logging
+from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any, cast
 
 import openai
@@ -24,13 +25,9 @@ from agent.llm_client import (
     StreamToolCallDelta,
     ToolCall,
 )
-
-# ISSUE-010: `app/alert_service.py` was never ported from drnickv4, so this import fails at
-# runtime and this whole module is unimportable (tests mark it xfail). The ignore records
-# that KNOWN gap so mypy reflects reality instead of a second, separate red signal — it is
-# NOT a claim the import works. Remove it when alert_service lands and ISSUE-010 closes.
-from app import alert_service  # type: ignore[attr-defined]  # spec 34 P2 — provider-429 counter
 from app.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 def _to_openai_content(content: str | list[Any]) -> Any:
@@ -111,6 +108,7 @@ class OpenAIClient(LLMClient):
         *,
         base_url: str | None = None,
         api_key: str | None = None,
+        on_rate_limit: Callable[[], Awaitable[None]] | None = None,
     ) -> None:
         super().__init__()
         settings = get_settings()
@@ -121,17 +119,49 @@ class OpenAIClient(LLMClient):
             api_key=api_key or settings.openai_api_key, base_url=base_url
         )
         self._default_model = default_model or settings.openai_model
+        # ISSUE-010 (spec 07 G0): the 429 counter used to be a module-level import of
+        # `app.alert_service`, a module never ported from drnickv4 — so that one dead import
+        # made this ENTIRE module unimportable, which is why Together (OpenAI-compatible,
+        # otherwise a free ride on this class) was blocked.
+        # Telemetry is now injected: absent hook → no counter, same exception. ISSUE-010 stays
+        # OPEN for real alerting; G0 only removed the coupling, it did not port the service.
+        self._on_rate_limit = on_rate_limit
 
     async def _create(self, **kwargs: Any) -> Any:
-        """Single funnel for `create` that counts provider 429s for the alert signal, then
-        RE-RAISES unchanged. Fire-and-forget counter on RateLimitError; exception propagates as
-        before (no swallow, no retry). Returns what `create` returns (ChatCompletion or
-        AsyncStream); callers cast as before.
+        """Single funnel for `create` that reports provider 429s to the injected hook, then
+        RE-RAISES unchanged. Fire-and-forget: the RateLimitError propagates in EVERY path — no
+        hook, hook succeeds, or hook itself blows up. No swallow, no retry. Returns what
+        `create` returns (ChatCompletion or AsyncStream); callers cast as before.
         """
         try:
             return await self._client.chat.completions.create(**kwargs)
         except openai.RateLimitError:
-            await alert_service.record_provider_429()
+            if self._on_rate_limit is not None:
+                try:
+                    await self._on_rate_limit()
+                except Exception as hook_exc:
+                    # Telemetry NEVER gets to mask the real error. The hook is caller-supplied
+                    # code (a counter, a metrics push, a DB write) — if it times out or throws,
+                    # letting that escape would replace RateLimitError with something unrelated,
+                    # and every backoff/retry branch upstream keys on the exception TYPE. The
+                    # caller would stop seeing "rate limited" during exactly the incident where
+                    # telemetry is most likely to be failing too.
+                    #
+                    # `except Exception` (not BaseException) on purpose: KeyboardInterrupt and
+                    # asyncio.CancelledError must still propagate — a cancelled request should
+                    # die, not get downgraded into a logged warning.
+                    #
+                    # Log the exception TYPE only — not the message, not the traceback. A
+                    # traceback is actually safe (CPython prints source lines, never local
+                    # values — verified, not assumed), but the hook's exception *message* is
+                    # attacker-adjacent: a DB/HTTP client that echoes the row or body it choked
+                    # on would put customer message text into our logs, which under PDPL is
+                    # data we never consented to store there. The hook's author owns logging
+                    # their own detail; our only job is to not lose the signal or the 429.
+                    logger.warning(
+                        "on_rate_limit hook raised %s; original 429 re-raised intact",
+                        type(hook_exc).__name__,
+                    )
             raise
 
     async def stream(

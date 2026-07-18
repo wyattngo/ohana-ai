@@ -1,0 +1,39 @@
+{
+  "verdict": "APPROVE",
+  "phase": "G0",
+  "spec": "docs/tasks/07-Task-OhanaAISeller-GeneralChat.md",
+  "model": "output-evaluator (haiku) — 3 rounds",
+  "rounds": 3,
+  "checks": {
+    "W1": "Tranh chấp kỹ thuật round 2 đã phân xử: reviewer SAI về việc CPython traceback in local variables; tác giả kiểm thực nghiệm đúng (traceback chỉ in file/dòng/tên hàm/dòng lệnh nguồn, không in giá trị biến).",
+    "W2": "Rủi ro THẬT (message của exception hook chứa dữ liệu khách) đã đóng bằng logger.warning(type(hook_exc).__name__). Test test_hook_failure_log_does_not_carry_the_hook_error_message KHÔNG vacuous — fail nếu đổi lại log nguyên hook_exc.",
+    "W3": "Đánh đổi hợp lý: mất traceback, được PDPL compliance, giữ tên kiểu lỗi làm tín hiệu vận hành. Hook là code caller tiêm — caller tự log chi tiết của mình.",
+    "W4": "Không leak tham chiếu (hook_exc bị xoá cuối except block theo PEP 3110). `raise` bare nằm NGOÀI except lồng → re-raise RateLimitError GỐC, không phải hook_exc. 429 propagate nguyên vẹn ở cả 3 đường.",
+    "W5": "Không còn finding nào. Không assertion nào bị làm yếu qua 3 vòng.",
+    "W6": "GOAL đạt đủ: TogetherClient là LLMClient trỏ Together (17 dòng subclass, không nhân bản 380 dòng); key/model từ Settings; hết coupling module-level alert_service; hành vi 429 KHÔNG đổi; test_config.py xfail đã đảo chiều đúng."
+  },
+  "round1_findings_resolved": {
+    "F1_high_hook_exception_masks_429": "FIXED — try/except quanh hook, log, raise vẫn chạy. Mutation-tested.",
+    "F2_missing_hook_throws_test": "FIXED — test_rate_limit_reraised_even_when_hook_itself_throws. Mutation-tested.",
+    "F3_source_grep_not_runtime": "FIXED — test_together_base_url_reaches_the_real_client_at_runtime đọc client._client.base_url thật.",
+    "F4_weak_placeholder_key": "INVALID — reviewer nhầm: test dùng so sánh BẰNG, không grep. Reviewer đã tự rút lại ở round 3."
+  },
+  "round2_findings_resolved": {
+    "logger_exception_pii": "RESOLVED THEO HƯỚNG KHÁC — cơ chế reviewer mô tả sai (đã kiểm thực nghiệm), nhưng rủi ro lân cận có thật và đã vá: log tên kiểu lỗi thay vì message/traceback."
+  },
+  "author_self_reported": [
+    "Test repr ban đầu VACUOUS (tiêm fake client ⇒ key không bao giờ chạm object) — tự phát hiện và sửa thành dựng AsyncOpenAI thật, thêm assert key ĐÃ tới object trước khi assert repr sạch.",
+    "Comment trong app/config.py khai sai rằng thiếu key sẽ hỏng lúc GỌI — thực tế hỏng lúc DỰNG (openai SDK validate credentials trong __init__). Đã sửa comment + khoá sự thật bằng test_missing_key_fails_at_construction_not_at_call. Hệ quả cho G1: KHÔNG được dựng TogetherClient ở module scope app/main.py."
+  ],
+  "mutation_testing": [
+    "Nuốt 429 (return None thay raise) → 2 test đỏ ✓",
+    "Gỡ try/except quanh hook → test_rate_limit_reraised_even_when_hook_itself_throws đỏ ✓",
+    "Log nguyên hook_exc thay type name → test_hook_failure_log_does_not_carry_the_hook_error_message đỏ ✓"
+  ],
+  "gate_full": "80 passed, 1 deselected (live) · mypy 0 lỗi / 37 files · ruff check + format sạch",
+  "issue_010_status": "VẪN OPEN — G0 chỉ gỡ coupling, KHÔNG port app/alert_service.py. Hôm nay 429 không được đếm ở đâu trừ khi caller tiêm hook. Đây là capability regression spec chấp nhận có ý thức.",
+  "new_findings": [],
+  "summary": "Round 1 (4 finding) + round 2 (1 finding) đã xử lý hết; 1 finding của reviewer bị bác bỏ bằng kiểm chứng thực nghiệm, 1 finding được vá theo hướng đúng hơn hướng reviewer mô tả. 3 bất biến chính đều mutation-tested. GOAL G0 đạt đủ. APPROVE.",
+  "diff_sha256": "164b9cf5803ea42a7b9892adc9c20b526a1d912ff553033eba1e8755aa2defcf",
+  "stamped_at": "2026-07-19T01:51"
+}
