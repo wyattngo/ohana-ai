@@ -2,7 +2,7 @@
 
 > Nơi log deferred bugs / assumption breaks / waivers / open PRE checks. Update mỗi sub-phase (ghi mới, KHÔNG xoá cũ — chỉ đổi STATUS + gắn resolved commit SHA).
 >
-> Last updated: 2026-07-17 · Status: Spec 01 = 100% DONE. Contract gates all GREEN via mocks/fixtures; PRE-002/003/004 backfill deferred until source landed. Newly-tracked deferred items from Phase 2–5: HS256+exp/aud/iss upgrade (auth), send-on-approve worker (F3), shops/customers/conversations tables, wider F2 read-tools.
+> Last updated: 2026-07-18 · Status: Spec 01/02/04/05/06 DONE (ADP 18/28). mypy 0 lỗi (F2 đưa 12→0 — CI mypy trước đó ĐỎ âm thầm trên main). Contract gates all GREEN via mocks/fixtures; PRE-002/003/004 backfill deferred until source landed. Newly-tracked deferred items from Phase 2–5: HS256+exp/aud/iss upgrade (auth), send-on-approve worker (F3), shops/customers/conversations tables, wider F2 read-tools.
 
 ---
 
@@ -134,7 +134,16 @@ _Empty. Log ở đây khi port drnickv4 phát hiện bug nhưng defer fix per sp
 - **Why not blocking:** DoD §2.5 chỉ yêu cầu backend flow `draft → approve → status flip` (đã đạt, 42/42 test xanh). GĐ0.5 = local demo Wyatt/Tân, chưa có seller thật. Thêm harness = dep mới (`vitest`/`playwright`) + config mới → phase riêng đúng nghĩa, không nhét vào P1.
 - **Action:** (1) Wyatt/Tân smoke browser thủ công theo spec 04 §10 PC6 TRƯỚC khi merge `feat/gd0_5-inbox-ui` — session P1 không có browser harness nên KHÔNG verify được rendering/click-through/polling/`document.cookie` parsing. (2) Mở spec riêng cho FE test harness: Vitest+RTL (nhẹ, test component) hoặc Playwright (nặng, test click-through thật) — quyết lúc scope. Ưu tiên trước khi có seller thật (spec 05 real login).
 
-### ISSUE-016 — Embedder THẬT là dead code: `app/config.py` chưa bao giờ tồn tại → F1 wiki-RAG chưa từng chạy với embedding thật
+### ISSUE-017 — `channels/identity.py`: thiếu unique constraint → race có thể tạo 2 Conversation cho 1 khách
+- **Origin:** spec 06 F1 (khai KNOWN UNCOVERED ngay trong code + review artifact `docs/reviews/06-F1-auto-verdict.json`)
+- **Discovered:** 2026-07-18 · session spec-06-F1
+- **Severity:** medium (chưa chạm được, nhưng chạm được ngay khi webhook mount)
+- **Status:** OPEN
+- **Detail:** `resolve_conversation()` upsert `Customer` bằng `ON CONFLICT DO NOTHING` trên `uq_customers_shop_chan_ext` (race-safe), NHƯNG phần `Conversation` là **select-then-insert** và bảng `conversations` KHÔNG có unique trên `(shop_id, customer_id, channel)`. Hai tin nhắn đến đồng thời từ cùng một khách → 2 Conversation.
+- **Why not blocking now:** `api/webhook.py` **chưa mount** trong `app/main.py` (thiếu concrete `Drafter`), nên không luồng nào gọi hàm này đồng thời. Đây là lỗi TIỀM ẨN, không phải đang chảy máu.
+- **Action:** Thêm Alembic migration `UNIQUE (shop_id, customer_id, channel)` trên `conversations` + đổi phần Conversation sang cùng shape upsert như Customer. **BẮT BUỘC làm TRƯỚC khi Spec 03c mount webhook** — đừng dựa vào "chưa xảy ra bao giờ".
+
+### ISSUE-016 — F1 wiki-RAG chưa từng chạy với embedding thật (⚠️ ĐỔI BẢN CHẤT 2026-07-18: provider chuyển sang Together e5)
 - **Origin:** phát hiện lúc executor P2 wire `api/admin.py` mount (spec 04) 2026-07-17
 - **Discovered:** 2026-07-17 · session spec-04-P2
 - **Severity:** **high** (không chặn GĐ0.5 vì PRE-003 chưa land, nhưng chặn F1 thật)
@@ -156,12 +165,12 @@ _Empty. Log ở đây khi port drnickv4 phát hiện bug nhưng defer fix per sp
 - **Detail:** Spec ghi textarea "min 100 chars". Wyatt/main session chốt đó là **gợi ý UX client-side**, backend giữ `min_length=1`. Lý do: caller là admin đã xác thực (vốn ingest được nội dung tuỳ ý ≥100 ký tự) → ép 100 server-side không chặn rác, chỉ chặn rác ngắn, đổi lại từ chối fact hợp lệ ngắn (`"Freeship đơn từ 400k."` = 21 ký tự).
 - **Action:** Khi PRE-003 land wiki thật, đo độ dài doc điển hình → quyết có cần ngưỡng server-side không, và nếu có thì bao nhiêu. Nếu vẫn không cần → xoá `MIN_TEXT_LENGTH` client cho khỏi gây nhầm.
 
-### ISSUE-014 — Test suite không có cleanup tập trung; row rò rỉ khi test crash giữa chừng
+### ISSUE-014 — ✅ RESOLVED (spec 06 F2, commit 95ad405) — Test suite không có cleanup tập trung
 - **Origin:** phát hiện lúc smoke browser P1 (Wyatt xác nhận 3 màn chạy) 2026-07-17
 - **Discovered:** 2026-07-17 · session spec-04-P1 · tìm thấy 1 row mồ côi `shop_id='shop_a', status='pending', draft="I'm not sure."` trong `pending_reply` trước khi chạy suite
 - **Severity:** low
-- **Status:** OPEN
-- **Detail:** Không có `tests/conftest.py`, không có autouse cleanup. Chỉ `tests/test_inbox_ui_e2e.py` có teardown fixture (`seeded_replies`, executor P1 tự thêm sau khi tự bắt được bug). Các file dùng `shop_a`/`shop_b` (`test_orchestrator.py`, `test_policy_gate.py`, `test_tenant_isolation.py`, `test_ohana_tools.py`, `test_wiki_rag.py`) không dọn. Suite chạy trọn vẹn thì rows về 0, nhưng test crash/interrupt giữa chừng sẽ để lại row.
+- **Status:** ✅ **RESOLVED 2026-07-18** — `tests/conftest.py` đã land (spec 06 F2). Fixture `fresh_db` drop+create schema mỗi lần gọi, và **dispose engine trong teardown kể cả khi test raise** (trước đây `await engine.dispose()` cuối mỗi test bị bỏ qua hoàn toàn khi assert fail giữa chừng → rò pool mỗi lần fail). Test DB mới dùng fixture; test cũ **cố ý KHÔNG mass-refactor** (đổi test đang xanh chỉ để cho đẹp = rủi ro không được trả công) — chúng migrate dần khi có lý do khác để đụng vào.
+- **Detail (lịch sử):** Không có `tests/conftest.py`, không có autouse cleanup. Chỉ `tests/test_inbox_ui_e2e.py` có teardown fixture (`seeded_replies`, executor P1 tự thêm sau khi tự bắt được bug). Các file dùng `shop_a`/`shop_b` (`test_orchestrator.py`, `test_policy_gate.py`, `test_tenant_isolation.py`, `test_ohana_tools.py`, `test_wiki_rag.py`) không dọn. Suite chạy trọn vẹn thì rows về 0, nhưng test crash/interrupt giữa chừng sẽ để lại row.
 - **Why not blocking:** Suite hiện xanh 42/42, rows=0 sau full run. Row rò rỉ **không làm vỡ test nào** vì tenant isolation che: inbox của `fixture-shop-001` không bao giờ thấy row `shop_a`. ⚠️ Chính điều này là rủi ro thật — feature (tenant scope) đang che giấu test pollution, nên lỗi chỉ lộ khi 2 test tình cờ dùng chung `shop_id` (đúng cái đã xảy ra ở P1 với `fixture-shop-001`).
 - **Action:** Thêm `tests/conftest.py` với autouse fixture truncate `pending_reply` (+ các bảng test khác) giữa các test, hoặc transaction-rollback pattern. Gộp vào spec FE test harness (ISSUE-012) hoặc làm riêng. Est. 30 phút.
 

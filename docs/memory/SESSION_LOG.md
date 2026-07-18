@@ -176,3 +176,30 @@
   2. **Push** `main` lên origin (harness chặn `git push` cả session — Wyatt chạy tay). Toàn bộ spec 04+05 chưa lên remote.
   3. LLM-client wiring spec (F2/F3) — port `app/alert_service.py` + wire `OpenAIClient` + concrete `Drafter` + mount webhook (gated PRE-004). Xóa xfail test_config khi xong.
   4. Spec FE test harness (ISSUE-012) + conftest.py cleanup (ISSUE-014) trước khi có seller thật.
+
+---
+
+## 2026-07-18 · Session: spec 06 Foundation (F0+F1+F2) + ADR PRE-007 + Roadmap v4
+
+- **Bối cảnh:** bắt đầu bằng audit Spec 03 → phát hiện Spec 03 đứng trên data-model **không tồn tại**. Sinh spec 06 Foundation để vá, chạy trọn 3 phase trong session.
+- **Spec 06 = 3/3 DONE** (ADP 18/28, 64%; STATE_HASH `edb8b40d651e`):
+  - **F0** (high, `7f786df`) — `Customer`/`Conversation`/`OrderDraft` + Alembic 0003 + **composite FK `(shop_id, …)`** chặn cross-shop ở tầng DB + `ConversationRepo`. Identity type = TEXT (PRE-F01 Wyatt ký).
+  - **F1** (medium, `bbf866b`) — `channels/` abstraction + webhook generic + **gỡ shim `conversation_id or customer_id`**.
+  - **F2** (medium, `95ad405`) — `tests/conftest.py` (đóng ISSUE-014) + **mypy 12 → 0**.
+- **Phát hiện đáng giá nhất:** `PendingReply.conversation_id`/`.customer_id` là **cột mồ côi** (Text, không FK, không bảng đằng sau) → Spec 03 migration `0005`/`0006` sẽ **FAIL khi apply** (0006 ALTER một bảng chưa từng CREATE). Cộng type-mismatch `UUID` vs `TEXT`. Spec 03 §8 **chưa sửa** — xem "Next".
+- **Cũng phát hiện:** **CI mypy đã ĐỎ sẵn trên `main`** (12 lỗi, verify bằng cách stash diff ra) — không ai biết. F2 đưa về 0 bằng fix thật (`identity_dep: object` → `Callable[..., Identity]`), không suppress.
+- **ADR PRE-007** (`docs/adr/2026-07-18-hosting-region.md`) — **PROPOSED, chưa ký**. Provider chốt = **Together AI open-weight (LLM + embedding)**. Ràng buộc pháp lý: PDPL hiệu lực 1/1/2026, TIA 60 ngày, localization overlay, **two-data-plane VN/US** (Ohana là công ty Mỹ — US entity KHÔNG miễn PDPL, luật theo chủ thể dữ liệu).
+- **Roadmap → v4:** re-prioritize **General Chat (Together) ship TRƯỚC** (chỉ cần Together key), tính năng chính chờ platform API từ Tân.
+- **Sai sót của tôi trong session (ghi để không lặp):**
+  1. `DROP SCHEMA public CASCADE` trên DB dev → xoá luôn extension `vector`, user `ohana` không tạo lại được. Đã khôi phục qua superuser; verify DrNick không bị đụng (2 database tách biệt cùng container `drnickv4-db-1`).
+  2. `.env.example` bản đầu dùng placeholder `<...>` cho secret → **truthy**, khiến `default_embedder()` chọn OpenAI thật với key rác, và `REASONING_MODELS=` rỗng làm `Settings()` RAISE (app không khởi động được). Đã đổi convention: secret để **RỖNG**, gợi ý format trong comment.
+  3. Khẳng định sai rằng bỏ `api` khỏi lệnh mypy sẽ loại nó khỏi việc kiểm — quên follow-imports.
+  4. Quên nêu floor rule khi mở scope F2 sang `api/inbox.py` → spine chặn checkpoint, phải nâng low→medium.
+- **Spine chặn 3 lần, cả 3 đều đúng:** thiếu dòng `REVIEW:`; diff đổi sau stamp; floor rule. Không lần nào tôi bypass.
+- **Meta sync (session này):** CLAUDE.md §2 + §6 (sửa drift `providers/` top-level KHÔNG tồn tại → thật ra `agent/providers/`; thêm `channels/`, `.env.example`), workspace router, KNOWN_ISSUES (014 RESOLVED · 016 đổi bản chất · **017 mới**), SESSION_LOG.
+- **Next:**
+  1. **Wyatt ký ADR PRE-007** (deployment-region + legal) → mở khoá F1-embedder-swap sang Together e5 (1536→1024, cần migration + re-embed + ISSUE-016 chạy lại trên e5).
+  2. **Sửa Spec 03 §8**: DDL `UUID` → `TEXT`; migration `0006` giờ THỪA (F0 đã tạo `conversations` kèm `last_inbound_at`/`window_status`).
+  3. **ISSUE-017** — thêm unique `(shop_id, customer_id, channel)` **trước khi** Spec 03c mount webhook.
+  4. **Push** `main` (ahead 6, chưa lên origin). Cân nhắc sửa spec 06 §0 `Branch:` cho khớp thực tế.
+  5. General Chat (Together key đã có) — spec riêng, ưu tiên 1 theo Roadmap v4 §3.0.
