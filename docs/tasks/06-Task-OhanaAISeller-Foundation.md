@@ -164,7 +164,8 @@ PRE-F04: spec này KHÔNG bị ADR PRE-007 chặn — xác nhận không chạm 
 
 ### Phase F0 — Core data model + Alembic 0003
 <!-- ADP:PHASE F0 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=7f786df, gate_exit=0, duration=4s, review=PASS(judge=APPROVE,model=output-evaluator (haiku) — first-pass auto-verdict,bound=f4bc655d650b,tier=high), ran=2026-07-18T12:58
 GOAL: `Conversation` + `Customer` + `OrderDraft` tồn tại, tenant-first (`shop_id Text NOT NULL` + index dẫn đầu `shop_id`); Alembic 0003 apply + downgrade sạch; `PendingReply.conversation_id`/`.customer_id` có FK; test cross-shop rejection PASS trên từng bảng mới; **FK composite (shop_id, …) chặn tham chiếu chéo shop ở tầng DB**.
 APPROACH: Thêm 3 model theo đúng pattern `Message`/`PendingReply` (Text id, shop_id Text NOT NULL, created_at server_default now(), Index dẫn đầu shop_id). Identity type = **Text** theo PRE-F01 (KHÔNG UUID — tránh migrate 3 bảng hiện có + JWT + repos). Alembic 0003 `down_revision="0002"`, có `downgrade()` thật. FK cho 2 cột mồ côi theo kết quả PRE-F02 (rỗng → FK thẳng; có data → backfill trước). Repo mới theo pattern `_shop_scope` của `PendingReplyRepo`.
 ALLOWED_FILES: db/models.py, db/repos.py, db/migrations/versions/0003_foundation_entities.py, tests/test_foundation_models.py, tests/test_inbox_ui_e2e.py, tests/test_orchestrator.py, docs/reviews/, docs/tasks/06-Task-OhanaAISeller-Foundation.md
