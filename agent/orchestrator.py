@@ -5,12 +5,20 @@ LLM adapter later) → `policy_gate.decide` → either `sender.send(...)` or a p
 `PendingReply` row scoped to `shop_id`. The two branches are the ONLY outcomes; there is no
 side channel that sends without gating.
 
+Identity contract (spec 06 F1 — was a shim before):
+  - `customer_id` and `conversation_id` are OURS, already resolved. This module never sees
+    a platform's id format. `channels.identity.resolve_conversation` maps
+    `(channel, external_user_id)` → our ids; the caller does that before calling here.
+  - `conversation_id` is REQUIRED. It used to default to `customer_id` when the caller had
+    no conversation model, which was survivable only while `conversation_id` was a bare
+    Text column referencing nothing. Spec 06 F0 gave it a composite foreign key, so that
+    fallback would now write a customer id into a conversation column and be rejected by
+    Postgres at runtime. Requiring the argument turns a runtime FK violation into a caller
+    error at the boundary.
+
 Explicitly deferred to Phase 5+:
   - Real F1/F2 context enrichment — the `Drafter` protocol receives just the raw message
     for GĐ0. Layering wiki + API context happens in the `Drafter` implementation, not here.
-  - Conversation/customer normalization — `customer_id` and `conversation_id` are opaque
-    strings (defaults to customer_id when the caller doesn't have a real conversation model
-    yet). Wiring these into a normalized schema is deferred to when shops/customers land.
   - Auth wire — the caller MUST supply `shop_id` from `auth.identity.Identity.shop_id`.
     This module cannot verify it; if the caller passes an unverified value, that's an S1
     breach caught upstream (webhook layer / API dependency).
@@ -50,12 +58,12 @@ async def receive_and_draft(
     *,
     shop_id: str,
     customer_id: str,
+    conversation_id: str,
     message: str,
     drafter: Drafter,
     sender: ZaloSender,
     session_factory: async_sessionmaker[AsyncSession],
     shop_auto_enabled_intents: frozenset[str],
-    conversation_id: str | None = None,
 ) -> ReceiveOutcome:
     """Draft → decide → send OR park. Returns the outcome for the caller to log/telemetrize.
 
@@ -86,7 +94,7 @@ async def receive_and_draft(
         repo = PendingReplyRepo(session, shop_scope=shop_id)
         await repo.create(
             reply_id=reply_id,
-            conversation_id=conversation_id or customer_id,
+            conversation_id=conversation_id,
             customer_id=customer_id,
             draft_text=draft.text,
             intent=draft.intent,

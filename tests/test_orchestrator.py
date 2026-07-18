@@ -168,9 +168,14 @@ async def test_safe_high_confidence_auto_enabled_sends() -> None:
     )
     sender = _FakeSender()
 
+    # No `_seed_parents` here, unlike the park tests: the auto_send path writes NO row, so
+    # nothing references these ids and no foreign key is exercised. `conversation_id` is
+    # still required (spec 06 F1 removed the `or customer_id` shim) — the caller always
+    # knows it, whether or not this particular branch persists anything.
     outcome = await receive_and_draft(
         shop_id="shop_a",
         customer_id="cust1",
+        conversation_id="conv1",
         message="What are your hours?",
         drafter=drafter,
         sender=sender,

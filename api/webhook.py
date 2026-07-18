@@ -1,82 +1,107 @@
-"""Zalo OA inbound webhook scaffold (spec 01 §3 Sub-task E, step 17).
+"""Inbound webhook — channel-agnostic (spec 06 Phase F1; was platform-specific in spec 01).
 
-PRE-004 unresolved — this scaffold accepts a path-scoped `oa_id` (per-shop URL that our
-Zalo gateway configures) and a JSON body carrying the inbound message. When PRE-004 lands:
+Route shape is `/webhook/{channel}/{external_id}`: `{channel}` selects an adapter from the
+registry the caller passes in, `{external_id}` is the per-shop endpoint id that platform's
+gateway was configured with. Nothing in this module knows which platforms exist — adding one
+means registering an adapter, not editing request handling (roadmap §5.2.1).
 
-  1. Verify the Zalo signature (HMAC over the raw body with the OA's shared secret).
-  2. Look up `oa_id -> shop_id` in a shops table (currently a stub `_oa_to_shop`).
-  3. Enforce the 8-msg / 48-hour reactive window per shop.
+Still NOT mounted in `app/main.py`: there is no concrete `Drafter` implementation yet, and
+mounting would expose a path that reaches the draft engine. `enabled=False` is a second,
+independent guard so even a mounted router refuses by default until PRE-004 clears.
 
-Until then this endpoint is disabled by default in prod (see the guard in `build_router`)
-so an unauthenticated `POST /webhook/zalo/{oa_id}` cannot enqueue a draft. Tests build the
-router with `enabled=True`; the gate for phase 5 does NOT exercise this HTTP surface (the
-orchestrator is tested directly).
+`shop_id` is DERIVED from `(channel, external_id)` via lookup. The request body is untrusted
+and MUST NOT supply a shop_id claim (R1.1 extended) — note the body is handed straight to the
+adapter's parser, which only ever reads message content, never tenancy.
 
-`shop_id` is DERIVED from `oa_id` via lookup — the request body is untrusted and MUST NOT
-supply a shop_id claim (R1.1 extended).
+When PRE-004 lands: verify the platform signature over the RAW body before parsing.
 """
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Any, Protocol
 
-from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Body, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from agent.orchestrator import ReceiveOutcome, receive_and_draft
-from bridge.zalo_sender import ZaloSender
+from channels.base import InboundChannel, OutboundChannel
+from channels.identity import resolve_conversation
 
 
 class _Drafter(Protocol):
     async def draft(self, *, shop_id: str, customer_id: str, message: str): ...  # type: ignore[no-untyped-def]  # returns _Draft
 
 
-class ZaloInboundBody(BaseModel):
-    customer_id: str = Field(..., min_length=1)
-    message: str = Field(..., min_length=1)
+class _Channel(InboundChannel, OutboundChannel, Protocol):
+    """A channel usable on this route must both parse inbound and send outbound."""
 
 
 def build_router(
     drafter: _Drafter,
-    sender: ZaloSender,
     session_factory: async_sessionmaker[AsyncSession],
     *,
-    oa_to_shop: dict[str, str],
+    channels: dict[str, _Channel],
+    endpoint_to_shop: dict[tuple[str, str], str],
     shop_auto_enabled: dict[str, frozenset[str]],
     enabled: bool = False,
 ) -> APIRouter:
-    """Assemble the webhook router.
+    """Assemble the inbound router.
 
-    `oa_to_shop`: temporary in-memory map — a `shops` table lookup lands with the wider
-    schema. `shop_auto_enabled`: per-shop opt-in intent sets (defaults to empty frozenset
-    when a shop hasn't been configured, so an unrecognized shop always parks).
-    `enabled=False` returns 503 on every request — a defensive default so a misconfigured
-    prod deploy can't accept webhooks before PRE-004 clears.
+    `channels`: channel name → adapter. This mapping is the ONLY place platform names live.
+    `endpoint_to_shop`: `(channel, external_id)` → shop_id. Temporary in-memory map; a
+    `shops` table lookup lands with Spec 03 Phase 1.
+    `shop_auto_enabled`: per-shop opt-in intent sets — an unconfigured shop defaults to an
+    empty set, so it always parks rather than auto-sending.
+    `enabled=False` returns 503 on every request.
     """
 
     router = APIRouter(prefix="/webhook", tags=["webhook"])
 
-    @router.post("/zalo/{oa_id}")
-    async def zalo_inbound(oa_id: str, req: Request, body: ZaloInboundBody) -> dict[str, object]:
+    @router.post("/{channel}/{external_id}")
+    async def inbound(
+        channel: str,
+        external_id: str,
+        req: Request,
+        payload: dict[str, Any] = Body(...),
+    ) -> dict[str, object]:
         if not enabled:
-            raise HTTPException(status_code=503, detail="zalo_webhook_disabled")
+            raise HTTPException(status_code=503, detail="webhook_disabled")
 
-        shop_id = oa_to_shop.get(oa_id)
+        adapter = channels.get(channel)
+        if adapter is None:
+            raise HTTPException(status_code=404, detail="unknown_channel")
+
+        shop_id = endpoint_to_shop.get((channel, external_id))
         if shop_id is None:
-            # Unknown OA — same shape as a 404 rather than 4xx that would leak which OAs
-            # are registered.
-            raise HTTPException(status_code=404, detail="unknown_oa")
+            # Same shape as "unknown channel" — do not leak which endpoints are registered.
+            raise HTTPException(status_code=404, detail="unknown_endpoint")
 
-        # TODO(PRE-004): verify Zalo signature over raw request body BEFORE reading json.
-        _ = req  # kept for future signature-verify pass — do not remove.
+        # TODO(PRE-004): verify platform signature over the RAW body BEFORE parsing.
+        _ = req  # kept for the signature-verify pass — do not remove.
+
+        try:
+            msg = adapter.parse_inbound(payload)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="unparsable_payload") from exc
+
+        # External identity → our identity. This is what removed the orchestrator's old
+        # `conversation_id or customer_id` shim: real rows exist before the draft is parked.
+        async with session_factory() as session:
+            customer_id, conversation_id = await resolve_conversation(
+                session,
+                shop_id=shop_id,
+                channel=channel,
+                external_user_id=msg.external_user_id,
+                external_thread_id=msg.external_thread_id,
+            )
 
         outcome: ReceiveOutcome = await receive_and_draft(
             shop_id=shop_id,
-            customer_id=body.customer_id,
-            message=body.message,
+            customer_id=customer_id,
+            conversation_id=conversation_id,
+            message=msg.text,
             drafter=drafter,
-            sender=sender,
+            sender=adapter,
             session_factory=session_factory,
             shop_auto_enabled_intents=shop_auto_enabled.get(shop_id, frozenset()),
         )

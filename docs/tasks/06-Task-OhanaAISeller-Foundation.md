@@ -200,15 +200,17 @@ gate hở kiểu đó nguy hiểm hơn không có gate.
 
 ### Phase F1 — Channel abstraction (Zalo migrate lên Protocol)
 <!-- ADP:PHASE F1 -->
-STATUS: TODO
-GOAL: `channels/base.py` Protocol tồn tại; Zalo chạy qua adapter thay vì hardcode; `api/webhook.py` dùng shape generic `/webhook/{channel}/{external_id}`; interface `ZaloSender` KHÔNG đổi; toàn bộ test cũ vẫn xanh; webhook VẪN chưa mount.
-APPROACH: Định nghĩa Protocol tối thiểu đủ cho Zalo hôm nay + Messenger GĐ2 (đừng thiết kế thừa cho kênh chưa thấy — §5.2.4 "không generic sớm"). Adapter `channels/zalo/` bọc `bridge/zalo_sender.py` hiện có, KHÔNG sửa file đó nếu tránh được. Webhook resolve adapter qua registry theo `{channel}`. Behavior-preserving refactor: không thêm/bớt tính năng.
-ALLOWED_FILES: channels/, api/webhook.py, tests/test_channel_abstraction.py, docs/reviews/, docs/tasks/06-Task-OhanaAISeller-Foundation.md
+STATUS: IN_PROGRESS
+GOAL: `channels/base.py` Protocol tồn tại; Zalo chạy qua adapter thay vì hardcode; `api/webhook.py` dùng shape generic `/webhook/{channel}/{external_id}`; interface `ZaloSender` KHÔNG đổi; **shim `conversation_id or customer_id` ở `agent/orchestrator.py:89` bị GỠ — channel layer resolve Customer/Conversation thật**; toàn bộ test cũ vẫn xanh; webhook VẪN chưa mount.
+APPROACH: Protocol tối thiểu đủ cho Zalo hôm nay + Messenger GĐ2 (KHÔNG thiết kế thừa cho kênh chưa thấy — §5.2.4). Adapter `channels/zalo/` bọc `bridge/zalo_sender.py`, KHÔNG sửa file đó. Webhook resolve adapter qua registry theo `{channel}`.
+  **Fix shim (Wyatt duyệt gộp vào F1 — 2026-07-18):** identity mapping `(channel, external_user_id) → (customer_id, conversation_id)` đặt ở **channel layer**, vì đó là nơi DUY NHẤT biết id phía kênh. `channels/identity.py resolve_conversation()` upsert Customer+Conversation rồi trả id thật. `agent/orchestrator.py` đổi `conversation_id` thành **tham số BẮT BUỘC** (bỏ hẳn `or customer_id`) — caller luôn biết nó, nên ép ở chữ ký tốt hơn raise lúc chạy.
+ALLOWED_FILES: channels/, api/webhook.py, agent/orchestrator.py, tests/test_channel_abstraction.py, tests/test_orchestrator.py, docs/reviews/, docs/tasks/06-Task-OhanaAISeller-Foundation.md
 GATE: .venv/bin/python -m pytest tests/test_channel_abstraction.py -x -q
-GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' -x
+GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live'
 RETRY: 0/3
-RISK: medium (proposed — api/webhook.py + bridge/ trong RISK_PATHS nhưng refactor behavior-preserving, route chưa mount ⇒ không có đường sống tới khách. Wyatt ký; nâng high nếu muốn)
-BLOCKED_BY: F0 (Conversation cần cho shape inbound)
+RISK: medium (Wyatt ký 2026-07-18, giữ nguyên khi gộp thêm agent/orchestrator.py — refactor behavior-preserving + route chưa mount ⇒ không có đường sống tới khách. 1 confirm tại ANCHOR.)
+REVIEW: PASS ref=docs/reviews/06-F1-auto-verdict.json
+BLOCKED_BY: (đã gỡ) F0 ✅ DONE — Conversation/Customer đã tồn tại
 <!-- /ADP -->
 
 7. `tests/test_channel_abstraction.py` (**RED trước**): (a) adapter Zalo thoả Protocol; (b) webhook resolve đúng adapter theo `{channel}`; (c) channel lạ → 404/400 không crash; (d) interface `ZaloSender` giữ nguyên chữ ký.

@@ -1,0 +1,54 @@
+{
+  "verdict": "APPROVE",
+  "model": "output-evaluator (haiku) — first-pass auto-verdict",
+  "phase": "F1",
+  "spec": "06-Task-OhanaAISeller-Foundation",
+  "claims_verified": [
+    {
+      "id": "C1",
+      "verified": true,
+      "evidence": "orchestrator.py conversation_id không còn default; grep toàn repo không còn caller thiếu đối số; 'or customer_id' đã biến mất"
+    },
+    {
+      "id": "C2",
+      "verified": true,
+      "evidence": "identity.py mọi SELECT filter shop_id; on_conflict trỏ đúng uq_customers_shop_chan_ext (tồn tại trong 0003); cùng external_id ở 2 shop tạo 2 Customer riêng"
+    },
+    {
+      "id": "C3",
+      "verified": true,
+      "evidence": "webhook.py shop_id derive từ endpoint_to_shop lookup, KHÔNG từ body; adapter chỉ đọc external_user_id+text, không đọc field tenancy; không còn tên kênh trong code thực thi"
+    },
+    {
+      "id": "C4",
+      "verified": true,
+      "evidence": "TRỌNG ĐIỂM: logic strip docstring đúng; test e2e chạy thật qua webhook→resolve→orchestrator→park (không mock mất phần quan trọng); diff test_orchestrator.py chỉ THÊM conversation_id + _seed_parents, không nới/xoá assertion"
+    },
+    {
+      "id": "C5",
+      "verified": true,
+      "evidence": "bridge/zalo_sender.py KHÔNG bị sửa; ZaloSender.send giữ nguyên chữ ký; ZaloChannel chỉ delegate"
+    },
+    {
+      "id": "C6",
+      "verified": true,
+      "evidence": "KNOWN UNCOVERED race khai trung thực; mỗi Conversation vẫn đúng shop_id nên race là trùng dữ liệu, KHÔNG phải cross-tenant; webhook chưa mount"
+    }
+  ],
+  "findings": [
+    {
+      "severity": "low",
+      "file": "channels/identity.py",
+      "line": 101,
+      "issue": "resolve_conversation tự commit() thay vì để caller quản transaction",
+      "status": "WAIVED",
+      "waiver_rationale": "Chủ ý, không phải sơ suất. Identity mapping phải bền vững độc lập với kết quả draft — gộp chung transaction thì drafter lỗi sẽ xoá luôn danh tính khách vừa nhận diện, tin kế tiếp lại tạo khách mới. Đánh đổi: mất atomicity, hệ quả xấu nhất là Conversation mồ côi (vô hại). Xem lại nếu sau này cần rollback identity."
+    }
+  ],
+  "known_uncovered": [
+    "channels/identity.py: conversation lookup là select-then-insert, thiếu unique (shop_id, customer_id, channel) → race có thể tạo 2 Conversation. Chưa chạm được vì webhook chưa mount. PHẢI thêm unique constraint trước khi Spec 03c mount webhook."
+  ],
+  "summary": "6/6 claim verified bằng đọc code. Shim đã gỡ thật. Tenant isolation giữ. Webhook channel-agnostic có runtime coverage thật (test kênh 'fakechan' chạy end-to-end). 1 finding low đã WAIVE có lý do.",
+  "diff_sha256": "0fae20e3b66482336b26993d40362af5128861099e96226f90a2ea10d3d3059e",
+  "stamped_at": "2026-07-18T13:13"
+}
