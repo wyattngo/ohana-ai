@@ -222,7 +222,8 @@ BLOCKED_BY: (đã gỡ) F0 ✅ DONE — Conversation/Customer đã tồn tại
 
 ### Phase F2 — Test/CI foundation
 <!-- ADP:PHASE F2 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=95ad405, gate_exit=0, duration=4s, review=PASS(judge=APPROVE,model=output-evaluator (haiku) — first-pass auto-verdict,bound=12ddec027ac1,tier=medium), ran=2026-07-18T13:35
 GOAL: `tests/conftest.py` cung cấp fixture DB dùng chung (ISSUE-014 đóng); mypy **XANH** trên `app agent retrieval parsing storage db bridge tools`; nợ type còn lại thu gọn đúng `api/`.
 APPROACH: conftest dùng `DATABASE_URL` (khớp service pgvector sẵn có trong ci.yml), fixture dựng/dọn schema. 2 test mới của spec này bỏ helper `_fresh_engine`/`_fresh` trùng lặp, chuyển sang fixture chung. **KHÔNG mass-refactor test cũ** — đổi test đang xanh chỉ để "cho đẹp" là rủi ro không được trả công.
   **Amendment 2026-07-18 (Wyatt chọn b2).** Phát hiện khi audit: (a) `mypy` của CI **đã exit=1 trên `main`** trước spec này — 12 lỗi, không do F0/F1; (b) thêm `db bridge tools` vào lệnh mypy là **no-op** vì mypy đã follow-imports vào chúng (đó là lý do `db/repos.py` hiện ra trong CI hiện tại). Nên "mở rộng scope" một mình KHÔNG mua được gì. Thay vào đó sửa đúng 2 lỗi nằm trong scope: `db/repos.py:138` (`Result` vs `CursorResult` — của mình) và `agent/providers/openai_client.py:28` (`app.alert_service` chưa port = **ISSUE-010**, module hiện không import nổi, đã `xfail` trong test → dùng `type: ignore` CÓ ghi rõ ISSUE-010, không phải suppress mù). 10 lỗi còn lại đều ở `api/` (FastAPI `Depends` typing) → **spec riêng**, KHÔNG kéo vào F2.
