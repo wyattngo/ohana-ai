@@ -1,0 +1,48 @@
+{
+  "verdict": "APPROVE",
+  "model": "output-evaluator (haiku) — first-pass auto-verdict",
+  "phase": "F0",
+  "spec": "06-Task-OhanaAISeller-Foundation",
+  "claims_verified": [
+    {
+      "id": "C1",
+      "verified": true,
+      "evidence": "customers có UniqueConstraint(shop_id,id) làm target; Conversation/OrderDraft/PendingReply khai composite FK; migration 0003 khớp model, không drift"
+    },
+    {
+      "id": "C2",
+      "verified": true,
+      "evidence": "downgrade() drop constraint pending_reply trước, rồi order_drafts→conversations→customers; down_revision='0002' nối đúng"
+    },
+    {
+      "id": "C3",
+      "verified": true,
+      "evidence": "ConversationRepo.list_recent/get đều WHERE shop_id=_shop_scope SQL-level; get() trả None cho id shop khác; constructor chặn scope rỗng"
+    },
+    {
+      "id": "C4",
+      "verified": true,
+      "evidence": "TRỌNG ĐIỂM: diff 2 file test chỉ THÊM _seed_parents; mọi assert cũ còn nguyên, không nới điều kiện, không try/except nuốt lỗi"
+    },
+    {
+      "id": "C5",
+      "verified": true,
+      "evidence": "test tạo customer_b ở shop_b TRƯỚC rồi conversation shop_a trỏ vào — FK đơn sẽ pass sai, composite mới fail đúng; test phân biệt được"
+    },
+    {
+      "id": "C6",
+      "verified": true,
+      "evidence": "OrderDraft.status server_default='draft' ở cả model lẫn migration; không hàm ý xác nhận (guardrail §1.3)"
+    }
+  ],
+  "findings": [],
+  "known_uncovered": [
+    "agent/orchestrator.py:89 shim `conversation_id or customer_id` sẽ FK-violate lúc runtime; hiện unreachable (webhook chưa mount); PHẢI sửa trước khi mount webhook (spec 03c/F1)"
+  ],
+  "pre_existing_not_caused_by_this_diff": [
+    "mypy 12 lỗi trên main (api/inbox.py, api/admin.py) — verified bằng cách stash diff này ra"
+  ],
+  "summary": "6/6 claim verified bằng đọc code. Composite FK cưỡng chế tenant integrity ở tầng DB. Migration reversible. Repo scope SQL-level. Test cũ không bị làm yếu.",
+  "diff_sha256": "f4bc655d650bbb1dab85bc94d2707d3eb40e3f1e184a25023a4af7e32b8361a7",
+  "stamped_at": "2026-07-18T12:28"
+}

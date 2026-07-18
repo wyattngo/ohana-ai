@@ -21,7 +21,44 @@ from datetime import UTC, datetime
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.models import PendingReply
+from db.models import Conversation, PendingReply
+
+
+class ConversationRepo:
+    """Shop-scoped access to `conversations` (spec 06 Phase F0).
+
+    Same seam as PendingReplyRepo: scope is chosen at construction, every statement carries
+    `WHERE shop_id = :scope`. Note this is belt-AND-braces with the composite FKs in
+    db/models.py — the FKs stop a row from being WRITTEN across shops, this repo stops rows
+    from being READ across shops. Neither replaces the other.
+    """
+
+    def __init__(self, session: AsyncSession, *, shop_scope: str) -> None:
+        if not shop_scope:
+            raise ValueError("shop_scope is required — no default, no cross-tenant surface")
+        self._session = session
+        self._shop_scope = shop_scope
+
+    async def list_recent(self, *, limit: int = 50) -> Sequence[Conversation]:
+        """Most-recent-first threads for THIS shop."""
+        stmt = (
+            select(Conversation)
+            .where(Conversation.shop_id == self._shop_scope)
+            .order_by(Conversation.created_at.desc())
+            .limit(limit)
+        )
+        return (await self._session.execute(stmt)).scalars().all()
+
+    async def get(self, conversation_id: str) -> Conversation | None:
+        """Fetch one thread by id — scoped. An id owned by another shop returns None
+        (same shape as "not found"; we do not distinguish, so the caller cannot probe
+        for existence of another shop's rows)."""
+        stmt = (
+            select(Conversation)
+            .where(Conversation.shop_id == self._shop_scope)
+            .where(Conversation.id == conversation_id)
+        )
+        return (await self._session.execute(stmt)).scalar_one_or_none()
 
 
 class PendingReplyRepo:

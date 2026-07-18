@@ -14,9 +14,22 @@ ids for those relations since GĐ0 doesn't need normalized joins.
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
+from typing import Any
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import BigInteger, DateTime, Float, Index, Text, func
+from sqlalchemy import (
+    BigInteger,
+    DateTime,
+    Float,
+    ForeignKeyConstraint,
+    Index,
+    Numeric,
+    Text,
+    UniqueConstraint,
+    func,
+)
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 _EMBED_DIM = 1536
@@ -69,6 +82,117 @@ class Embedding(Base):
     __table_args__ = (Index("idx_emb_shop_ns", "shop_id", "namespace"),)
 
 
+class Customer(Base):
+    """An end-consumer as known to ONE shop, on ONE channel (spec 06 Phase F0).
+
+    Deliberately NOT a global person: the same human messaging two shops is two rows. That
+    keeps the tenant boundary absolute — there is no cross-shop identity object to leak
+    through, and no join that could surface shop B's customer to shop A.
+
+    `UniqueConstraint(shop_id, id)` looks redundant next to the `id` primary key, but it is
+    load-bearing: it is what lets child tables declare a COMPOSITE foreign key on
+    `(shop_id, customer_id)`. See `Conversation.__table_args__` for why that matters.
+    """
+
+    __tablename__ = "customers"
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    shop_id: Mapped[str] = mapped_column(Text, nullable=False)
+    channel: Mapped[str] = mapped_column(Text, nullable=False)  # zalo | messenger | …
+    external_id: Mapped[str] = mapped_column(Text, nullable=False)  # id phía kênh
+    display_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint("shop_id", "id", name="uq_customers_shop_id"),
+        UniqueConstraint("shop_id", "channel", "external_id", name="uq_customers_shop_chan_ext"),
+        Index("idx_customer_shop_created", "shop_id", "created_at"),
+    )
+
+
+class Conversation(Base):
+    """A message thread between one shop and one customer on one channel (spec 06 Phase F0).
+
+    **Composite FK, not a plain one.** `FOREIGN KEY (shop_id, customer_id)` →
+    `customers(shop_id, id)` is the whole point. A plain `FK customer_id -> customers.id`
+    would only assert "this customer exists" — it would happily let a shop A conversation
+    point at a shop B customer, which is an R1.22 cross-tenant breach that no amount of
+    code review reliably catches. The composite form makes Postgres itself reject the
+    mismatch, so tenant integrity survives a buggy or hostile caller.
+    Gate: tests/test_foundation_models.py::test_cross_shop_reference_rejected_by_database.
+
+    `last_inbound_at` + `window_status` land here (not in a later ALTER) so Zalo's 48h
+    reactive window has a home from day one — spec 03 Phase 10 planned to ALTER a
+    `conversations` table that had never been created (spec 06 §1 finding #3).
+    """
+
+    __tablename__ = "conversations"
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    shop_id: Mapped[str] = mapped_column(Text, nullable=False)
+    customer_id: Mapped[str] = mapped_column(Text, nullable=False)
+    channel: Mapped[str] = mapped_column(Text, nullable=False)
+    external_thread_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_inbound_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    window_status: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="active"
+    )  # active | warning | expired
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint("shop_id", "id", name="uq_conversations_shop_id"),
+        ForeignKeyConstraint(
+            ["shop_id", "customer_id"],
+            ["customers.shop_id", "customers.id"],
+            name="fk_conversations_customer_same_shop",
+        ),
+        Index("idx_conv_shop_last_inbound", "shop_id", "last_inbound_at"),
+    )
+
+
+class OrderDraft(Base):
+    """An order the AI extracted from a conversation, parked for seller approval.
+
+    Scope note: this is a HOLDER, not an order state machine. `status` stays in draft-land
+    (`draft | confirmed | discarded`); the real `draft→paid→shipped→delivered→refunded`
+    machine with its transition audit log is GĐ1 (spec 07) and must NOT be grown here.
+
+    `status` defaults to `draft` on purpose — guardrail §1.3 says the AI never confirms an
+    order by itself, so the default must not imply confirmation.
+    """
+
+    __tablename__ = "order_drafts"
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    shop_id: Mapped[str] = mapped_column(Text, nullable=False)
+    conversation_id: Mapped[str] = mapped_column(Text, nullable=False)
+    customer_id: Mapped[str] = mapped_column(Text, nullable=False)
+    items: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False)
+    total_amount: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="draft")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["shop_id", "conversation_id"],
+            ["conversations.shop_id", "conversations.id"],
+            name="fk_order_drafts_conversation_same_shop",
+        ),
+        ForeignKeyConstraint(
+            ["shop_id", "customer_id"],
+            ["customers.shop_id", "customers.id"],
+            name="fk_order_drafts_customer_same_shop",
+        ),
+        Index("idx_od_shop_status_created", "shop_id", "status", "created_at"),
+    )
+
+
 class PendingReply(Base):
     """A drafted reply parked for seller review (spec 01 §3 Sub-task E).
 
@@ -98,4 +222,20 @@ class PendingReply(Base):
     decided_by: Mapped[str | None] = mapped_column(Text, nullable=True)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    __table_args__ = (Index("idx_pending_shop_status_created", "shop_id", "status", "created_at"),)
+    # spec 06 F0: `conversation_id` / `customer_id` were bare Text with nothing behind them —
+    # they could point at ids that never existed and Postgres accepted it. Now composite FKs,
+    # same reasoning as Conversation: they pin the referenced row to THIS shop, not merely to
+    # an existing row. Gate: test_pending_reply_orphan_columns_now_have_fk.
+    __table_args__ = (
+        Index("idx_pending_shop_status_created", "shop_id", "status", "created_at"),
+        ForeignKeyConstraint(
+            ["shop_id", "conversation_id"],
+            ["conversations.shop_id", "conversations.id"],
+            name="fk_pending_reply_conversation_same_shop",
+        ),
+        ForeignKeyConstraint(
+            ["shop_id", "customer_id"],
+            ["customers.shop_id", "customers.id"],
+            name="fk_pending_reply_customer_same_shop",
+        ),
+    )

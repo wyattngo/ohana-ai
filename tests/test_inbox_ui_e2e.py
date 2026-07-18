@@ -69,6 +69,40 @@ async def seeded_replies():
         await engine.dispose()
 
 
+async def _seed_parents(session, *, conversation_id: str, customer_id: str) -> None:
+    """Seed the Customer + Conversation rows a PendingReply now points AT.
+
+    Spec 06 F0 turned `pending_reply.conversation_id` / `.customer_id` from bare Text into
+    composite foreign keys `(shop_id, …)`. Before that, this file could invent ids like
+    "conv-1" and Postgres accepted them — the columns referenced nothing. They do now, so a
+    parked reply requires its parents to exist, exactly as production would.
+
+    `ON CONFLICT DO NOTHING` because `_FIXTURE_SHOP_ID` is shared across tests in this file
+    (and with test_web_scaffold.py): re-seeding the same customer/conversation must be a
+    no-op, not a unique violation.
+    """
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+    from db.models import Conversation, Customer
+
+    await session.execute(
+        pg_insert(Customer)
+        .values(id=customer_id, shop_id=_FIXTURE_SHOP_ID, channel="zalo", external_id=customer_id)
+        .on_conflict_do_nothing()
+    )
+    await session.execute(
+        pg_insert(Conversation)
+        .values(
+            id=conversation_id,
+            shop_id=_FIXTURE_SHOP_ID,
+            customer_id=customer_id,
+            channel="zalo",
+        )
+        .on_conflict_do_nothing()
+    )
+    await session.commit()
+
+
 async def _seed_pending_reply(
     tracker: list[str],
     *,
@@ -83,6 +117,7 @@ async def _seed_pending_reply(
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
     try:
         async with session_factory() as session:
+            await _seed_parents(session, conversation_id=conversation_id, customer_id=customer_id)
             repo = PendingReplyRepo(session, shop_scope=_FIXTURE_SHOP_ID)
             await repo.create(
                 reply_id=reply_id,
@@ -170,9 +205,7 @@ async def test_approve_flips_status_in_db(
     assert await _fetch_status(reply_id) == "approved"
 
 
-async def test_reject_flips_status_in_db(
-    dev_client: TestClient, seeded_replies: list[str]
-) -> None:
+async def test_reject_flips_status_in_db(dev_client: TestClient, seeded_replies: list[str]) -> None:
     reply_id = await _seed_pending_reply(
         seeded_replies,
         conversation_id="conv-3",

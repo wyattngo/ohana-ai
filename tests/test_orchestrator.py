@@ -62,6 +62,32 @@ class _FakeSender:
         self.sends.append({"shop_id": shop_id, "customer_id": customer_id, "text": text})
 
 
+async def _seed_parents(session_factory, *, shop_id: str, customer_id: str, conversation_id: str):
+    """Create the Customer + Conversation a parked reply now references.
+
+    Spec 06 F0 gave `pending_reply.conversation_id` / `.customer_id` composite foreign keys
+    `(shop_id, …)`. These tests used to pass invented ids straight through because the columns
+    referenced nothing; now the parents must exist, same as production.
+
+    Note these tests pass `conversation_id` EXPLICITLY from here on. `agent/orchestrator.py`
+    still falls back to `conversation_id or customer_id` — a shim from before `conversations`
+    existed, which would now FK-violate at runtime. That shim is KNOWN UNCOVERED in spec 06
+    §7 F0 and must be fixed before the webhook is mounted; these tests deliberately do not
+    exercise it rather than papering over it.
+    """
+    from db.models import Conversation, Customer
+
+    async with session_factory() as s:
+        s.add(Customer(id=customer_id, shop_id=shop_id, channel="zalo", external_id=customer_id))
+        await s.flush()
+        s.add(
+            Conversation(
+                id=conversation_id, shop_id=shop_id, customer_id=customer_id, channel="zalo"
+            )
+        )
+        await s.commit()
+
+
 @pytest.mark.asyncio
 async def test_sensitive_intent_parks_and_never_sends() -> None:
     """Adversarial: high confidence, shop opted into auto — the sensitive-intent blocklist
@@ -84,9 +110,14 @@ async def test_sensitive_intent_parks_and_never_sends() -> None:
     )
     sender = _FakeSender()
 
+    await _seed_parents(
+        session_factory, shop_id="shop_a", customer_id="cust1", conversation_id="conv1"
+    )
+
     outcome = await receive_and_draft(
         shop_id="shop_a",
         customer_id="cust1",
+        conversation_id="conv1",
         message="I want a refund on order O1.",
         drafter=drafter,
         sender=sender,
@@ -183,9 +214,14 @@ async def test_low_confidence_parks_even_for_safe_intent() -> None:
     )
     sender = _FakeSender()
 
+    await _seed_parents(
+        session_factory, shop_id="shop_a", customer_id="cust1", conversation_id="conv1"
+    )
+
     outcome = await receive_and_draft(
         shop_id="shop_a",
         customer_id="cust1",
+        conversation_id="conv1",
         message="Something unclear",
         drafter=drafter,
         sender=sender,
