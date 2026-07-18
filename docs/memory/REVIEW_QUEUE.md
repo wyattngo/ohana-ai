@@ -16,3 +16,4 @@ Revert 1 lệnh kèm sẵn (evidence commit revert riêng nếu cần).
 - [ ] 2026-07-17T23:40 · 05-Task-OhanaAISeller-ConfigEmbedder-F1 phase-P0 · tier=medium · review=PASS(judge=APPROVE,model=haiku,bound=5165de25e1ed,tier=medium) · commit=897ba1f · revert: git revert 897ba1f
 - [ ] 2026-07-18T00:31 · 05-Task-OhanaAISeller-ConfigEmbedder-F1 phase-P1 · tier=medium · review=PASS(judge=APPROVE,model=haiku,bound=7cfe51e5521f,tier=medium) · commit=b4a7119 · revert: git revert b4a7119
 - [ ] 2026-07-18T00:58 · 05-Task-OhanaAISeller-ConfigEmbedder-F1 phase-P2 · tier=medium · review=PASS(judge=APPROVE,model=haiku,bound=7720c55af005,tier=medium) · commit=196a4c4 · revert: git revert 196a4c4
+- [ ] 2026-07-18T13:13 · 06-Task-OhanaAISeller-Foundation phase-F1 · tier=medium · review=PASS(judge=APPROVE,model=output-evaluator (haiku) — first-pass auto-verdict,bound=0fae20e3b664,tier=medium) · commit=bbf866b · revert: git revert bbf866b

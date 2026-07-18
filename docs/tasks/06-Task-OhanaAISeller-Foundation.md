@@ -200,7 +200,8 @@ gate hở kiểu đó nguy hiểm hơn không có gate.
 
 ### Phase F1 — Channel abstraction (Zalo migrate lên Protocol)
 <!-- ADP:PHASE F1 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=bbf866b, gate_exit=0, duration=3s, review=PASS(judge=APPROVE,model=output-evaluator (haiku) — first-pass auto-verdict,bound=0fae20e3b664,tier=medium), ran=2026-07-18T13:13
 GOAL: `channels/base.py` Protocol tồn tại; Zalo chạy qua adapter thay vì hardcode; `api/webhook.py` dùng shape generic `/webhook/{channel}/{external_id}`; interface `ZaloSender` KHÔNG đổi; **shim `conversation_id or customer_id` ở `agent/orchestrator.py:89` bị GỠ — channel layer resolve Customer/Conversation thật**; toàn bộ test cũ vẫn xanh; webhook VẪN chưa mount.
 APPROACH: Protocol tối thiểu đủ cho Zalo hôm nay + Messenger GĐ2 (KHÔNG thiết kế thừa cho kênh chưa thấy — §5.2.4). Adapter `channels/zalo/` bọc `bridge/zalo_sender.py`, KHÔNG sửa file đó. Webhook resolve adapter qua registry theo `{channel}`.
   **Fix shim (Wyatt duyệt gộp vào F1 — 2026-07-18):** identity mapping `(channel, external_user_id) → (customer_id, conversation_id)` đặt ở **channel layer**, vì đó là nơi DUY NHẤT biết id phía kênh. `channels/identity.py resolve_conversation()` upsert Customer+Conversation rồi trả id thật. `agent/orchestrator.py` đổi `conversation_id` thành **tham số BẮT BUỘC** (bỏ hẳn `or customer_id`) — caller luôn biết nó, nên ép ở chữ ký tốt hơn raise lúc chạy.
