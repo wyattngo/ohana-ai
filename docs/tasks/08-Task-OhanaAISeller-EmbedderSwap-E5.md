@@ -237,7 +237,8 @@ REVIEW: PASS ref=docs/reviews/08-E1-auto-verdict.json human=docs/reviews/08-E1-h
 
 ### Phase E2 — Live acceptance trên e5 (đóng ISSUE-016)
 <!-- ADP:PHASE E2 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=dd81da9, gate_exit=0, duration=10s, review=PASS(judge=APPROVE,model=unknown,bound=1cd0c0da7233,tier=low), smoke=PASS(bound=1cd0c0da7233), ran=2026-07-19T23:15
 ROADMAP: GD0-EMBED
 GOAL: `tests/test_wiki_rag_live.py -m live` PASS **trên e5 thật** — ingest doc mẫu → search trả đúng chunk, có bằng chứng dán vào SMOKE artifact. ISSUE-016 chuyển RESOLVED, cảnh báo F1 trong CLAUDE.md gỡ.
 APPROACH: Sửa live test trỏ e5 (không phải OpenAI). Test phải kiểm **thứ hạng**, không chỉ "có trả về gì đó": chunk đúng chủ đề phải xếp TRÊN chunk sai chủ đề — đó mới là điều F1 hứa. Skip sạch khi thiếu key (không FAIL giả).

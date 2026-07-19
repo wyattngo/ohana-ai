@@ -22,3 +22,4 @@ Revert 1 lệnh kèm sẵn (evidence commit revert riêng nếu cần).
 - [ ] 2026-07-19T09:38 · 07-Task-OhanaAISeller-GeneralChat phase-G1 · tier=medium · review=PASS(judge=APPROVE,model=output-evaluator (haiku) — 3 rounds,bound=427f4c2f9f62,tier=medium) · commit=3b1883d · revert: git revert 3b1883d
 - [ ] 2026-07-19T10:05 · 07-Task-OhanaAISeller-GeneralChat phase-G2 · tier=low · review=PASS(judge=APPROVE,model=output-evaluator (haiku),bound=a06543688984,tier=low) · commit=e0d0f80 · revert: git revert e0d0f80
 - [ ] 2026-07-19T22:23 · 08-Task-OhanaAISeller-EmbedderSwap-E5 phase-E0 · tier=medium · review=PASS(judge=APPROVE,model=unknown,bound=93201661e389,tier=medium) · smoke=PASS(bound=93201661e389) · commit=8ba4fef · revert: git revert 8ba4fef
+- [ ] 2026-07-19T23:15 · 08-Task-OhanaAISeller-EmbedderSwap-E5 phase-E2 · tier=low · review=PASS(judge=APPROVE,model=unknown,bound=1cd0c0da7233,tier=low) · smoke=PASS(bound=1cd0c0da7233) · commit=dd81da9 · revert: git revert dd81da9
