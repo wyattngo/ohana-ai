@@ -93,11 +93,71 @@ for e in events:
     g = e.get("gate", "?")
     stats["by_gate"][g] = stats["by_gate"].get(g, 0) + 1
 
+# --- roadmap coverage: parse L3 (docs/ROADMAP-STATUS.md, machine-generated) ---
+# L3 is a VIEW joining L1 (docs/ROADMAP.md) × L2 (docs/tasks/*.md) × git — DEC-OHANA-03.
+# We only READ it here; adp-roadmap.sh owns writing it.
+import re
+
+def _section(md, head):
+    """Body of a '## <head>…' section, up to the next '## '."""
+    m = re.search(r"^##[^\n]*" + re.escape(head) + r"[^\n]*\n(.*?)(?=^## |\Z)",
+                  md, re.S | re.M)
+    return m.group(1) if m else ""
+
+def _rows(body):
+    out = []
+    for line in body.splitlines():
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) != 4 or not cells[0].startswith("`"):
+            continue
+        out.append({"id": cells[0].strip("`"), "state": cells[1],
+                    "prog": cells[2], "phases": cells[3]})
+    return out
+
+def _bullets(body):
+    return [l.strip()[2:].strip() for l in body.splitlines()
+            if l.strip().startswith("- ")]
+
+def read_roadmap(base):
+    f = os.path.join(base, "docs", "ROADMAP-STATUS.md")
+    if not os.path.isfile(f):
+        return {"present": False}
+    md = open(f, errors="replace").read()
+
+    def frac(pat):
+        m = re.search(pat, md)
+        if not m:
+            return None
+        d, t = int(m.group(1)), int(m.group(2))
+        o = {"done": d, "total": t}
+        if len(m.groups()) >= 3 and m.group(3) is not None:
+            o["pct"] = int(m.group(3))
+        return o
+
+    gen = re.search(r"@ ([0-9T:\-]+)", md)
+    # denominator shrink = index-gaming signal (L1 §0.2): compare latest vs max seen
+    denoms = [int(x) for x in
+              re.findall(r"^- \S+\s+(\d+)\s+internal_denominator\s*$",
+                         _section(md, "Lịch sử mẫu số internal"), re.M)]
+    return {
+        "present": True,
+        "generated": gen.group(1) if gen else "",
+        "denom_warn": bool(denoms) and denoms[-1] < max(denoms),
+        "internal": frac(r"Internal:\s*(\d+)/(\d+)[^(\n]*\((\d+)%\)"),
+        "external": frac(r"External:\s*(\d+)/(\d+)[^(\n]*\((\d+)%\)"),
+        "phase": frac(r"Phase gate-passed:\s*(\d+)/(\d+)"),
+        "internal_rows": _rows(_section(md, "internal (đếm vào 100%)")),
+        "external_rows": _rows(_section(md, "External — chờ bên thứ ba")),
+        "uncovered": _bullets(_section(md, "Uncovered")),
+        "unplanned": _bullets(_section(md, "Unplanned")),
+    }
+
 payload = {
     "meta": {"generated": ts, "spine": spine, "force_shadow": fs,
              "sources": sources, "stats": stats},
     "events": events[:300],   # cap for page weight
     "issues": issues,
+    "roadmap": read_roadmap(root),
 }
 
 TEMPLATE = r"""<!doctype html>
@@ -133,8 +193,13 @@ TEMPLATE = r"""<!doctype html>
 </style></head>
 <body><div class="wrap">
   <h1>ADP Control-Plane Dashboard</h1>
-  <div class="sub">generated <span id="gen"></span> · spec #19 spine · re-run <code>bash .claude/tools/adp-dashboard.sh</code> to refresh</div>
+  <div class="sub">generated <span id="gen"></span> · ADP spine + roadmap L1×L2×L3 (DEC-OHANA-03) · re-run <code>bash .claude/tools/adp-dashboard.sh</code> to refresh</div>
   <div class="banner" id="banner"></div>
+
+  <h2>Roadmap coverage — L1×L2×L3 spine</h2>
+  <div class="banner" id="rm-banner"></div>
+  <div class="legend" id="rm-note"></div>
+  <div id="rm-tables"></div>
 
   <h2>Issues / bugs caught by the spine</h2>
   <table id="issues"><thead><tr><th>time</th><th>repo</th><th>kind</th><th>detail</th><th>task</th><th>phase</th></tr></thead><tbody></tbody></table>
@@ -184,6 +249,41 @@ function render(){
     : `<tr><td colspan="7" class="empty">no events match.</td></tr>`;
 }
 q.addEventListener("input",render); render();
+
+// --- roadmap coverage (L3) — synced with the 3-tier spine (DEC-OHANA-03) ---
+// NB: payload always carries a roadmap object. Do NOT end any statement/comment below
+// with a brace-then-semicolon: the spine-test DATA extractor greedily captures the DATA
+// literal up to the LAST brace-semicolon in the file, so a stray one steals its match.
+const RM = DATA.roadmap;
+const rmb=document.getElementById("rm-banner"),
+      rmn=document.getElementById("rm-note"),
+      rmt=document.getElementById("rm-tables");
+if(!RM || !RM.present){
+  rmb.innerHTML="";
+  rmn.innerHTML=`<span class="warn">No docs/ROADMAP-STATUS.md (L3) found</span> — run <code>bash .claude/tools/adp-roadmap.sh</code> to generate it.`;
+} else {
+  const frac=o=>o?`${o.done}/${o.total}`:"—", pct=o=>(o&&o.pct!=null)?` (${o.pct}%)`:"";
+  const nUnc=(RM.uncovered||[]).length, nUnp=(RM.unplanned||[]).length;
+  rmb.innerHTML=[
+    card("Internal (100% target)", frac(RM.internal)+pct(RM.internal),
+         (RM.internal&&RM.internal.pct>=100)?"b-ok":"b-warn", "mẫu số của mục tiêu 100%"),
+    card("External (3rd-party)", frac(RM.external)+pct(RM.external),
+         "b-warn", "đếm riêng — không vào 100%"),
+    card("Phase gate-passed", frac(RM.phase), "b-ok", "adp-status.sh: phase đã ký"),
+    card("Drift", `${nUnc} unc · ${nUnp} unpl`,
+         nUnp>0?"b-bad":(nUnc>0?"b-warn":"b-ok"), "uncovered · unplanned"),
+  ].join("");
+  const warn=RM.denom_warn?`<span class="bad">⚠ MẪU SỐ GIẢM — tín hiệu gian lận chỉ số (L1 §0.2)</span> · `:"";
+  rmn.innerHTML=`${warn}L3 generated <code>${esc(RM.generated||"?")}</code> · re-run <code>adp-roadmap.sh</code> to refresh · `+
+    `<span class="muted">✅ DONE · 🔶 một phần · ⬜ TODO · ⛔ BLOCKED · ⚪ chưa có spec</span>`;
+  const rmTable=(title,rows)=> (!rows||!rows.length)?"":
+    `<h2>${esc(title)}</h2><table><thead><tr><th>roadmap id</th><th>state</th><th>phase done</th><th>phase trỏ tới</th></tr></thead><tbody>`+
+    rows.map(r=>`<tr><td class="info">${esc(r.id)}</td><td>${esc(r.state)}</td>`+
+      `<td class="nowrap">${esc(r.prog)}</td><td class="muted">${esc(r.phases)}</td></tr>`).join("")+
+    `</tbody></table>`;
+  rmt.innerHTML=rmTable("Internal — đếm vào 100%", RM.internal_rows)+
+                rmTable("External — chờ bên thứ ba", RM.external_rows);
+}
 </script>
 </body></html>"""
 
