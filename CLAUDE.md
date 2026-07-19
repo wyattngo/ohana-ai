@@ -36,6 +36,7 @@
   - G2 (low, Wyatt tick) — `web/src/screens/Chat.{tsx,css}` + `postChat()` + `App.tsx` (state-based routing, KHÔNG react-router). Disclaimer "chưa kết nối dữ liệu shop" hiện **thường trực**, không phải tooltip.
   - **`_blank_env_means_unset`** (`app/config.py`) — env khai báo nhưng RỖNG ⇒ coi như chưa set. Áp cho MỌI field. Sinh ra từ bug thật: `TOGETHER_MODEL=` rỗng ghi đè default → falsy → trượt `or` → `TogetherClient` xin `gpt-4o-mini` từ Together → 404.
   - ⚠️ **`.env` KHÔNG được app đọc** — `Settings` cố ý bỏ `env_file` (env_file sẽ đọc file dev cả sau `monkeypatch.delenv`). Dev nạp qua `.claude/launch.json`; production PHẢI set env tường minh.
+  - Model = `meta-llama/Llama-3.3-70B-Instruct-Turbo`. **KHÔNG đổi sang MiniMax-M3** dù bảng giá rẻ hơn 3.5× — nó bịa 6/6 lần ở ca an toàn và **đắt hơn 2.4× khi dùng thật** (nói dài gấp 4.5×). Số đo: [DEC-OHANA-02](docs/decisions/DEC-OHANA-02-chat-model-selection.md).
   - **Đo thật:** cold start **24.8s**, call sau ~1.2s ⇒ UI bắt buộc có loading state. `token_cached=0` trên 3 request giống hệt (1236 prompt token) ⇒ **không có bằng chứng cache phía Together**; xem lại sau khi Wiki-RAG land.
 
 - **Shipped surface — Foundation (spec 06, 2026-07-18) — vá nền móng Spec 03 đang đứng trên:**
