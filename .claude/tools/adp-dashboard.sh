@@ -34,9 +34,15 @@ out, root, spine, fs = sys.argv[1:5]
 ts = datetime.datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %z")
 
 # --- aggregate audit logs from workspace root + project repos -----------------
-roots = [(".", root),
-         ("Localhost Onfa", os.path.join(root, "Localhost Onfa")),
-         ("drnickv4", os.path.join(root, "drnickv4"))]
+# Primary = the repo this dashboard lives in. In the isolated ohana-ai checkout ROOT
+# IS the repo root (not a workspace parent), so label it by basename. Workspace siblings
+# are aggregated ONLY when they actually exist on disk — DEC-OHANA-03 "một nguồn": don't
+# advertise phantom repos in an isolated checkout.
+roots = [(os.path.basename(root.rstrip("/")) or ".", root)]
+for _sib in ("Localhost Onfa", "drnickv4"):
+    _p = os.path.join(root, _sib)
+    if os.path.isdir(_p):
+        roots.append((_sib, _p))
 events = []
 sources = []
 for label, base in roots:
@@ -93,9 +99,61 @@ for e in events:
     g = e.get("gate", "?")
     stats["by_gate"][g] = stats["by_gate"].get(g, 0) + 1
 
+# --- roadmap L3 (docs/ROADMAP-STATUS.md) — sync the dashboard with the 3-tier spine ---
+# DEC-OHANA-03: L1×L2×git → L3 (adp-roadmap.sh). The dashboard is a read-only presentation
+# layer over L3; if L3 is absent it degrades to a "generate it" note (never crashes).
+import re as _re
+
+def parse_roadmap(base):
+    f = os.path.join(base, "docs", "ROADMAP-STATUS.md")
+    rm = {"present": False}
+    if not os.path.isfile(f):
+        return rm
+    txt = open(f, errors="replace").read()
+    rm["present"] = True
+    m = _re.search(r"AUTO-GENERATED .*? @ ([0-9T:\-]+)", txt)
+    rm["generated"] = m.group(1) if m else ""
+    rm["denom_warn"] = bool(_re.search(r"MẪU SỐ GIẢM", txt))
+
+    def trio(pat):
+        mm = _re.search(pat, txt)
+        return {"done": int(mm.group(1)), "total": int(mm.group(2)),
+                "pct": int(mm.group(3))} if mm else None
+    rm["internal"] = trio(r"Internal:\s*(\d+)/(\d+)\s*work item.*?\((\d+)%\)")
+    rm["external"] = trio(r"External:\s*(\d+)/(\d+)\s*\((\d+)%\)")
+    mm = _re.search(r"Phase gate-passed:\s*(\d+)/(\d+)", txt)
+    rm["phase"] = {"done": int(mm.group(1)), "total": int(mm.group(2))} if mm else None
+
+    def rows(section_re):
+        blk = _re.search(section_re, txt, _re.S)
+        out = []
+        if blk:
+            for line in blk.group(1).splitlines():
+                r = _re.match(r"\|\s*`([^`]+)`\s*\|\s*([^|]+?)\s*\|\s*(\d+/\d+)\s*\|\s*([^|]*?)\s*\|", line)
+                if r:
+                    out.append({"id": r.group(1), "state": r.group(2).strip(),
+                                "prog": r.group(3), "phases": r.group(4).strip()})
+        return out
+    rm["internal_rows"] = rows(r"## GĐ0 → GĐ3 — internal.*?\n(.*?)\n## ")
+    rm["external_rows"] = rows(r"## External —.*?\n(.*?)\n## ")
+
+    def bullets(section_re, prefix="- "):
+        blk = _re.search(section_re, txt, _re.S)
+        if not blk:
+            return []
+        return [ln[len(prefix):].strip() for ln in blk.group(1).splitlines()
+                if ln.startswith(prefix)]
+    rm["uncovered"] = bullets(r"## ⚠️ Uncovered.*?\n(.*?)\n## ")
+    rm["unplanned"] = [b for b in bullets(r"## ⚠️ Unplanned.*?\n(.*?)\n(?:## |<!--|\Z)")
+                       if b.startswith("`")]
+    return rm
+
+roadmap = parse_roadmap(root)
+
 payload = {
     "meta": {"generated": ts, "spine": spine, "force_shadow": fs,
              "sources": sources, "stats": stats},
+    "roadmap": roadmap,
     "events": events[:300],   # cap for page weight
     "issues": issues,
 }
@@ -133,8 +191,13 @@ TEMPLATE = r"""<!doctype html>
 </style></head>
 <body><div class="wrap">
   <h1>ADP Control-Plane Dashboard</h1>
-  <div class="sub">generated <span id="gen"></span> · spec #19 spine · re-run <code>bash .claude/tools/adp-dashboard.sh</code> to refresh</div>
+  <div class="sub">generated <span id="gen"></span> · ADP spine + roadmap L1×L2×L3 (DEC-OHANA-03) · re-run <code>bash .claude/tools/adp-dashboard.sh</code> to refresh</div>
   <div class="banner" id="banner"></div>
+
+  <h2>Roadmap coverage — L1×L2×L3 spine</h2>
+  <div class="banner" id="rm-banner"></div>
+  <div class="legend" id="rm-note"></div>
+  <div id="rm-tables"></div>
 
   <h2>Issues / bugs caught by the spine</h2>
   <table id="issues"><thead><tr><th>time</th><th>repo</th><th>kind</th><th>detail</th><th>task</th><th>phase</th></tr></thead><tbody></tbody></table>
@@ -184,6 +247,41 @@ function render(){
     : `<tr><td colspan="7" class="empty">no events match.</td></tr>`;
 }
 q.addEventListener("input",render); render();
+
+// --- roadmap coverage (L3) — synced with the 3-tier spine (DEC-OHANA-03) ---
+// NB: payload always carries a roadmap object. Do NOT end any statement/comment below
+// with a brace-then-semicolon: the spine-test DATA extractor greedily captures the DATA
+// literal up to the LAST brace-semicolon in the file, so a stray one steals its match.
+const RM = DATA.roadmap;
+const rmb=document.getElementById("rm-banner"),
+      rmn=document.getElementById("rm-note"),
+      rmt=document.getElementById("rm-tables");
+if(!RM || !RM.present){
+  rmb.innerHTML="";
+  rmn.innerHTML=`<span class="warn">No docs/ROADMAP-STATUS.md (L3) found</span> — run <code>bash .claude/tools/adp-roadmap.sh</code> to generate it.`;
+} else {
+  const frac=o=>o?`${o.done}/${o.total}`:"—", pct=o=>o?` (${o.pct}%)`:"";
+  const nUnc=(RM.uncovered||[]).length, nUnp=(RM.unplanned||[]).length;
+  rmb.innerHTML=[
+    card("Internal (100% target)", frac(RM.internal)+pct(RM.internal),
+         (RM.internal&&RM.internal.pct>=100)?"b-ok":"b-warn", "mẫu số của mục tiêu 100%"),
+    card("External (3rd-party)", frac(RM.external)+pct(RM.external),
+         "b-warn", "đếm riêng — không vào 100%"),
+    card("Phase gate-passed", frac(RM.phase), "b-ok", "adp-status.sh: phase đã ký"),
+    card("Drift", `${nUnc} unc · ${nUnp} unpl`,
+         nUnp>0?"b-bad":(nUnc>0?"b-warn":"b-ok"), "uncovered · unplanned"),
+  ].join("");
+  const warn=RM.denom_warn?`<span class="bad">⚠ MẪU SỐ GIẢM — tín hiệu gian lận chỉ số (L1 §0.2)</span> · `:"";
+  rmn.innerHTML=`${warn}L3 generated <code>${esc(RM.generated||"?")}</code> · re-run <code>adp-roadmap.sh</code> to refresh · `+
+    `<span class="muted">✅ DONE · 🔶 một phần · ⬜ TODO · ⛔ BLOCKED · ⚪ chưa có spec</span>`;
+  const rmTable=(title,rows)=> (!rows||!rows.length)?"":
+    `<h2>${esc(title)}</h2><table><thead><tr><th>roadmap id</th><th>state</th><th>phase done</th><th>phase trỏ tới</th></tr></thead><tbody>`+
+    rows.map(r=>`<tr><td class="info">${esc(r.id)}</td><td>${esc(r.state)}</td>`+
+      `<td class="nowrap">${esc(r.prog)}</td><td class="muted">${esc(r.phases)}</td></tr>`).join("")+
+    `</tbody></table>`;
+  rmt.innerHTML=rmTable("Internal — đếm vào 100%", RM.internal_rows)+
+                rmTable("External — chờ bên thứ ba", RM.external_rows);
+}
 </script>
 </body></html>"""
 
