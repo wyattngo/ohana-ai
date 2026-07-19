@@ -200,7 +200,8 @@ REVIEW: PASS ref=docs/reviews/2026-07-19-spec07-G1.json
 
 ### Phase G2 — Màn Chat
 <!-- ADP:PHASE G2 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=e0d0f80, gate_exit=0, duration=7s, review=PASS(judge=APPROVE,model=output-evaluator (haiku),bound=a06543688984,tier=low), ran=2026-07-19T10:05
 GOAL: Seller mở màn Chat trong app, gõ, thấy phản hồi; UI nói RÕ đây là AI tổng quát không có căn cứ dữ liệu shop; build `web/dist/` xanh; toàn suite vẫn xanh.
 APPROACH: `Chat.tsx` tái dụng shell + Astronixa tokens spec 04 (KHÔNG token mới). Gọi qua `apiFetch` (CSRF đã tập trung sẵn). State-based routing như 4 màn hiện có, KHÔNG thêm react-router. Disclaimer VI hiện thường trực, không phải tooltip ẩn.
 ALLOWED_FILES: web/, tests/test_chat_ui.py, docs/reviews/, docs/tasks/07-Task-OhanaAISeller-GeneralChat.md
