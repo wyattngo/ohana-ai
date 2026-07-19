@@ -1,7 +1,16 @@
 # ADR — Hosting Region & Customer-Data Flow (PRE-007)
 
-- **Status:** PROPOSED (2026-07-18, Claude tech-lead draft) — chờ Wyatt duyệt trước Spec 03 Phase 1 execute.
-- **Decision log:** ✅ Provider = **Together AI** (LLM + embedding), chốt 2026-07-18. ✅ Embedding = **`multilingual-e5-large-instruct`** (1024-dim). ⏳ Chờ chốt để ký: **deployment-region** (Open-Q #1) + **legal path** (Open-Q #4).
+- **Status:** **ACCEPTED** — Wyatt, 2026-07-19.
+- **Decision log:** ✅ Provider = **Together AI** (LLM + embedding), chốt 2026-07-18. ✅ Embedding = **`multilingual-e5-large-instruct`** (1024-dim). ✅ **Deployment-region = Together US serverless ngay** (Open-Q #1, Wyatt 2026-07-19) → self-host VN/SG khi residency buộc. ⚠️ **Legal path (Open-Q #4) KHÔNG đóng bằng chữ ký này** — xem "Nghĩa vụ pháp lý chưa có chủ" ngay dưới.
+- **Ghi chú phạm vi chữ ký:** ACCEPTED này chốt **kiến trúc**. Nó KHÔNG xác nhận đã tuân thủ PDPL, và KHÔNG có giá trị tư vấn pháp lý.
+
+> ### ⚠️ Nghĩa vụ pháp lý chưa có chủ (2026-07-19)
+>
+> Chọn US serverless = **posture Option C**: PII khách VN (tên, sđt, địa chỉ, nội dung đơn) vượt biên sang US. PDPL + Nghị định 356/2025 buộc: **(a)** thoả thuận với bên nhận, **(b)** **TIA nộp Bộ Công an trong 60 ngày kể từ lần chuyển ĐẦU TIÊN** + cập nhật mỗi 6 tháng, **(c)** consent/căn cứ hợp pháp. Chế tài tới **5% doanh thu năm trước hoặc 3 tỷ VND**.
+>
+> **Hôm nay chưa ai nhận việc này và chưa có deadline.** Ghi ra để nó không trôi thành giả định rằng "ADR ký rồi = xong pháp lý".
+>
+> **Đồng hồ 60 ngày CHƯA chạy** — GĐ0 mới chỉ có General Chat (seller ↔ AI, không có tin nhắn khách) và corpus wiki chưa land (PRE-003). Nó bắt đầu chạy kể từ **tin nhắn khách hàng THẬT đầu tiên** đi qua embedding/LLM — tức là khi Spec 03c mount webhook Zalo. **Đó là mốc phải có consent-UX + hồ sơ, không phải mốc để bắt đầu nghĩ về nó.**
 - **Spec:** `docs/tasks/03-Task-GD0-AcceptanceBackfill.md` PRE-007 (block Phase 1). Gate post-check: `test -f docs/adr/2026-07-18-hosting-region.md && grep -q "<token chấp-thuận>" $_`.
 - **Liên quan:** TL-5 trong `docs/tasks/PLAN-TechLead-Decomposition-Roadmap.md` (residency đe doạ F1 embedder đã ship). Spec 05 F1 = `OpenAIEmbedder` / `text-embedding-3-small` (endpoint OpenAI US).
 
@@ -97,10 +106,10 @@ PRE-007 yêu cầu ADR cover 4 thứ: (a) region, (b) data-flow qua LLM provider
 
 ## Open questions — Wyatt chốt khi duyệt
 
-1. **Deployment-region:** Together **US serverless now** (posture C, consent+dossier) → self-host VN/SG later? Hay cần Dedicated-APAC / self-host **ngay** từ GĐ0?
+1. ~~**Deployment-region**~~ ✅ **RESOLVED 2026-07-19 — Wyatt chốt: Together US serverless ngay**, posture C (consent + dossier), self-host VN/SG khi residency buộc. Lý do: đây đã là thực tế đang chạy (spec 07 G0–G2 dùng Together US serverless), nên chữ ký phê chuẩn hiện trạng thay vì mô tả một hệ thống không tồn tại. Weights open nên đổi nơi deploy sau KHÔNG phải làm lại prompt/eval — chỉ re-embed nếu đổi embedding model.
 2. ~~Embedding có đi cùng Together không?~~ ✅ **RESOLVED 2026-07-18** — Wyatt chốt chuyển embedding → Together `multilingual-e5-large-instruct` (1024-dim). F1 swap thành work-item (xem Consequences).
 3. **LLM model nào trên Together** cho drafting VN — Qwen2.5 / Llama-3.x / DeepSeek / SeaLLM? (eval-SEED chọn, không chốt vội).
-4. **Legal:** đường hồ sơ vượt biên VN→US (Together serverless) + phiên bản luật áp dụng — ai xác nhận?
+4. **Legal:** đường hồ sơ vượt biên VN→US + phiên bản luật áp dụng — **VẪN MỞ, CHƯA CÓ CHỦ** (Wyatt 2026-07-19: ghi là điều kiện song song, chưa giao ai). Chữ ký ACCEPTED ở trên KHÔNG đóng mục này. Cần luật sư VN + US xác nhận; deadline thực tế = trước khi tin nhắn khách THẬT đầu tiên chạy qua pipeline (Spec 03c mount webhook). Xem hộp cảnh báo đầu file.
 5. **Consent-UX:** land onboarding GĐ0 (shops table, Spec 03b-B1) — thêm scope?
 6. **Budget re-embed** (1536→1024) khi PRE-003 land — chấp nhận?
 
@@ -108,4 +117,13 @@ PRE-007 yêu cầu ADR cover 4 thứ: (a) region, (b) data-flow qua LLM provider
 
 ## How to accept
 
-Wyatt duyệt bằng cách: đổi dòng **Status** ở đầu file `PROPOSED` → **token chấp-thuận chữ hoa** (đúng chuỗi mà Phase-1 post-check `grep` tìm) + ngày + "Wyatt", và điền lựa chọn ở Open-questions #1–2. Tôi **cố ý chưa gõ token đó** vào file để gate PRE-007 còn đỏ đúng cho tới khi anh thực sự ký. Sau khi duyệt: mở ticket cập nhật F1 embedder (OpenAI `text-embedding-3-small` 1536 → Together `multilingual-e5-large-instruct` 1024) + Spec 05 status **trước** khi Spec 03 Phase 1/D chạy.
+~~Wyatt duyệt bằng cách…~~ ✅ **ĐÃ KÝ — Wyatt, 2026-07-19.** Status ở đầu file đã mang token chấp-thuận, gate PRE-007 của Spec 03 Phase 1 giờ XANH.
+
+**Việc bật ra ngay sau chữ ký (chưa làm — đừng coi ADR này là đã thực thi):**
+
+1. **F1 embedder swap** — `OpenAIEmbedder` (`text-embedding-3-small`, 1536) → Together `multilingual-e5-large-instruct` (1024). Kéo theo: Alembic migration đổi `Vector(1536)` → `Vector(1024)` (`db/models.py:_EMBED_DIM`), re-embed toàn corpus khi PRE-003 land, và **ISSUE-016 live acceptance phải chạy lại trên e5 — kết quả cũ trên OpenAI KHÔNG áp dụng**.
+2. **Spec 05 status** — F1 embedder-provider ghi là "chưa final chờ ADR"; giờ đã final, cập nhật lại.
+3. **Consent-UX** (Open-Q #5) — land ở onboarding cùng shops table (Spec 03b-B1), TRƯỚC khi webhook mount.
+4. **Legal (Open-Q #4)** — chưa có chủ. Xem hộp cảnh báo đầu file.
+
+⚠️ Không mục nào ở trên nằm trong spec 07. Chúng là công việc mới, cần spec/phase riêng.

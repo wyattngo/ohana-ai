@@ -3,17 +3,11 @@
   "configurations": [
     {
       "name": "ohana-api",
-      "runtimeExecutable": "env",
+      "//": "Nạp .env vào TIẾN TRÌNH trước khi chạy uvicorn. Cần thật: app/config.py Settings cố ý KHÔNG dùng env_file (một env_file sẽ đọc file dev ngay cả sau monkeypatch.delenv trong test — đúng bẫy stale-env spec 05 P0 sinh ra để đóng), nên .env có key mà tiến trình vẫn không thấy. Trước khi có dòng này, /api/chat trả 500 'Missing credentials' dù TOGETHER_API_KEY nằm sẵn trong .env. Nạp ở tầng launcher, KHÔNG nạp trong app code: production phải đòi env tường minh, không im lặng đọc file.",
+      "runtimeExecutable": "/bin/sh",
       "runtimeArgs": [
-        "OHANA_ENV=dev",
-        "/Users/wyattngo/Sites/localhost/ohana-ai/.venv/bin/python",
-        "-m",
-        "uvicorn",
-        "app.main:app",
-        "--port",
-        "8010",
-        "--host",
-        "127.0.0.1"
+        "-c",
+        "cd /Users/wyattngo/Sites/localhost/ohana-ai && set -a && . ./.env && set +a && OHANA_ENV=dev exec .venv/bin/python -m uvicorn app.main:app --port 8010 --host 127.0.0.1"
       ],
       "port": 8010
     },

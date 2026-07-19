@@ -21,6 +21,8 @@ outside this phase's scope; deferred to whichever phase adds a real drafter.
 
 from __future__ import annotations
 
+import logging
+import os
 import secrets
 from pathlib import Path
 
@@ -42,6 +44,24 @@ from auth.identity import (
     require_admin,
 )
 from db.session import make_session_factory
+
+# ---- Logging ------------------------------------------------------------------------------
+# Uvicorn cấu hình logger CỦA NÓ (`uvicorn.*`) rồi để root KHÔNG có handler và mức mặc định
+# WARNING. Nên mọi `logger.info(...)` của app bị NUỐT im lặng khi chạy thật.
+#
+# Đã cháy thật (2026-07-19): G1 yêu cầu log `model/token_in/token_out/latency_ms/shop_id` mỗi
+# request chat. Test dùng `caplog.at_level(logging.INFO)` — pytest TỰ ÉP mức, nên test xanh —
+# nhưng server thật không in một dòng nào. Phát hiện khi mở trình duyệt bấm thử rồi grep log
+# không thấy gì. Bài học: caplog chứng minh "code có gọi logger", KHÔNG chứng minh "log xuất
+# hiện ở production".
+#
+# `force=True` vì uvicorn đã chạy dictConfig trước khi import module này; không có nó thì
+# basicConfig thấy root đã được đụng tới và lặng lẽ không làm gì.
+logging.basicConfig(
+    level=os.environ.get("OHANA_LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    force=True,
+)
 
 app = FastAPI(title="Ohana AI Seller", version="0.1.0")
 
