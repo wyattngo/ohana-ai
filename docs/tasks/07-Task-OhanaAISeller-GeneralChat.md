@@ -178,7 +178,8 @@ REVIEW: PASS ref=docs/reviews/2026-07-19-spec07-G0.json
 
 ### Phase G1 — `POST /api/chat` + ranh giới an toàn
 <!-- ADP:PHASE G1 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=3b1883d, gate_exit=0, duration=3s, review=PASS(judge=APPROVE,model=output-evaluator (haiku) — 3 rounds,bound=427f4c2f9f62,tier=medium), ran=2026-07-19T09:38
 GOAL: Seller đã đăng nhập POST `/api/chat` nhận phản hồi thật từ Together; `shop_id` chỉ từ JWT; thiếu cookie → 401, thiếu CSRF → 403; body claim `shop_id` khác JWT → dùng JWT; **gate ranh giới: `api/chat.py` KHÔNG với tới sender/`PendingReply`/`policy_gate`**; log `model_id`/`token_in`/`token_out`/`latency_ms`/`shop_id`.
 APPROACH: `api/chat.py` follow shape `api/inbox.py` (router builder + `identity_dep`). LLM client **inject qua tham số** để test dùng fake, không gọi mạng. Mount trong `app/main.py` TRƯỚC `StaticFiles`. Response `{reply, model, grounded: false, usage:{...}}` — cờ `grounded` tường minh để consumer sau không nhầm. Gate ranh giới đọc module `api.chat` + toàn bộ import transitive, FAIL nếu chạm `bridge.*sender*` / `PendingReply` / `agent.policy_gate`.
 ALLOWED_FILES: api/chat.py, app/main.py, tests/test_chat_endpoint.py, app/config.py, agent/providers/together_client.py, tests/test_together_client.py, tests/test_together_live.py, tests/test_config.py, .env.example, docs/reviews/, docs/tasks/07-Task-OhanaAISeller-GeneralChat.md
