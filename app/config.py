@@ -62,9 +62,24 @@ class Settings(BaseSettings):
         `gpt-4o-mini` từ Together ⇒ 404. Toàn bộ 90 test vẫn xanh vì test dùng fake client,
         không chạm model id thật.
 
-        Áp cho MỌI field, không riêng Together: cùng cái bẫy đang chờ ở `DATABASE_URL`,
-        `OHANA_JWT_SECRET`, `OPENAI_MODEL`. Với `str | None` thì bỏ key đi cũng ra `None` như
-        cũ — không đổi hành vi; với `str` có default thì đây chính là phần vá.
+        PHẠM VI — chỉ field VÔ HƯỚNG (`str`, `str | None`). Đó là nơi cái bẫy đang chờ:
+        `DATABASE_URL`, `OHANA_JWT_SECRET`, `OPENAI_MODEL`. Với `str | None` thì bỏ key đi
+        cũng ra `None` như cũ — không đổi hành vi; với `str` có default thì đây chính là
+        phần vá.
+
+        ⚠️ KHÔNG phủ field kiểu PHỨC (`frozenset[str]`, list, dict) — ISSUE-018. Validator
+        này chạy `mode="before"`, nhưng "before" ở đây là *sau* khi `EnvSettingsSource` đã
+        parse giá trị env thành JSON. Với field phức, chuỗi rỗng nổ ngay tại tầng source và
+        validator không bao giờ nhìn thấy nó:
+
+            REASONING_MODELS=  ⇒  SettingsError: error parsing value for field
+                                  "reasoning_models" from source "EnvSettingsSource"
+
+        Nên đừng đọc hàm này như một hàng rào toàn diện. Field phức muốn "rỗng = chưa set"
+        thì phải BỎ HẲN dòng env, hoặc dùng `NoDecode` + validator riêng cho field đó.
+        Hôm nay chỉ có ĐÚNG MỘT field phức (`reasoning_models`) và nó không nằm trong
+        `.env.example`, nên lỗ này fail-loud lúc khởi động chứ không silent-wrong — thêm
+        field phức thứ hai thì đọc lại ISSUE-018 trước.
 
         Đã kiểm tay trên path bảo mật (`get_jwt_secret`), fail-closed giữ nguyên: unset /
         rỗng / production đều RAISE, secret thật vẫn OK, dev vẫn fallback. Có ĐÚNG MỘT thay
