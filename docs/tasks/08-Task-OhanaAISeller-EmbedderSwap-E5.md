@@ -175,7 +175,7 @@ ALLOWED_FILES: agent/embedder.py, agent/providers/together_embedder.py, app/conf
 GATE: .venv/bin/python -m pytest tests/test_together_embedder.py -x -q
 GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && .venv/bin/mypy app agent retrieval parsing storage db bridge tools && .venv/bin/ruff check . && .venv/bin/ruff format --check .
 RETRY: 0/3
-RISK: medium (proposed — ALLOWED_FILES KHÔNG giao RISK_PATHS ⇒ floor là low; đề xuất nâng lên medium theo tiền lệ spec 07 G0, vì đây là adapter provider mới + đổi ABC dùng chung. Wyatt chốt.)
+RISK: medium (SIGNED Wyatt 2026-07-19 — chốt theo đề xuất. Nâng trên floor `low` vì adapter provider mới + đổi ABC dùng chung; tiền lệ spec 07 G0.)
 BLOCKED_BY: PRE-E01 ✅
 SMOKE: (điền khi chạy — có mặt runtime: gọi e5 thật)
 <!-- /ADP -->
@@ -196,7 +196,7 @@ ALLOWED_FILES: db/models.py, db/migrations/versions/, api/admin.py, app/config.p
 GATE: .venv/bin/python -m pytest tests/test_embedding_dim.py tests/test_embedder_wiring.py -x -q
 GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && .venv/bin/mypy app agent retrieval parsing storage db bridge tools && .venv/bin/ruff check . && .venv/bin/ruff format --check .
 RETRY: 0/3
-RISK: high (proposed — ALLOWED_FILES giao RISK_PATHS ở `db/migrations` VÀ `api/admin.py` ⇒ floor medium; đề xuất **high** vì migration ĐỔI schema và XOÁ dữ liệu, không chỉ chạm file. Wyatt chốt; nếu high thì cần human review artifact bound cùng diff.)
+RISK: high (SIGNED Wyatt 2026-07-19 — chốt theo đề xuất. Nâng trên floor `medium` vì migration ĐỔI schema và XOÁ dữ liệu, không chỉ chạm file. ⇒ per-step confirm + human review artifact `human=<file>` ký `REVIEWED_BY` bound cùng diff; auto-verdict Haiku KHÔNG đủ.)
 BLOCKED_BY: E0, PRE-E02 ✅, PRE-E03 ✅, PRE-E04 ⏳
 SMOKE: (điền khi chạy — có mặt runtime: migration trên Postgres thật)
 <!-- /ADP -->
@@ -217,7 +217,7 @@ ALLOWED_FILES: tests/test_wiki_rag_live.py, docs/memory/KNOWN_ISSUES.md, CLAUDE.
 GATE: .venv/bin/python -m pytest tests/test_wiki_rag_live.py -m live -x -q
 GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && .venv/bin/ruff check . && .venv/bin/ruff format --check .
 RETRY: 0/3
-RISK: low (proposed — ALLOWED_FILES KHÔNG giao RISK_PATHS; chỉ test + docs)
+RISK: low (SIGNED Wyatt 2026-07-19 — chốt theo đề xuất. ALLOWED_FILES KHÔNG giao RISK_PATHS; chỉ test + docs.)
 BLOCKED_BY: E1
 SMOKE: (điền khi chạy — chính phase này LÀ smoke; artifact phải dán output live test thật)
 <!-- /ADP -->
@@ -316,7 +316,7 @@ Commit: `adp/08-Task-OhanaAISeller-EmbedderSwap-E5 phase-<id>: <concern>`
 
 ## §13 — Tracking
 
-| Phase | Concern | RISK (proposed) | STATUS | BLOCKED_BY | EVIDENCE |
+| Phase | Concern | RISK (SIGNED) | STATUS | BLOCKED_BY | EVIDENCE |
 |---|---|---|---|---|---|
 | E0 | `TogetherEmbedder` + query/passage split | medium | TODO | — | — |
 | E1 | Migration 1536→1024 + wire factory | **high** | TODO | E0, PRE-E04 | — |
