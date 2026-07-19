@@ -167,7 +167,8 @@ PRE-E04: Wyatt chốt số phận vector cũ.
 
 ### Phase E0 — `TogetherEmbedder` + query/passage split
 <!-- ADP:PHASE E0 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=8ba4fef, gate_exit=0, duration=6s, review=PASS(judge=APPROVE,model=unknown,bound=93201661e389,tier=medium), smoke=PASS(bound=93201661e389), ran=2026-07-19T22:23
 ROADMAP: GD0-EMBED
 GOAL: `TogetherEmbedder` gọi được e5 thật (1024-dim), prefix `query:`/`passage:` đặt ĐÚNG bên; `Embedder` ABC có `embed_query`/`embed_documents` với default delegate ⇒ `OpenAIEmbedder` + `_DeterministicDevEmbedder` KHÔNG vỡ; gate BẤT ĐỐI XỨNG đỏ khi prefix lệch bên.
 APPROACH: ABC thêm 2 concrete method (KHÔNG abstract — thêm abstract sẽ phá mọi impl hiện có). `TogetherEmbedder` bám shape `together_client.py` spec 07 G0: base_url hằng số, model/key từ `Settings`, resolve model bằng `.strip() or DEFAULT` để chuỗi rỗng không trượt sang provider khác (đúng bug 2026-07-19). Call-site (`ingest.py`/`wiki.py`) chuyển sang `embed_documents`/`embed_query` — prefix là việc của ADAPTER, không phải của call-site, vì OpenAI không dùng prefix.
