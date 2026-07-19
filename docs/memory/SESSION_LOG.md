@@ -203,3 +203,37 @@
   3. **ISSUE-017** — thêm unique `(shop_id, customer_id, channel)` **trước khi** Spec 03c mount webhook.
   4. **Push** `main` (ahead 6, chưa lên origin). Cân nhắc sửa spec 06 §0 `Branch:` cho khớp thực tế.
   5. General Chat (Together key đã có) — spec riêng, ưu tiên 1 theo Roadmap v4 §3.0.
+
+## 2026-07-19 — Spec 07 General Chat (G0/G1/G2) + ADR PRE-007 ký + SMOKE gate
+
+**Done.** Spec 07 3/3 → ADP 21/31 (67%). `TogetherClient` = subclass 17 dòng của `OpenAIClient`
+(Together OpenAI-compatible ⇒ không nhân bản 380 dòng streaming/tool-call); `POST /api/chat` có
+auth + CSRF + gate ranh giới import-graph; màn Chat có disclaimer thường trực + loading state.
+109 test, mypy 0, đã push (`main` == `origin/main`).
+
+**Quyết định.**
+- ADR PRE-007 **ACCEPTED**: region = Together US serverless ngay, self-host VN/SG khi residency
+  buộc. Legal path **cố ý để mở** — chữ ký chốt kiến trúc, không đóng nghĩa vụ PDPL.
+- PRE-G02 **ký lại**: `meta-llama/Llama-3.3-70B-Instruct-Turbo`. Model ký trước
+  (`Qwen2.5-72B-Instruct-Turbo`) KHÔNG serverless — có trong `/v1/models` kèm bảng giá mà gọi vẫn 400.
+- G2 tier = low (Wyatt tick).
+
+**Bài học — 5 lỗi lọt qua 107 test xanh + mypy sạch + 3 vòng review:**
+1. `TogetherClient` gọi Together bằng `gpt-4o-mini` → 404 (`TOGETHER_MODEL=` rỗng ghi đè default,
+   falsy, trượt chuỗi `or` sang `openai_model`). Fake client không quan tâm model id có thật không.
+2. Model đã ký không tồn tại dạng serverless. **Danh sách `/v1/models` không phải bằng chứng.**
+3. `logger.info` bị uvicorn nuốt (root không handler, mức WARNING) ⇒ observability G1 im lặng hoàn
+   toàn. Test xanh vì `caplog.at_level(INFO)` **tự ép mức**.
+4+5. Hai lỗi layout G2 (ô nhập bị bóp còn một sợi; ô nhập bị đẩy khỏi màn hình khi hội thoại dài) —
+   repo không có Playwright nên không test nào thấy được.
+
+Cả 5 chỉ lộ khi chạy thật. ⇒ **SMOKE gate** (`.claude/tools/adp-smoke.sh` + enforce trong
+`adp-checkpoint.sh`): mỗi phase phải có `SMOKE: PASS ref=…` hoặc `SMOKE: N/A <lý do>`.
+Bắt buộc KHAI BÁO, không bắt buộc CHẠY — bắt smoke chỗ không có mặt runtime chỉ đẻ ra tick bừa.
+
+**Đo được.** Cold start 24.8s / call sau ~1.2s. `token_cached=0` trên 3 request giống hệt
+(1236 prompt token) ⇒ không có bằng chứng prompt-cache phía Together; xem lại sau khi Wiki-RAG land.
+
+**Next.** Spec 03 (0/10, 4 BLOCKED chờ Tân) · ISSUE-016 giờ là 4 việc thật (TogetherEmbedder +
+migration 1536→1024 + re-embed + live trên e5), chưa spec nào nhận · ISSUE-017 phải đóng TRƯỚC
+Spec 03c mount webhook · legal TIA/consent chưa có chủ.

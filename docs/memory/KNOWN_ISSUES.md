@@ -98,6 +98,8 @@
 - **Severity:** low (Phase 1.2 test bằng py_compile, không runtime-import; roadmap Phase 3+)
 - **Status:** ⏳ PARTIAL — `app/config.py` half RESOLVED bởi spec 05 P0 (2026-07-17); `app/alert_service.py` half còn OPEN.
 - **Detail:** `agent/providers/openai_client.py` imports `from app import alert_service` (line 28) + `from app.config import get_settings` (line 13). `agent/providers/openai_embedder.py` imports chỉ `from app.config import get_settings`. test_ports dùng `py_compile` (parse-only) nên GATE pass dù runtime-import vỡ.
+- **Cập nhật 2026-07-19 (spec 07 G0) — COUPLING GỠ, ISSUE VẪN OPEN:** `OpenAIClient` KHÔNG còn import module-level `app.alert_service`; telemetry 429 thành hook tiêm `on_rate_limit` (`Callable[[], Awaitable[None]] | None`). Module import sạch, `TogetherClient` dựng được trên nó. `xfail(strict=True)` trong `tests/test_config.py` đã **ĐẢO CHIỀU** thành assertion thật (`test_openai_client_imports_without_alert_service`) — giữ test để chặn ai đó thêm lại import module-level vào thứ chưa tồn tại.
+  - ⚠️ **VẪN OPEN:** `app/alert_service.py` CHƯA port. Hôm nay **429 không được đếm ở đâu cả** trừ khi caller tự tiêm hook — đây là capability regression spec 07 chấp nhận có ý thức, KHÔNG phải đã giải quyết.
 - **Cập nhật 2026-07-17 (spec 05 P0):** `app/config.py` đã build (Settings 4 field). Hệ quả: `OpenAIEmbedder` (F1) giờ import + instantiate được — nửa embedder của ISSUE-010 + toàn bộ ISSUE-016 config-half GIẢI QUYẾT. NHƯNG `OpenAIClient` (LLM chat, F2/F3) VẪN vỡ vì `app/alert_service.py` chưa port. Encode ở `tests/test_config.py::test_openai_client_import_blocked_by_unported_alert_service` (`xfail(strict=True)` — flip hard-fail khi port xong, không rot).
 - **Action còn lại:** port `app/alert_service.py` (fire-and-forget 429 counter — stub no-op OK ở MVP) — thuộc **LLM-client wiring spec** (F2/F3, cùng lúc wire `OpenAIClient` + concrete `Drafter` + webhook mount, gated PRE-004). KHÔNG thuộc spec 05 (F1 không cần LLM client). Khi làm: xoá xfail ở test_config.py.
 
@@ -144,6 +146,8 @@ _Empty. Log ở đây khi port drnickv4 phát hiện bug nhưng defer fix per sp
 - **Action:** Thêm Alembic migration `UNIQUE (shop_id, customer_id, channel)` trên `conversations` + đổi phần Conversation sang cùng shape upsert như Customer. **BẮT BUỘC làm TRƯỚC khi Spec 03c mount webhook** — đừng dựa vào "chưa xảy ra bao giờ".
 
 ### ISSUE-016 — F1 wiki-RAG chưa từng chạy với embedding thật (⚠️ ĐỔI BẢN CHẤT 2026-07-18: provider chuyển sang Together e5)
+
+- **Cập nhật 2026-07-19 — ADR PRE-007 đã ACCEPTED, blocker đổi từ 'chờ ký' sang 'chờ làm':** provider + embedding giờ là quyết định chốt (Together, `intfloat/multilingual-e5-large-instruct` 1024-dim). Việc còn lại KHÔNG còn là chờ ai duyệt mà là công việc thật: (1) `TogetherEmbedder` thay `OpenAIEmbedder`; (2) Alembic migration `Vector(1536)` → `Vector(1024)` (`db/models.py:_EMBED_DIM`); (3) re-embed corpus khi PRE-003 land; (4) chạy live acceptance **trên e5, KHÔNG phải OpenAI** — kết quả cũ trên OpenAI không áp dụng. Chưa có spec/phase nào nhận 4 việc này.
 - **Origin:** phát hiện lúc executor P2 wire `api/admin.py` mount (spec 04) 2026-07-17
 - **Discovered:** 2026-07-17 · session spec-04-P2
 - **Severity:** **high** (không chặn GĐ0.5 vì PRE-003 chưa land, nhưng chặn F1 thật)
