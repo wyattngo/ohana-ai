@@ -22,7 +22,8 @@ _DEFAULT_K = 5
 
 
 class _EmbedderProto(Protocol):
-    async def embed(self, texts: list[str]) -> list[list[float]]: ...
+    # Chỉ khai method mà hàm này THỰC SỰ gọi. Search là bên QUERY ⇒ `embed_query`.
+    async def embed_query(self, text: str) -> list[float]: ...
 
 
 async def search_wiki(
@@ -35,7 +36,10 @@ async def search_wiki(
     """Embed `query`, retrieve top-k chunks from the shared platform wiki."""
     if not query or not query.strip():
         return []
-    (vec,) = await embedder.embed([query])
+    # `embed_query`, KHÔNG `embed`: đây là bên QUERY. Phải khớp vai với
+    # `parsing/ingest.py` (`embed_documents`) — lệch vai không crash, chỉ làm retrieval tệ
+    # đi âm thầm (spec 08 §7 E0, gate bất đối xứng).
+    vec = await embedder.embed_query(query)
     retriever = PgvectorRetriever(session_factory, shop_scope=PLATFORM_SHOP_ID)
     return await retriever.search(namespaces=[PLATFORM_WIKI_NAMESPACE], query=vec, k=k)
 

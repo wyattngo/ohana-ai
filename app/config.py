@@ -38,6 +38,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # bán hàng. Vẫn là open-weight ⇒ lập luận portability của ADR PRE-007 giữ nguyên.
 DEFAULT_TOGETHER_MODEL = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
 
+# Embedding model mặc định — ADR PRE-007 (ACCEPTED 2026-07-19) chốt e5 open-weight thay
+# `text-embedding-3-small` của OpenAI. Không lấy từ bảng giá hay `/v1/models`: spec 08 §5.1
+# gọi thật `POST /v1/embeddings` → HTTP 200, dimension THẬT = 1024. (Bài học spec 07: model
+# có trong danh sách kèm giá vẫn có thể trả 400 "non-serverless" — danh sách không phải
+# bằng chứng.)
+DEFAULT_TOGETHER_EMBED_MODEL = "intfloat/multilingual-e5-large-instruct"
+
 
 class Settings(BaseSettings):
     # No `env_file` — read from process env only, matching how every other env-reader in this
@@ -136,6 +143,16 @@ class Settings(BaseSettings):
     # Đổi default ở đây KHÔNG kéo theo migration nào (khác `openai_embed_model`): chat model
     # không đụng cột vector.
     together_model: str = DEFAULT_TOGETHER_MODEL
+
+    # `TOGETHER_EMBED_MODEL`. Default = e5 chốt ở ADR PRE-007, đã verify bằng gọi thật
+    # (spec 08 §5.1: POST /v1/embeddings → 200, dim THẬT = 1024).
+    #
+    # ⚠️ KHÁC `together_model` ở một điểm sống còn: đổi default Ở ĐÂY **KÉO THEO MIGRATION**.
+    # Model embedding quyết định số chiều của cột `embeddings.embedding`; đổi model mà không
+    # đổi `Vector(...)` thì Postgres từ chối insert (ồn ào, an toàn) — nhưng đổi cả hai mà
+    # không re-embed thì corpus cũ nằm sai không gian và retrieval hỏng ÂM THẦM. Xem
+    # `db/models.py _EMBED_DIM` + spec 08 §8 trước khi chạm dòng này.
+    together_embed_model: str = DEFAULT_TOGETHER_EMBED_MODEL
 
     # ---- P2 (spec 05 §7 Phase P2) — consolidate the remaining direct `os.environ.get(...)`
     # reads into this one Settings surface. Pure refactor: these three fields exist so

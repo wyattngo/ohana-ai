@@ -23,6 +23,8 @@ import os
 
 import pytest
 
+from agent.embedder import Embedder
+
 DATABASE_URL = os.environ.get(
     "DATABASE_URL", "postgresql+psycopg://ohana:ohana@localhost:5432/ohana"
 )
@@ -30,10 +32,15 @@ DATABASE_URL = os.environ.get(
 VECTOR_DIM = 1536
 
 
-class FakeEmbedder:
+class FakeEmbedder(Embedder):
     """Deterministic sparse-ish embedder. Splits text on whitespace, hashes each token into a
     fixed slot in a `VECTOR_DIM`-length vector (value = 1.0). Two texts that share a token also
     share a slot → cosine distance is smaller. No network, no model, fully reproducible.
+
+    Kế thừa `Embedder` (spec 08 E0) chứ KHÔNG duck-type nữa. Bản duck-type chỉ có `embed()`
+    đã vỡ ngay khi ABC mọc thêm `embed_query`/`embed_documents` — fake không kế thừa thì mỗi
+    lần contract đổi lại phải sửa tay từng chỗ, và chỗ nào quên thì hỏng lúc chạy chứ không
+    phải lúc type-check. Kế thừa xong, default delegate của ABC lo phần còn lại.
     """
 
     async def embed(self, texts: list[str]) -> list[list[float]]:

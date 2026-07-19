@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from agent.embedder import Embedder
 from agent.providers.openai_embedder import OpenAIEmbedder
 from app.config import get_settings
 from auth.identity import Identity
@@ -25,10 +26,13 @@ _DEV_EMBED_DIM = 1536  # must match db.models.Embedding.embedding (Vector(_EMBED
 
 
 class _EmbedderProto(Protocol):
-    async def embed(self, texts: list[str]) -> list[list[float]]: ...
+    # Khai đúng method route này truyền xuống `ingest_wiki` — bên CORPUS ⇒ `embed_documents`
+    # (spec 08 E0). Trước E0 chỗ này khai `embed`; giữ nguyên sẽ lệch với
+    # `parsing.ingest._EmbedderProto` và mypy bắt được ngay ở call site.
+    async def embed_documents(self, texts: list[str]) -> list[list[float]]: ...
 
 
-class _DeterministicDevEmbedder:
+class _DeterministicDevEmbedder(Embedder):
     """GD0.5 placeholder embedder — only selected by `default_embedder()` below when there is no
     `OPENAI_API_KEY` AND `OHANA_ENV=dev`. Since spec 05 Phase P1, `app/config.py` exists and
     `agent.providers.openai_embedder.OpenAIEmbedder` is the default whenever a key IS configured

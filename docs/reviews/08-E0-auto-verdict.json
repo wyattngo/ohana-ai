@@ -1,0 +1,30 @@
+{
+  "verdict": "APPROVE",
+  "phase": "E0",
+  "spec": "08-Task-OhanaAISeller-EmbedderSwap-E5.md",
+  "reviewer": "output-evaluator (sonnet), prompt siết theo bài học APPROVE-nhầm-cross-tenant",
+  "scores": {
+    "correctness": 9,
+    "completeness": 9,
+    "safety": 9
+  },
+  "summary": "Prefix đúng bên (lần theo call-site thật, không đọc comment). Câu hỏi trọng tâm — _DeterministicDevEmbedder kế thừa Embedder có mở đường vòng qua guard OHANA_ENV không — trả lời KHÔNG: lớp này chỉ override embed() (đã guard), embed_query/embed_documents dùng default delegate của ABC gọi thẳng self.embed() nên mọi đường vào đều qua guard. Resolve model 3 lớp không rơi sang provider khác. 6/7 nhóm assertion là gate thật.",
+  "findings": [
+    {
+      "severity": "low",
+      "file": "tests/test_together_embedder.py:278",
+      "issue": "Assertion (g) là trang trí với code hiện tại — key không lưu làm attribute, không có __repr__ custom, phá gì cũng không đỏ.",
+      "status": "ĐÃ SỬA — thêm docstring nói thẳng nó không gate hiện tại mà gate tương lai; sửa luôn câu khai quá lời trong docs/smokes/08-E0.md"
+    },
+    {
+      "severity": "low",
+      "file": "docs/.adp-red-proof.json",
+      "issue": "Artifact máy sinh của bước TDD-RED nhưng không có trong ALLOWED_FILES.",
+      "status": "ĐÃ SỬA — thêm vào ALLOWED_FILES"
+    }
+  ],
+  "blocking": false,
+  "diff_sha256": "93201661e38955ea266a1b0e8fb7da2f3cd9a79e2f1c5e6dbcf194a417e8b3a0",
+  "stamped_at": "2026-07-19T22:23",
+  "model": "unknown"
+}

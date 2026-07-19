@@ -20,7 +20,9 @@ PLATFORM_WIKI_NAMESPACE = "platform_wiki"
 
 
 class _EmbedderProto(Protocol):
-    async def embed(self, texts: list[str]) -> list[list[float]]: ...
+    # Chỉ khai method mà hàm này THỰC SỰ gọi. Ingest là bên CORPUS ⇒ `embed_documents`.
+    # Khai thêm `embed` sẽ bắt mọi fake phải có cả hai mà không ai dùng tới.
+    async def embed_documents(self, texts: list[str]) -> list[list[float]]: ...
 
 
 async def ingest_wiki(
@@ -41,7 +43,10 @@ async def ingest_wiki(
     if not chunks:
         return 0
 
-    vectors = await embedder.embed(chunks)
+    # `embed_documents`, KHÔNG `embed`: đây là bên CORPUS. Với adapter e5 nó gắn
+    # `passage: `; với OpenAI nó delegate y nguyên về `embed()`. Gọi thẳng `embed()` ở đây
+    # sẽ làm corpus mất dấu vai và lệch không gian so với query (spec 08 §7 E0).
+    vectors = await embedder.embed_documents(chunks)
     if len(vectors) != len(chunks):
         raise RuntimeError(f"embedder returned {len(vectors)} vectors for {len(chunks)} chunks")
 

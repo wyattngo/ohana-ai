@@ -16,5 +16,11 @@
     "red_exit": "1",
     "red_ts": "2026-07-17T08:59:10+0700",
     "files": "agent/policy_gate.py,agent/orchestrator.py,db/models.py,db/repos.py,db/migrations/versions/0002_pending_reply.py,bridge/zalo_sender.py,api/webhook.py,api/inbox.py"
+  },
+  "08-E0-together-embedder": {
+    "acc_sha": "d46bf43ae3e86814683528442353e5ff7aac9357654b641f9bfd688914a7cbfc",
+    "red_exit": "1",
+    "red_ts": "2026-07-19T19:25:57+0700",
+    "files": "agent/embedder.py,agent/providers/together_embedder.py,app/config.py,parsing/ingest.py,tools/wiki.py"
   }
 }

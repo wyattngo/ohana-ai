@@ -167,17 +167,25 @@ PRE-E04: Wyatt chốt số phận vector cũ.
 
 ### Phase E0 — `TogetherEmbedder` + query/passage split
 <!-- ADP:PHASE E0 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 ROADMAP: GD0-EMBED
 GOAL: `TogetherEmbedder` gọi được e5 thật (1024-dim), prefix `query:`/`passage:` đặt ĐÚNG bên; `Embedder` ABC có `embed_query`/`embed_documents` với default delegate ⇒ `OpenAIEmbedder` + `_DeterministicDevEmbedder` KHÔNG vỡ; gate BẤT ĐỐI XỨNG đỏ khi prefix lệch bên.
 APPROACH: ABC thêm 2 concrete method (KHÔNG abstract — thêm abstract sẽ phá mọi impl hiện có). `TogetherEmbedder` bám shape `together_client.py` spec 07 G0: base_url hằng số, model/key từ `Settings`, resolve model bằng `.strip() or DEFAULT` để chuỗi rỗng không trượt sang provider khác (đúng bug 2026-07-19). Call-site (`ingest.py`/`wiki.py`) chuyển sang `embed_documents`/`embed_query` — prefix là việc của ADAPTER, không phải của call-site, vì OpenAI không dùng prefix.
-ALLOWED_FILES: agent/embedder.py, agent/providers/together_embedder.py, app/config.py, parsing/ingest.py, tools/wiki.py, tests/test_together_embedder.py, docs/reviews/, docs/smokes/, docs/tasks/08-Task-OhanaAISeller-EmbedderSwap-E5.md
+ALLOWED_FILES: agent/embedder.py, agent/providers/together_embedder.py, app/config.py, parsing/ingest.py, tools/wiki.py, tests/test_together_embedder.py, api/admin.py, tests/test_wiki_rag.py, tests/test_admin_ui.py, docs/memory/KNOWN_ISSUES.md, docs/.adp-red-proof.json, docs/reviews/, docs/smokes/, docs/tasks/08-Task-OhanaAISeller-EmbedderSwap-E5.md
+ALLOWED_FILES_AMENDED: 2026-07-19 — Wyatt duyệt mở rộng +4 file. Lý do: đổi contract call-site
+  (`embed()` → `embed_query`/`embed_documents`) làm vỡ MỌI fake duck-type chỉ có `embed()` —
+  `api/admin.py` `_EmbedderProto` (mypy) + 3 test ở `test_wiki_rag.py`/`test_admin_ui.py`
+  (AttributeError). Đây là hệ quả BẮT BUỘC của scope E0, không phải việc mới; spec bản đầu
+  bỏ sót. Hoãn sang E1 không được: E1 cũng không liệt 2 file test đó, và sẽ để `main` đỏ
+  giữa hai phase. `docs/memory/KNOWN_ISSUES.md` thêm để ghi ISSUE-019 (ruff, độc lập E0).
+  TIER KHÔNG ĐỔI: `api/admin.py` ∈ RISK_PATHS ⇒ floor medium; E0 đã ký medium sẵn.
 GATE: .venv/bin/python -m pytest tests/test_together_embedder.py -x -q
 GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && .venv/bin/mypy app agent retrieval parsing storage db bridge tools && .venv/bin/ruff check . && .venv/bin/ruff format --check .
 RETRY: 0/3
 RISK: medium (SIGNED Wyatt 2026-07-19 — chốt theo đề xuất. Nâng trên floor `low` vì adapter provider mới + đổi ABC dùng chung; tiền lệ spec 07 G0.)
 BLOCKED_BY: PRE-E01 ✅
-SMOKE: (điền khi chạy — có mặt runtime: gọi e5 thật)
+SMOKE: PASS ref=docs/smokes/08-E0.md
+REVIEW: PASS ref=docs/reviews/08-E0-auto-verdict.json
 <!-- /ADP -->
 
 1. `tests/test_together_embedder.py` (RED): (a) `TogetherEmbedder` là `Embedder`; (b) trỏ base_url Together, model/key từ `Settings`, KHÔNG hardcode; (c) `TOGETHER_EMBED_MODEL` rỗng ⇒ rơi về default, KHÔNG rơi sang model provider khác; (d) `embed_query` gắn `query: `, `embed_documents` gắn `passage: ` — kiểm bằng fake client bắt được text GỬI ĐI; (e) **gate bất đối xứng**: prefix không được hoán đổi/thiếu một bên; (f) `OpenAIEmbedder` + `_DeterministicDevEmbedder` vẫn thoả ABC sau khi thêm method (không vỡ impl cũ); (g) key KHÔNG lộ qua `repr()`.
