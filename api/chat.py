@@ -112,11 +112,22 @@ def build_router(
         # không log `step.content`: tin nhắn seller có thể chứa thông tin khách hàng, và PDPL
         # không cho ta rải nó vào log ứng dụng chỉ vì tiện debug. Cùng nguyên tắc đã áp cho
         # message lỗi của hook 429 ở G0.
+        # `token_cached` = prompt-cache hit do PROVIDER báo (`agent/providers/openai_client.py`
+        # `_extract_cache_hit_tokens` đọc được 3 shape: OpenAI/Together
+        # `prompt_tokens_details.cached_tokens`, DeepSeek `prompt_cache_hit_tokens`, và fallback).
+        # Đã được đo sẵn từ lúc port DrNick nhưng chưa ai ĐỌC.
+        #
+        # Log nó để trả lời bằng SỐ LIỆU, không bằng suy đoán, hai câu hỏi trước khi bàn tới
+        # việc xây cache: (a) Together có tự cache prompt không, (b) tỷ lệ `token_cached/token_in`
+        # là bao nhiêu. Hôm nay prompt ngắn (~134 token) nên gần như chắc chắn 0 — con số đáng
+        # xem là SAU khi Wiki-RAG land, lúc prompt phình vì chunk wiki lặp lại giữa các request.
+        # Đó mới là phần cache ăn được, và cũng là lúc quyết định xây cache mới có căn cứ.
         logger.info(
-            "chat model=%s token_in=%s token_out=%s latency_ms=%s shop_id=%s",
+            "chat model=%s token_in=%s token_out=%s token_cached=%s latency_ms=%s shop_id=%s",
             model_id,
             usage.get("prompt_tokens", 0),
             usage.get("completion_tokens", 0),
+            usage.get("cached_tokens", 0),
             latency_ms,
             identity.shop_id,
         )

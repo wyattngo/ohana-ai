@@ -239,8 +239,42 @@ def test_observability_fields_are_logged(chat_client, caplog) -> None:
         client.post("/api/chat", json={"message": "xin chào"}, headers=headers)
 
     blob = caplog.text
-    for field in ("model", "token_in", "token_out", "latency_ms", "shop_id"):
+    for field in ("model", "token_in", "token_out", "token_cached", "latency_ms", "shop_id"):
         assert field in blob, f"thiếu trường observability {field!r} trong log"
+
+
+def test_cached_tokens_is_logged_from_provider_usage(chat_client, caplog) -> None:
+    """`token_cached` phải lấy từ usage của provider, KHÔNG hardcode 0.
+
+    `cached_tokens` được `_extract_cache_hit_tokens` trích sẵn từ lúc port DrNick nhưng chưa
+    ai đọc. Log nó để có SỐ LIỆU trả lời "Together có tự cache prompt không / tỷ lệ bao nhiêu"
+    trước khi bàn xây cache — thay vì đoán.
+
+    Test đưa `cached_tokens` KHÁC 0 để phân biệt "đọc thật từ usage" với "in hằng số 0".
+    Nếu ai đó hardcode `token_cached=0` cho tiện, test này đỏ.
+    """
+    client, fake = chat_client
+    fake_usage = {
+        "prompt_tokens": 900,
+        "completion_tokens": 20,
+        "total_tokens": 920,
+        "cached_tokens": 768,
+    }
+
+    async def step_with_cache(messages, **kwargs):  # type: ignore[no-untyped-def]
+        return AssistantStep(content="ok", tool_calls=[], usage=fake_usage)
+
+    fake.step = step_with_cache  # type: ignore[method-assign]
+    headers = _authorize(client)
+
+    with caplog.at_level(logging.INFO):
+        resp = client.post("/api/chat", json={"message": "xin chào"}, headers=headers)
+
+    assert resp.status_code == 200, resp.text
+    assert "token_cached=768" in caplog.text, (
+        f"token_cached không đọc từ usage của provider — log: {caplog.text[-300:]}"
+    )
+    assert resp.json()["usage"]["cached_tokens"] == 768, "response cũng phải mang cached_tokens"
 
 
 def test_app_logging_is_configured_so_info_actually_reaches_output() -> None:
