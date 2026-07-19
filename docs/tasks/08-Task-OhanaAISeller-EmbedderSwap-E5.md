@@ -138,11 +138,21 @@ PRE-E02: Postgres sống + pgvector, và biết chính xác có bao nhiêu row s
             (spec này giả định corpus chưa land).
   Status: ✅ ĐÃ VERIFY 2026-07-19 — 2 row (_platform 1, shop_a 1), đều là test fixture.
 
-PRE-E03: Số migration 0004 chưa bị ai lấy.
+PRE-E03: Số migration chưa bị ai lấy — kiểm CẢ trên đĩa LẪN trong spec khác.
   Command: ls db/migrations/versions/
-  Expected: 0001, 0002, 0003 — KHÔNG có 0004.
-  Status: ✅ ĐÃ VERIFY 2026-07-19. ⚠️ Spec 03 dự định dùng 0005/0006 — spec này lấy 0004,
-          KHÔNG đụng dải đó.
+           grep -rhoE '0[0-9]{3}' docs/tasks/*.md | sort -u    # ← bước này ban đầu tôi BỎ SÓT
+  Expected: số chọn không xuất hiện ở cả hai nơi.
+  Status: ⚠️ **VA CHẠM ĐÃ PHÁT HIỆN 2026-07-19.** Bản đầu của check này chỉ đối chiếu file
+          TRÊN ĐĨA (0001/0002/0003) rồi kết luận "0004 trống" — sai phạm vi. Spec 03 §8
+          (dòng 164) đã đặt gạch `Phase 1 (0004), Phase 2 (0005), Phase 5 (0006)` từ trước.
+
+  **Luật chốt (áp cho mọi spec sau):** số migration cấp theo **THỨ TỰ LAND**, không theo thứ
+  tự lập kế hoạch. Alembic nối chuỗi bằng `down_revision`, không bằng số trong tên file — nên
+  số trong spec chưa chạy chỉ là **dự kiến**, không phải chỗ đã giữ.
+
+  Áp vào đây: spec 03 đang **BLOCKED** (chờ Tân, 0/10), spec 08 chạy được ngay ⇒ **spec 08 lấy
+  0004**, spec 03 dịch xuống 0005/0006/0007 khi nó thực sự chạy. Đã ghi cảnh báo vào spec 03 §8.
+  Người execute spec 03 PHẢI chạy lại check này, KHÔNG tin số ghi sẵn trong spec.
 
 PRE-E04: Wyatt chốt số phận vector cũ.
   Câu hỏi: 2 row hiện có là test fixture — XOÁ khi migrate (đơn giản, đúng bản chất)

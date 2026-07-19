@@ -161,7 +161,13 @@ Ohana priority order: **safety → user trust → stability → growth**. Filter
 - `api/inbox.py` — Phase 8 UI hint để seller thấy "cần bạn tự trả lời" khi escalate.
 - `auth/identity.py` — Phase 1 mở rộng claim source từ real onboard flow (không stub).
 - `db/models.py` — Phase 1 (Shop, WebhookEventLog), Phase 5 (CreditLedger).
-- `db/migrations/` — Phase 1 (**0004**), Phase 2 (**0005**), Phase 5 (**0006**). Phase 10 KHÔNG còn cần migration (xem §8).
+- `db/migrations/` — ~~Phase 1 (**0004**), Phase 2 (**0005**), Phase 5 (**0006**)~~ ⚠️ **SỐ NÀY ĐÃ CŨ (2026-07-19).**
+  Spec 08 (EmbedderSwap-E5) chạy TRƯỚC spec này (spec 03 đang BLOCKED chờ Tân) và lấy **0004**.
+  ⇒ Khi execute spec này, dịch thành **Phase 1 = 0005 · Phase 2 = 0006 · Phase 5 = 0007**.
+  **Luật:** số migration cấp theo THỨ TỰ LAND, không theo thứ tự lập kế hoạch — Alembic nối
+  chuỗi bằng `down_revision`, không bằng số trong tên file. Chạy lại `ls db/migrations/versions/`
+  + `grep -rhoE '0[0-9]{3}' docs/tasks/*.md` trước khi đặt tên; **đừng tin số ghi sẵn ở đây**.
+  Phase 10 KHÔNG còn cần migration (xem §8).
 
 **DrNickv4 pattern (đọc để hiểu, KHÔNG edit):**
 - `drnickv4/agent/orchestrator.py` — ReAct+Reflect pattern, ConfirmEvent shape (Phase 7 router hook lấy cảm hứng từ đâu).
