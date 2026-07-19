@@ -173,11 +173,19 @@
 
 /* ---- Admin wiki ingest form (spec 04 Phase P2, AdminWikiIngest.tsx) ----------------------- */
 
-.admin-entry-link {
+/* Hàng lối-vào-phụ ở góc trên phải (G2 gộp link Chat vào cạnh link admin). Trước đó
+   `.admin-entry-link` tự định vị absolute; giờ hàng chứa định vị, link chỉ lo kiểu chữ —
+   thêm lối vào thứ ba sau này không phải canh toạ độ lại. */
+.shell-chrome {
   position: absolute;
   top: 12px;
   right: 16px;
   z-index: 5;
+  display: flex;
+  gap: 4px;
+}
+
+.chrome-link {
   background: none;
   border: none;
   padding: 4px 8px;

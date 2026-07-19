@@ -32,6 +32,24 @@ export interface WikiIngestResult {
   chunks: number;
 }
 
+/**
+ * Mirrors `ChatOut` in `api/chat.py`. Kept field-for-field identical on purpose: nothing in
+ * the toolchain type-checks Python against TypeScript, so a rename on either side would
+ * otherwise surface as a silently `undefined` value rendered as an empty bubble.
+ * `tests/test_chat_ui.py::test_typescript_interface_matches_the_python_response_model`
+ * introspects `ChatOut` and diffs it against this interface, so drift fails a gate instead.
+ *
+ * `grounded` is always `false` at GD0 — general chat has no Wiki-RAG, no live stock, no real
+ * orders. It is carried through to the UI rather than assumed, so that when a later phase adds
+ * grounded answers the screen can tell the two apart instead of guessing from the endpoint.
+ */
+export interface ChatResult {
+  reply: string;
+  model: string;
+  grounded: boolean;
+  usage: Record<string, number>;
+}
+
 export class ApiError extends Error {
   readonly status: number;
 
@@ -95,6 +113,27 @@ export async function mockAuthorize(role: "seller" | "admin" = "seller"): Promis
     method: "POST",
   });
   return (await resp.json()) as MockAuthorizeResult;
+}
+
+/** `POST /api/chat` (spec 07 §7 Phase G1) — seller ↔ AI tổng quát.
+ *
+ * No `shop_id` in the body, deliberately: the backend derives it from the verified JWT and
+ * ignores anything the client claims (`ChatIn` uses `extra="ignore"`). Sending one here would
+ * be harmless today but signals the wrong mental model about where tenant scope comes from —
+ * `tests/test_chat_ui.py::test_chat_ui_never_sends_shop_id` keeps it that way.
+ *
+ * Callers must handle a slow first response: a cold Together endpoint measured **24.8s** on
+ * the first call and 1.2s afterwards (spec 07 §14). There is no client-side timeout here on
+ * purpose — aborting at, say, 10s would turn a working-but-cold request into a failure the
+ * seller can only fix by retrying, which costs another paid LLM call.
+ */
+export async function postChat(message: string): Promise<ChatResult> {
+  const resp = await apiFetch("/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message }),
+  });
+  return (await resp.json()) as ChatResult;
 }
 
 /** `POST /api/admin/wiki/ingest` (admin-only, spec 04 §7 Phase P2) — ingests raw text into the

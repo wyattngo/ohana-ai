@@ -200,20 +200,28 @@ REVIEW: PASS ref=docs/reviews/2026-07-19-spec07-G1.json
 
 ### Phase G2 — Màn Chat
 <!-- ADP:PHASE G2 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 GOAL: Seller mở màn Chat trong app, gõ, thấy phản hồi; UI nói RÕ đây là AI tổng quát không có căn cứ dữ liệu shop; build `web/dist/` xanh; toàn suite vẫn xanh.
 APPROACH: `Chat.tsx` tái dụng shell + Astronixa tokens spec 04 (KHÔNG token mới). Gọi qua `apiFetch` (CSRF đã tập trung sẵn). State-based routing như 4 màn hiện có, KHÔNG thêm react-router. Disclaimer VI hiện thường trực, không phải tooltip ẩn.
 ALLOWED_FILES: web/, tests/test_chat_ui.py, docs/reviews/, docs/tasks/07-Task-OhanaAISeller-GeneralChat.md
 GATE: .venv/bin/python -m pytest tests/test_chat_ui.py -x -q
-GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && .venv/bin/ruff check . && cd web && pnpm build
-RETRY: 0/3
-RISK: low (proposed — `web/` không giao RISK_PATHS; không có đường tới khách)
+GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && .venv/bin/ruff check . && env PATH="/Users/wyattngo/.nvm/versions/node/v23.6.1/bin:$PATH" pnpm --dir web build
+RETRY: 1/3
+RISK: low (Wyatt tick 2026-07-19 — `web/` không giao RISK_PATHS; không có đường tới khách)
 BLOCKED_BY: G1
+REVIEW: PASS ref=docs/reviews/2026-07-19-spec07-G2.json
 <!-- /ADP -->
 
 11. `tests/test_chat_ui.py` (RED): contract FE↔BE (shape response khớp cái `api.ts` bind).
 12. `Chat.tsx` + CSS + wire `api.ts` + `App.tsx`.
 13. `pnpm build` (⚠️ `nvm use v23.6.1` — system node v16 quá cũ cho Vite 8).
+    **GATE_FULL sửa 2026-07-19 (RETRY 1/3):** bản đầu ghi `cd web && pnpm build`, và checkpoint ĐỎ —
+    nhưng đỏ ở chính câu lệnh gate, không phải ở code. `pnpm` trên PATH thuộc node v20.20.2, corepack
+    bản đó thiếu `URL.canParse` (cần node ≥22) ⇒ `TypeError` trước khi build kịp chạy. Nghĩa là gate
+    đang đo **trạng thái shell lúc chạy** chứ không đo build: nó xanh với tôi chỉ vì tôi `nvm use`
+    trước. Đã ghim toolchain — `env PATH="…/v23.6.1/bin:$PATH" pnpm --dir web build` — cùng cách
+    `.claude/launch.json` đã ghim sẵn. Đây là làm gate **tái lập được**, KHÔNG phải nới gate: build vẫn
+    phải xanh y như cũ (đã kiểm: exit 0).
 14. **STOP+WAIT**.
 
 ---
@@ -313,7 +321,7 @@ Adversarial:
   Lý do chọn: **non-reasoning** (model reasoning trả `content` RỖNG khi `max_tokens` không đủ — Kimi-K2.6 đốt sạch 300 token vẫn rỗng, không exception; `api/chat.py` giờ bắt và trả 502, nhưng tránh vẫn hơn), không bịa số liệu dưới `_SYSTEM_PROMPT`, tiếng Việt đúng ngữ vực bán hàng ("Dạ", "anh/chị"), open-weight ⇒ giữ nguyên lập luận portability của ADR PRE-007. ~$0.36/1000 tin. ⚠️ Vẫn là **suy luận + smoke thủ công, KHÔNG phải eval-SEED** — chốt cuối ở Spec 03d-D3. Swappable qua `TOGETHER_MODEL`; đổi xong PHẢI chạy `pytest tests/test_together_live.py -m live`.
 - [x] **Đo thật (2026-07-19, end-to-end qua `/api/chat` với Together thật):** cold start **24.8s**, call thứ hai **1.2s**. ⚠️ G2 phải có loading state thật — 25s không có phản hồi thị giác là hỏng UX.
 - [x] **RISK tier:** G0 **medium** · G1 **medium** (Wyatt ký "risk medium" khi duyệt phương án A).
-- [ ] **G2 tier** — spec đề xuất `low` (chỉ `web/`, không giao RISK_PATHS). Wyatt chưa tick riêng; **agent KHÔNG tự hạ tier** ⇒ nếu tới G2 mà chưa có tick, chạy ở **medium**.
+- [x] **G2 tier = `low`** ✅ Wyatt tick 2026-07-19 (chỉ `web/`, không giao RISK_PATHS, không có đường tới khách).
 - [x] **`api/chat.py` vào RISK_PATHS** ✅ — endpoint có auth gọi LLM, cùng hạng `api/inbox.py`.
 - [x] **Lịch sử chat: để phase sau** ✅ — cần quyết retention + residency trước (§1.5 Roadmap).
 

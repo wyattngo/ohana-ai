@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import "./App.css";
 import { AdminWikiIngest } from "./screens/AdminWikiIngest";
 import { ChannelPicker } from "./screens/ChannelPicker";
+import { ChatScreen } from "./screens/Chat";
 import { InboxScreen } from "./screens/Inbox";
 import { ReviewCard } from "./screens/ReviewCard";
 import type { PendingReplyOut } from "./lib/api";
@@ -30,6 +31,7 @@ type Screen =
   | { name: "channel" }
   | { name: "inbox" }
   | { name: "review"; reply: PendingReplyOut }
+  | { name: "chat" }
   | { name: "admin" };
 
 interface ToastState {
@@ -54,14 +56,18 @@ function App() {
 
   return (
     <div className="ohana-app">
-      {screen.name !== "admin" && (
-        <button
-          type="button"
-          className="admin-entry-link"
-          onClick={() => setScreen({ name: "admin" })}
-        >
-          Quản trị Wiki
-        </button>
+      {/* Chrome dùng chung cho các lối vào phụ. Trước G2 chỉ có một link admin định vị tuyệt
+          đối; thêm link Chat cạnh nó bằng cách bọc cả hai vào một hàng — giữ nguyên vị trí
+          góc trên phải, không phải nhét thêm một phần tử absolute thứ hai rồi canh tay. */}
+      {screen.name !== "admin" && screen.name !== "chat" && (
+        <div className="shell-chrome">
+          <button type="button" className="chrome-link" onClick={() => setScreen({ name: "chat" })}>
+            Hỏi AI
+          </button>
+          <button type="button" className="chrome-link" onClick={() => setScreen({ name: "admin" })}>
+            Quản trị Wiki
+          </button>
+        </div>
       )}
 
       {screen.name === "channel" && (
@@ -93,6 +99,10 @@ function App() {
           }}
           onError={showError}
         />
+      )}
+
+      {screen.name === "chat" && (
+        <ChatScreen onBack={() => setScreen({ name: "inbox" })} onError={showError} />
       )}
 
       {screen.name === "admin" && (

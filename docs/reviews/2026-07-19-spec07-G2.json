@@ -1,0 +1,47 @@
+{
+  "verdict": "APPROVE",
+  "phase": "G2",
+  "spec": "docs/tasks/07-Task-OhanaAISeller-GeneralChat.md",
+  "model": "output-evaluator (haiku)",
+  "risk": "low (Wyatt tick 2026-07-19)",
+  "goal_met": "Seller mở màn Chat, gõ, thấy phản hồi; disclaimer VI hiện thường trực; web/dist build xanh; toàn suite xanh.",
+  "checks": {
+    "C1_safety_boundary": "PASS — Chat.tsx/postChat KHÔNG gửi shop_id; không có đường nào từ màn Chat tới PendingReply/policy_gate/sender.",
+    "C2_disclaimer": "PASS — render VÔ ĐIỀU KIỆN trong JSX, nội dung VI đúng bản chất ('chưa kết nối dữ liệu shop'), không nấp title/aria.",
+    "C3_tests": "PASS — 7 test; 3 finding low về độ chắc của regex, đã sửa 2 (xem dưới).",
+    "C4_error_handling": "PASS — hiện lượt user trước khi gọi mạng; lỗi thì trả draft về ô nhập + pop lượt; `finally` luôn reset sending; canSend chặn double-submit.",
+    "C5_css": "PASS — không token mới ngoài Astronixa, mọi var() có fallback, không ảnh hưởng 4 màn cũ.",
+    "C6_scope": "PASS — mọi file ⊆ ALLOWED_FILES, không secret.",
+    "C7_goal": "PASS"
+  },
+  "layout_bugs_found_by_looking_not_by_tests": {
+    "B1_input_squashed": "`.btn-primary` dùng chung mang `width: 100%` (đúng cho 4 màn P1 xếp nút theo cột). Trong hàng flex của composer, nút Gửi chiếm trọn chiều rộng và bóp ô nhập còn một sợi. `min-width` KHÔNG chống lại được `width: 100%`. Sửa: `width: auto` + `flex: 0 0 auto`.",
+    "B2_composer_pushed_offscreen": "`.screen` mang `flex: 1` ⇒ `flex-basis: 0%`, mà trong flex container dọc flex-basis THẮNG `height` trên trục chính — nên đặt `height: 100dvh` thôi bị bỏ qua. Hậu quả: transcript không cuộn nội bộ, cả trang dài ra, **ô nhập bị đẩy khỏi màn hình** khi hội thoại dài. Đo ở 375×812: trang cao 1247, đáy composer 1216, composerVisible=false. Sửa: `height: 100dvh` + `flex: 0 0 auto`. Đo lại: pageScrolls=false, transcriptScrolls=true, composerVisible=true, trên CẢ mobile 375×812 và desktop 1280×720.",
+    "note": "KHÔNG test nào trong repo bắt được hai lỗi này (không có Playwright). Tìm ra bằng cách mở trình duyệt thật và nhìn. Đã thêm guard CSS dạng grep — tác giả tự nhận là guard YẾU, ghi rõ trong docstring để không ai tưởng layout đã được bảo chứng."
+  },
+  "reviewer_findings_addressed": {
+    "F1_loading_test_not_comment_stripped": "FIXED — `_strip_comments` + siết assertion `disabled={...sending}`. Đây đúng lớp lỗi đã làm test disclaimer vô nghĩa (M10); sửa cho nhất quán. Mutation M15 (gỡ state, để lại comment 'TODO: thêm sending state') giờ ĐỎ.",
+    "F2_conditional_guard_regex_narrow": "FIXED — regex nới để bắt `{(cờ) && <p ...`, biểu thức nhiều toán hạng, và toán tử ba ngôi. Mutation M14 giờ ĐỎ.",
+    "F3_css_guard_is_weak": "ACKNOWLEDGED, không sửa — không có công cụ kiểm layout thật trong repo. Đã ghi rõ giới hạn trong docstring thay vì để nó trông mạnh hơn thực tế."
+  },
+  "author_self_reported": [
+    "Test disclaimer bản đầu VACUOUS: grep nguyên file nên khớp cụm 'AI tổng quát' trong CHÍNH docstring của Chat.tsx ⇒ xanh cả khi disclaimer đã bị xoá. Mutation M10 lôi ra. Đã sửa thành đọc riêng phần tử .chat-disclaimer sau khi strip comment.",
+    "Hai test khác cũng false-positive vì grep thô: 'react-router' khớp câu văn giải thích vì sao KHÔNG dùng nó; `postChat` cắt tới hết file nên nuốt docstring của postWikiIngest (có chữ shop_id). Đã sửa bằng _strip_comments + _function_body cân ngoặc."
+  ],
+  "mutation_testing": [
+    "M8 postChat gửi shop_id → đỏ ✓",
+    "M9 đổi tên field backend reply→text (drift contract Python↔TS) → đỏ ✓",
+    "M10 gỡ nội dung disclaimer → đỏ ✓ (sau khi sửa test)",
+    "M11 thêm import react-router thật → đỏ ✓",
+    "M12 xoá hẳn phần tử disclaimer → đỏ ✓",
+    "M13 giấu disclaimer vào tooltip → đỏ ✓",
+    "M14 bọc disclaimer trong {(cờ) && …} → đỏ ✓",
+    "M15 gỡ state sending, để lại comment nhắc tên → đỏ ✓"
+  ],
+  "browser_verified": "Trình duyệt thật (127.0.0.1:8010, dist đã build): render 2 chrome link; màn Chat mở được; gửi/nhận nhiều lượt; bong bóng user phải-đậm / assistant trái-trắng; disclaimer thường trực; loading state có spinner + role='status' + input/nút disabled; console 0 lỗi; responsive mobile 375×812 và desktop OK sau khi vá 2 bug layout. Backend chat thật KHÔNG chạy trong preview vì server preview thiếu TOGETHER_API_KEY (launch.json ngoài ALLOWED_FILES, cố ý không sửa) — đã stub network trong trang để nghiệm thu phần FE; luồng backend đã được chứng minh end-to-end ở G1 bằng client Together THẬT.",
+  "gate_full": "107 passed, 3 deselected (live) · mypy 0 lỗi / 37 files · ruff check + format sạch · pnpm build xanh",
+  "findings": [],
+  "summary": "G2 đạt GOAL. Giá trị lớn nhất của phase này không đến từ test mà từ việc MỞ TRÌNH DUYỆT NHÌN: 2 bug layout (ô nhập bị bóp còn một sợi; ô nhập bị đẩy khỏi màn hình khi hội thoại dài) đều do kế thừa style dùng chung, và không test nào trong repo có khả năng thấy chúng. 8 mutation test cho phần kiểm được bằng máy.",
+  "diff_sha256": "a06543688984bce4cf0fe41f87ad665668af2478ed2da0e798d26e5f214cca02",
+  "stamped_at": "2026-07-19T10:05"
+}
