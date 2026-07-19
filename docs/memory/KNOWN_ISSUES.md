@@ -136,6 +136,18 @@ _Empty. Log ở đây khi port drnickv4 phát hiện bug nhưng defer fix per sp
 - **Why not blocking:** DoD §2.5 chỉ yêu cầu backend flow `draft → approve → status flip` (đã đạt, 42/42 test xanh). GĐ0.5 = local demo Wyatt/Tân, chưa có seller thật. Thêm harness = dep mới (`vitest`/`playwright`) + config mới → phase riêng đúng nghĩa, không nhét vào P1.
 - **Action:** (1) Wyatt/Tân smoke browser thủ công theo spec 04 §10 PC6 TRƯỚC khi merge `feat/gd0_5-inbox-ui` — session P1 không có browser harness nên KHÔNG verify được rendering/click-through/polling/`document.cookie` parsing. (2) Mở spec riêng cho FE test harness: Vitest+RTL (nhẹ, test component) hoặc Playwright (nặng, test click-through thật) — quyết lúc scope. Ưu tiên trước khi có seller thật (spec 05 real login).
 
+### ISSUE-019 — `ruff check .` ĐỎ trên `main`; nguyên nhân gốc là `ruff>=0.4` không pin
+- **Origin:** phát hiện lúc chạy GATE_FULL của spec 08 E0 (không phải do E0 gây ra)
+- **Discovered:** 2026-07-19 · session spec-08-E0
+- **Severity:** medium (CI đỏ, không phải bug runtime)
+- **Status:** ✅ RESOLVED 2026-07-19 — commit "fix(ci): pin ruff…" (action 1+2+3). Action 4 (rà phase DONE cũ) vẫn OPEN, xem cuối entry.
+- **Detail:** `ruff check .` tại HEAD trả **1 error** — `S603` (`subprocess` call: check for execution of untrusted input) ở `tests/test_chat_endpoint.py:313`. Verify bằng `git stash -u` (cây sạch, không có thay đổi E0) ⇒ lỗi có sẵn, land cùng `3a41bfe` (spec 07). CI `.github/workflows/ci.yml:64` chạy đúng lệnh này ⇒ **CI đang đỏ ở bước ruff**.
+  Bản thân S603 ở đây là **báo nhầm**: lệnh chạy là `[sys.executable, "-c", probe]` với `probe` là literal viết trong file test, không có input ngoài. Đó là subprocess CỐ Ý — probe đo thứ chỉ quan sát được ở tiến trình sạch (thứ tự `dictConfig` vs `import app.main`), in-process không đo được.
+- **Nguyên nhân gốc — quan trọng hơn cái lỗi:** `pyproject.toml:27` khai `ruff>=0.4`, không pin. Local đang **0.15.22**. Một bản ruff mới bật thêm rule là CI đỏ mà **không ai đổi một dòng code nào**. Nghĩa là gate của repo phụ thuộc ngày cài đặt — chạy hôm nay xanh, chạy tuần sau đỏ. Hệ quả thứ hai: một phase từng checkpoint DONE với `GATE_FULL` chứa `ruff check .` giờ không tái lập được kết quả đó, tức EVIDENCE cũ mất tính kiểm chứng.
+- **Why not blocking E0:** lỗi nằm ở `tests/test_chat_endpoint.py` — ngoài `ALLOWED_FILES` của E0 kể cả sau khi Wyatt mở rộng. Sửa kèm = scope drift đúng loại mà ADP dựng lên để chặn. **Nhưng nó CHẶN checkpoint E0**, vì `GATE_FULL` của E0 có `ruff check .` trong đó.
+- **Action:** (1) ✅ Pin `ruff==0.15.22` trong `pyproject.toml`. (2) ✅ Chặn S603 tại đúng dòng `test_chat_endpoint.py` kèm lý do — KHÔNG tắt S603 toàn repo. (3) ✅ Commit riêng, không nhét vào E0. (4) ⏳ **CÒN LẠI:** rà các phase đã DONE xem còn phase nào không tái lập được `GATE_FULL` với ruff pin hiện tại. Chưa ai làm. Cách rà: `git checkout <sha_phase>` rồi chạy `GATE_FULL` với ruff 0.15.22 — phase nào đỏ nghĩa là EVIDENCE của nó chưa từng được verify ở phiên bản này.
+- **Ghi chú cho lần sau:** lỗi lộ ra vì `GATE_FULL` chạy `ruff check .` (toàn repo). Trong session này tôi từng báo "ruff sạch" sau khi chỉ chạy `ruff check app/config.py` — scoped. Gate scoped trả lời câu hỏi hẹp hơn câu mình đang khẳng định; đó chính là hình dạng của ISSUE-018. Khi báo trạng thái gate, chạy đúng lệnh mà gate khai.
+
 ### ISSUE-017 — `channels/identity.py`: thiếu unique constraint → race có thể tạo 2 Conversation cho 1 khách
 - **Origin:** spec 06 F1 (khai KNOWN UNCOVERED ngay trong code + review artifact `docs/reviews/06-F1-auto-verdict.json`)
 - **Discovered:** 2026-07-18 · session spec-06-F1

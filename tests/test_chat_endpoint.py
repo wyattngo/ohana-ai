@@ -310,7 +310,12 @@ after = logging.getLogger("api.chat").isEnabledFor(logging.INFO)
 print(json.dumps({"before": before, "after": after,
                   "root_handlers": len(logging.getLogger().handlers)}))
 """
-    out = subprocess.run(
+    # S603 ở đây là báo nhầm, và tắt tại CHỖ NÀY chứ không tắt toàn repo — S603 vẫn phải
+    # kêu ở mọi subprocess khác. `probe` là literal viết ngay trong file này, không nhận
+    # input ngoài, không qua shell (`shell=False`, argv dạng list). Subprocess là CỐ Ý:
+    # thứ cần đo — thứ tự `dictConfig` vs `import app.main` — chỉ quan sát được ở một tiến
+    # trình sạch; đo in-process thì logging đã bị chính test runner cấu hình trước rồi.
+    out = subprocess.run(  # noqa: S603
         [sys.executable, "-c", probe],
         capture_output=True,
         text=True,

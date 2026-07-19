@@ -24,7 +24,15 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "ruff>=0.4",
+    # PIN CỨNG, không phải `>=` — ruff vừa là linter vừa là GATE của ADP.
+    #
+    # Với `ruff>=0.4`, `ruff check .` là hàm của NGÀY CÀI ĐẶT chứ không phải của source: một
+    # bản ruff mới bật thêm rule ⇒ CI đỏ mà không ai đổi dòng code nào. Đã xảy ra thật —
+    # S603 land cùng spec 07 và đỏ dần theo bản ruff mới (ISSUE-019). Hệ quả nặng hơn CI đỏ:
+    # phase từng checkpoint DONE với GATE_FULL chứa `ruff check .` sẽ KHÔNG tái lập được kết
+    # quả cũ, tức EVIDENCE mất tính kiểm chứng — mà EVIDENCE tái lập được chính là thứ ADP
+    # bán. Nâng ruff từ nay là một commit CÓ CHỦ ĐÍCH, đọc changelog, sửa cái nó bắt.
+    "ruff==0.15.22",
     "mypy>=1.10",
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
