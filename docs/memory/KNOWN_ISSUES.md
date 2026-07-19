@@ -145,6 +145,20 @@ _Empty. Log ở đây khi port drnickv4 phát hiện bug nhưng defer fix per sp
 - **Why not blocking now:** `api/webhook.py` **chưa mount** trong `app/main.py` (thiếu concrete `Drafter`), nên không luồng nào gọi hàm này đồng thời. Đây là lỗi TIỀM ẨN, không phải đang chảy máu.
 - **Action:** Thêm Alembic migration `UNIQUE (shop_id, customer_id, channel)` trên `conversations` + đổi phần Conversation sang cùng shape upsert như Customer. **BẮT BUỘC làm TRƯỚC khi Spec 03c mount webhook** — đừng dựa vào "chưa xảy ra bao giờ".
 
+### ISSUE-018 — `_blank_env_means_unset` KHÔNG phủ complex field; docstring khai "áp cho MỌI field" là SAI
+- **Origin:** spec 07 G0 (`app/config.py`) — phát hiện khi so sánh 2 bản CLAUDE.md, 2026-07-19
+- **Discovered:** 2026-07-19 · session claude-md-merge
+- **Severity:** medium (không chảy máu prod hôm nay; là lỗ trong chính hàng rào dựng lên để chặn lớp bug này)
+- **Status:** OPEN
+- **Detail:** `_blank_env_means_unset` là `@model_validator(mode="before")`, lọc `""` khỏi dict input. Nhưng với field kiểu phức (`reasoning_models: frozenset[str]`), pydantic-settings `EnvSettingsSource` **parse JSON TRƯỚC** khi validator chạy ⇒ chuỗi rỗng nổ ngay tại tầng source, validator không bao giờ thấy. Kiểm thật:
+  ```
+  REASONING_MODELS= → SettingsError: error parsing value for field "reasoning_models"
+                      from source "EnvSettingsSource"
+  ```
+  Nghĩa là hàng rào chỉ bảo vệ field vô hướng (`str`, `str | None`). Docstring hiện khai *"Áp cho MỌI field, không riêng Together"* — sai, và câu sai đó đã được chép nguyên vào CLAUDE.md, tức nó đang **nhân bản**. Đây đúng kịch bản `.env.example` mà spec 07 dựng hàng rào để chặn: admin copy template, để trống dòng chưa dùng → app không chạy, thông báo lỗi không nói gì về "để trống".
+- **Why not blocking:** `reasoning_models` là field phức DUY NHẤT hiện tại, và `.env.example` không liệt kê `REASONING_MODELS`. Lỗi là fail-loud (raise lúc khởi động), không phải silent-wrong.
+- **Action:** (1) Sửa docstring cho đúng phạm vi — ưu tiên cao hơn sửa code, vì docstring sai đang được chép đi. (2) Cân nhắc `settings_customise_sources` hoặc `NoDecode` + validator riêng để chuẩn hoá rỗng trước khi source parse. (3) Thêm test `REASONING_MODELS=` rỗng khoá hành vi đã chọn (dù chọn "raise" hay "coi như unset" — hiện KHÔNG có test nào chạm ca này).
+
 ### ISSUE-016 — F1 wiki-RAG chưa từng chạy với embedding thật (⚠️ ĐỔI BẢN CHẤT 2026-07-18: provider chuyển sang Together e5)
 
 - **Cập nhật 2026-07-19 — ADR PRE-007 đã ACCEPTED, blocker đổi từ 'chờ ký' sang 'chờ làm':** provider + embedding giờ là quyết định chốt (Together, `intfloat/multilingual-e5-large-instruct` 1024-dim). Việc còn lại KHÔNG còn là chờ ai duyệt mà là công việc thật: (1) `TogetherEmbedder` thay `OpenAIEmbedder`; (2) Alembic migration `Vector(1536)` → `Vector(1024)` (`db/models.py:_EMBED_DIM`); (3) re-embed corpus khi PRE-003 land; (4) chạy live acceptance **trên e5, KHÔNG phải OpenAI** — kết quả cũ trên OpenAI không áp dụng. Chưa có spec/phase nào nhận 4 việc này.
