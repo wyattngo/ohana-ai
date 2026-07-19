@@ -100,6 +100,51 @@ def test_openai_client_imports_without_alert_service() -> None:
     from agent.providers.openai_client import OpenAIClient  # noqa: F401
 
 
+@pytest.mark.parametrize(
+    ("secret_value", "env", "expect_raise"),
+    [
+        (None, "production", True),  # chưa set
+        ("", "production", True),  # set nhưng rỗng
+        ("   ", "production", True),  # chỉ khoảng trắng
+        ("a-real-secret-value-32bytes-long!", "production", False),
+        (None, "dev", False),  # dev fallback vẫn được phép
+    ],
+)
+def test_blank_env_validator_does_not_loosen_jwt_fail_closed(
+    monkeypatch: pytest.MonkeyPatch,
+    secret_value: str | None,
+    env: str,
+    expect_raise: bool,
+) -> None:
+    """`_blank_env_means_unset` (app/config.py) KHÔNG được nới lỏng fail-closed của JWT secret.
+
+    Validator đó xoá mọi biến env có giá trị rỗng/khoảng trắng để default được dùng — vá cho
+    bug `TOGETHER_MODEL=` rỗng (spec 07 G1). Nhưng nó áp cho MỌI field, kể cả
+    `ohana_jwt_secret`, và `get_jwt_secret()` là path bảo mật: rò secret ⇒ kẻ tấn công forge
+    được cookie với `shop_id` bất kỳ ⇒ cross-tenant (R1.22).
+
+    Ban đầu tôi kiểm tay rồi ghi kết quả vào comment trong `app/config.py`. Reviewer từ chối
+    coi đó là bằng chứng — đúng: một lần chạy tay không chặn được ai đó đổi validator ngày mai.
+    Đây là cùng nguyên tắc "docstring không phải bằng chứng" mà tôi đang áp cho người khác.
+
+    Hàng `("   ", production, raise)` là một thay đổi hành vi CÓ CHỦ Ý so với trước validator:
+    secret toàn khoảng trắng từng là truthy nên được dùng làm secret THẬT. Giờ nó bị từ chối.
+    Không ai cố tình đặt vậy — nhưng copy/paste hỏng thì có.
+    """
+    monkeypatch.delenv("OHANA_JWT_SECRET", raising=False)
+    if secret_value is not None:
+        monkeypatch.setenv("OHANA_JWT_SECRET", secret_value)
+    monkeypatch.setenv("OHANA_ENV", env)
+
+    from auth.identity import get_jwt_secret
+
+    if expect_raise:
+        with pytest.raises(RuntimeError):
+            get_jwt_secret()
+    else:
+        assert get_jwt_secret(), "phải trả về secret dùng được"
+
+
 def test_reasoning_models_supports_membership_test() -> None:
     """`openai_client.py:252` does `model in get_settings().reasoning_models` — field must be a
     collection (not e.g. a comma-string) for that to behave as intended."""

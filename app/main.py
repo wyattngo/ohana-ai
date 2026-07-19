@@ -32,6 +32,7 @@ from starlette.responses import Response as StarletteResponse
 
 from api.admin import build_router as build_admin_router
 from api.admin import default_embedder
+from api.chat import build_router as build_chat_router
 from api.inbox import build_router as build_inbox_router
 from api.mock_auth import build_router as build_mock_auth_router
 from auth.identity import (
@@ -55,6 +56,12 @@ app.include_router(
     build_admin_router(default_embedder(), _session_factory, require_admin),
     prefix="/api",
 )
+# General Chat (spec 07 G1). No session factory and no embedder: this endpoint deliberately
+# touches neither the database nor the retrieval stack — see `api/chat.py`'s module docstring
+# for why that isolation is the point, not an omission. The Together client is built lazily
+# inside the router's dependency, so a missing TOGETHER_API_KEY breaks /api/chat only rather
+# than preventing this module from importing at all.
+app.include_router(build_chat_router(identity_from_cookie), prefix="/api")
 
 
 @app.get("/health")

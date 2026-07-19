@@ -1,0 +1,46 @@
+{
+  "verdict": "APPROVE",
+  "phase": "G1",
+  "spec": "docs/tasks/07-Task-OhanaAISeller-GeneralChat.md",
+  "model": "output-evaluator (haiku) — 3 rounds",
+  "rounds": 3,
+  "goal_met": "7/7 — endpoint có auth; shop_id CHỈ từ JWT; thiếu cookie → 401; thiếu CSRF → 403; body claim shop_id bị bỏ qua; gate ranh giới import-graph; log model/token_in/token_out/latency_ms/shop_id.",
+  "round1_findings_resolved": {
+    "F1_loose_status_assertion": "FIXED — `in (401, 403)` tách thành 2 test riêng, mỗi cái assert chính xác 1 mã. Phát hiện thêm: nhánh 401 TRƯỚC ĐÓ CHƯA TỪNG được test — assertion lỏng che mất khoảng trống phủ, không chỉ lỏng.",
+    "F2_validator_claim_unproven": "FIXED — bằng chứng fail-closed của JWT chuyển từ comment sang test parametrize 5 hàng trong tests/test_config.py (thêm vào ALLOWED_FILES, ghi rõ trong SCOPE_EXTENSION). Reviewer đúng khi từ chối coi một lần chạy tay là bằng chứng.",
+    "F3_global_cache_fragile": "FIXED — fixture reset `api.chat._client_cache` ở CẢ đầu lẫn `finally`."
+  },
+  "round2_findings_rejected_with_evidence": {
+    "D1_httpx_cookies_delete_missing": "BÁC BỎ — `httpx.Cookies.delete()` TỒN TẠI trong httpx 0.28.1 (in ra signature thật). Test pass, và mutation (bỏ dòng xoá cookie) cho `assert 200 == 401` ⇒ test không vacuous. Reviewer tự nhận sai ở round 3: khẳng định API mà không kiểm.",
+    "D2_live_tests_leak_into_ci": "BÁC BỎ — `pyproject.toml addopts = \"-q -m 'not live'\"` áp cho MỌI lần gọi pytest, kể cả `pytest -q` trần trong ci.yml. Chạy thật kiểu CI không key: '100 passed, 3 deselected'. Reviewer tự nhận sai: tưởng addopts bị CLI flag ghi đè."
+  },
+  "bug_found_by_live_smoke": {
+    "what": "TogetherClient gọi Together bằng `gpt-4o-mini` ⇒ 404 model_not_available.",
+    "chain": "`.env` có TOGETHER_MODEL= RỖNG ⇒ pydantic-settings coi '' là giá trị hợp lệ, ghi đè default ⇒ '' falsy ⇒ `default_model or settings.together_model` = '' ⇒ OpenAIClient chạy tiếp `'' or settings.openai_model` ⇒ model OpenAI.",
+    "why_missed": "3 vòng review G0 + 90 test xanh + mypy sạch đều không thấy: mọi test tiêm fake client, và fake không quan tâm model id có thật hay không. Chỉ một gói tin thật ra ngoài mới lộ.",
+    "fixed_two_layers": "(1) `_blank_env_means_unset` — env rỗng ⇒ coi như chưa set, áp cho MỌI field; (2) `TogetherClient` chốt model tại chỗ, không để OpenAIClient quyết ⇒ không còn đường nào tới `openai_model`.",
+    "second_bug": "Model đã ký PRE-G02 (`Qwen/Qwen2.5-72B-Instruct-Turbo`) KHÔNG serverless — có trong /v1/models KÈM bảng giá mà gọi vẫn 400. Dò 148 ứng viên ⇒ 6 model thật sự phục vụ. Wyatt ký lại `meta-llama/Llama-3.3-70B-Instruct-Turbo` (non-reasoning, không bịa số liệu, tiếng Việt đúng ngữ vực)."
+  },
+  "author_self_reported": [
+    "Gate ranh giới ban đầu VACUOUS lúc chưa có api/chat.py — bao đóng import chỉ có chính nó nên mọi assertion `not in` xanh vô nghĩa. Đã thêm chốt `_module_path('api.chat') is not None` + `len(reachable) > 1`.",
+    "`api/chat.py` ban đầu trả 200 kèm `reply: \"\"` khi LLM trả rỗng — hỏng-âm-thầm (seller thấy bong bóng trống, không lỗi, không ai biết đã đốt token). Đổi thành 502 + log, sau khi dò model phát hiện model reasoning trả content rỗng khi thiếu max_tokens.",
+    "Comment trong app/config.py khai 'đã kiểm tay fail-closed' — đúng nhưng không phải bằng chứng kiểm chứng được. Reviewer bắt đúng; đã chuyển thành test."
+  ],
+  "mutation_testing": [
+    "M1 shop_id đọc từ body → test cross-tenant đỏ ✓",
+    "M2 import agent.policy_gate → gate ranh giới đỏ ✓",
+    "M3 log nội dung tin nhắn → test PDPL đỏ ✓",
+    "M4 mount sau StaticFiles → 5 test đỏ ✓",
+    "M5 nới validator blank-env → 12 test đỏ ✓",
+    "M6 thêm POST vào CSRF_SAFE_METHODS → 2 test đỏ ✓",
+    "M7 bỏ dòng xoá cookie phiên → test 401 đỏ (assert 200 == 401) ✓"
+  ],
+  "gate_full": "100 passed, 3 deselected (live) · mypy 0 lỗi / 37 files · ruff check + format sạch",
+  "live_gate": "tests/test_together_live.py -m live → 2 passed (Together thật, model đã ký). E2E qua /api/chat với client Together THẬT: 200, grounded=false, shop_id=fixture-shop-001 ở CẢ request adversarial.",
+  "measured_latency": "cold start 24.8s · call thứ hai 1.2s ⇒ G2 BẮT BUỘC có loading state thật.",
+  "open_issues_unchanged": "ISSUE-010 (alert_service chưa port) vẫn OPEN — 429 không được đếm trừ khi caller tiêm hook. ISSUE-017 (unique constraint conversations) vẫn OPEN, chưa chặn vì webhook chưa mount.",
+  "new_findings": [],
+  "summary": "G1 đạt GOAL 7/7. 3 finding round 1 sửa thật; 2 finding round 2 bị bác bỏ bằng kiểm chứng thực nghiệm và reviewer tự nhận sai ở round 3. Live smoke phát hiện 2 lỗi thật mà 3 vòng review code + 90 test xanh không thấy — đó là lý do live gate được thêm vào vĩnh viễn. 7 bất biến đều mutation-tested.",
+  "diff_sha256": "427f4c2f9f627bf813a67f47f4bf9b0ccd26343015c9af6190d43faad8c27bcf",
+  "stamped_at": "2026-07-19T09:38"
+}

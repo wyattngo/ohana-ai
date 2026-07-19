@@ -18,8 +18,25 @@ raising, not represent a real deployment choice.
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Any
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Model Together mặc định — Wyatt ký lại PRE-G02 ngày 2026-07-19. Hằng số CÓ TÊN chứ không
+# phải literal rải rác, vì `agent/providers/together_client.py` cần đúng giá trị này làm chốt
+# chặn cuối; hai bản sao literal sẽ lệch nhau vào một ngày nào đó.
+#
+# Lựa chọn đầu (`Qwen/Qwen2.5-72B-Instruct-Turbo`) KHÔNG dùng được: Together liệt kê nó trong
+# `/v1/models` KÈM bảng giá, nhưng gọi thật trả 400 "non-serverless — cần dedicated endpoint".
+# Danh sách model không phải bằng chứng về khả năng phục vụ; chỉ một cuộc gọi thật mới là.
+# Dò 148 ứng viên chat ⇒ đúng 6 cái chạy được (spec 07 §14).
+#
+# Chọn non-reasoning có chủ đích: model reasoning (gpt-oss, GLM, Kimi) trả `content` RỖNG khi
+# `max_tokens` không đủ chỗ cho phần suy luận — hỏng âm thầm, không exception. Llama-3.3-70B
+# không mang lớp rủi ro đó, không bịa số liệu trong test, và tiếng Việt tự nhiên đúng ngữ vực
+# bán hàng. Vẫn là open-weight ⇒ lập luận portability của ADR PRE-007 giữ nguyên.
+DEFAULT_TOGETHER_MODEL = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
 
 
 class Settings(BaseSettings):
@@ -29,6 +46,36 @@ class Settings(BaseSettings):
     # after `monkeypatch.delenv` clears `os.environ`, silently reintroducing the exact
     # stale-state trap this spec exists to close (see module docstring + P0 test docstring).
     model_config = SettingsConfigDict(extra="ignore")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _blank_env_means_unset(cls, data: Any) -> Any:
+        """Biến môi trường khai báo nhưng RỖNG ⇒ coi như KHÔNG khai báo (default được dùng).
+
+        Mặc định của pydantic-settings là coi `FOO=` như giá trị hợp lệ `""`, ghi đè default.
+        Điều đó đúng về mặt kỹ thuật và sai về mặt vận hành: `.env.example` liệt kê tên biến
+        với giá trị trống để admin điền, ai copy thành `.env` mà chưa điền hết sẽ *tắt* default
+        thay vì *nhận* default.
+
+        Đã cháy thật (spec 07 G1 smoke, 2026-07-19): `TOGETHER_MODEL=` rỗng ⇒ `together_model`
+        = `""` ⇒ chuỗi rỗng falsy trượt qua các `or` phía dưới ⇒ `TogetherClient` xin
+        `gpt-4o-mini` từ Together ⇒ 404. Toàn bộ 90 test vẫn xanh vì test dùng fake client,
+        không chạm model id thật.
+
+        Áp cho MỌI field, không riêng Together: cùng cái bẫy đang chờ ở `DATABASE_URL`,
+        `OHANA_JWT_SECRET`, `OPENAI_MODEL`. Với `str | None` thì bỏ key đi cũng ra `None` như
+        cũ — không đổi hành vi; với `str` có default thì đây chính là phần vá.
+
+        Đã kiểm tay trên path bảo mật (`get_jwt_secret`), fail-closed giữ nguyên: unset /
+        rỗng / production đều RAISE, secret thật vẫn OK, dev vẫn fallback. Có ĐÚNG MỘT thay
+        đổi hành vi, và nó theo hướng an toàn hơn: `OHANA_JWT_SECRET="   "` (chỉ khoảng
+        trắng) trước đây là truthy nên được dùng LÀM SECRET THẬT; giờ nó bị coi như chưa set
+        ⇒ raise ngoài dev. Không ai cố tình đặt secret bằng khoảng trắng — nhưng copy/paste
+        hỏng thì có.
+        """
+        if isinstance(data, dict):
+            return {k: v for k, v in data.items() if not (isinstance(v, str) and v.strip() == "")}
+        return data
 
     # None allowed — dev-without-key path (DoD #1). Read from env `OPENAI_API_KEY`
     # (pydantic-settings v2 is case-insensitive by default; verified empirically in
@@ -73,7 +120,7 @@ class Settings(BaseSettings):
     # model là sửa env chứ không sửa code — Roadmap §8.2 cấm hardcode model id ở call site.
     # Đổi default ở đây KHÔNG kéo theo migration nào (khác `openai_embed_model`): chat model
     # không đụng cột vector.
-    together_model: str = "Qwen/Qwen2.5-72B-Instruct-Turbo"
+    together_model: str = DEFAULT_TOGETHER_MODEL
 
     # ---- P2 (spec 05 §7 Phase P2) — consolidate the remaining direct `os.environ.get(...)`
     # reads into this one Settings surface. Pure refactor: these three fields exist so

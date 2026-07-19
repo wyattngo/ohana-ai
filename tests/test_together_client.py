@@ -98,12 +98,82 @@ def test_together_client_reads_model_from_settings(monkeypatch: pytest.MonkeyPat
     assert s.together_api_key == "test-key-not-real"
 
 
-def test_together_model_default_is_the_signed_choice() -> None:
+def test_together_model_default_is_the_signed_choice(monkeypatch: pytest.MonkeyPatch) -> None:
     """Default = model Wyatt ký ở §14 (PRE-G02). Không có key/model trong env vẫn phải có
-    default hợp lệ, để app khởi động được thay vì raise lúc import."""
+    default hợp lệ, để app khởi động được thay vì raise lúc import.
+
+    `delenv` là bắt buộc, không phải cho gọn: bản đầu của test này KHÔNG xoá env và chỉ xanh
+    vì môi trường test tình cờ không có `TOGETHER_MODEL`. Production đọc `.env` thì khác —
+    xem `test_empty_env_var_does_not_defeat_the_default` ngay dưới.
+    """
+    monkeypatch.delenv("TOGETHER_MODEL", raising=False)
     from app.config import Settings
 
-    assert Settings().together_model == "Qwen/Qwen2.5-72B-Instruct-Turbo"
+    assert Settings().together_model == "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+
+
+def test_empty_env_var_does_not_defeat_the_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`TOGETHER_MODEL=` (khai báo nhưng RỖNG) phải rơi về default, KHÔNG phải về chuỗi rỗng.
+
+    Đây là trạng thái THẬT trong `.env` của Wyatt 2026-07-19, sinh ra từ chính `.env.example`
+    tôi viết ở G0 (để trống mọi giá trị). pydantic-settings coi biến-tồn-tại-nhưng-rỗng là một
+    giá trị hợp lệ và ghi đè default — nên `together_model` thành `""`.
+
+    Chuỗi rỗng là falsy, nên nó trượt tiếp qua mọi `or` phía dưới và kết thúc ở model của
+    provider KHÁC. Lỗi không ồn ào ở tầng config; nó nổ ở tầng HTTP với 404 model_not_available.
+    """
+    monkeypatch.setenv("TOGETHER_MODEL", "")
+    from app.config import Settings
+
+    assert Settings().together_model == "meta-llama/Llama-3.3-70B-Instruct-Turbo", (
+        "env rỗng đã ghi đè default — cái bẫy này áp cho MỌI field str có default"
+    )
+
+
+def test_together_client_never_falls_back_to_the_openai_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Bất biến cấu trúc: `TogetherClient` KHÔNG có đường nào kết thúc trên `openai_model`.
+
+    Bug thật (G1 smoke, 2026-07-19): `TOGETHER_MODEL` rỗng ⇒ `default_model or
+    settings.together_model` = `""` ⇒ `OpenAIClient.__init__` chạy tiếp `"" or
+    settings.openai_model` ⇒ client trỏ Together nhưng xin `gpt-4o-mini` ⇒ 404.
+
+    Test dựng đúng cái bẫy đó: `OPENAI_MODEL` để một giá trị nhận ra được, `TOGETHER_MODEL`
+    rỗng. Nếu tên OpenAI xuất hiện trong `_default_model` thì fallback vẫn rò.
+    """
+    from agent.providers.together_client import TogetherClient
+    from app.config import get_settings
+
+    monkeypatch.setenv("TOGETHER_API_KEY", "test-key-not-real")
+    monkeypatch.setenv("TOGETHER_MODEL", "")
+    monkeypatch.setenv("OPENAI_MODEL", "openai/KHONG-DUOC-XUAT-HIEN")
+    get_settings.cache_clear()
+    try:
+        client = TogetherClient()
+        assert "KHONG-DUOC-XUAT-HIEN" not in client._default_model, (
+            "TogetherClient rơi về model của OpenAI — sẽ 404 trên Together"
+        )
+        assert client._default_model == "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+    finally:
+        get_settings.cache_clear()
+
+
+def test_explicit_blank_model_argument_is_treated_as_unset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Truyền `default_model="   "` (rỗng/khoảng trắng) cũng phải rơi về default, không được
+    gửi model rỗng lên API. Cùng gốc với bug trên: falsy-nhưng-không-None trượt qua `or`."""
+    from agent.providers.together_client import TogetherClient
+    from app.config import get_settings
+
+    monkeypatch.setenv("TOGETHER_API_KEY", "test-key-not-real")
+    monkeypatch.delenv("TOGETHER_MODEL", raising=False)
+    get_settings.cache_clear()
+    try:
+        assert TogetherClient(default_model="   ")._default_model.strip() != ""
+    finally:
+        get_settings.cache_clear()
 
 
 @pytest.mark.asyncio

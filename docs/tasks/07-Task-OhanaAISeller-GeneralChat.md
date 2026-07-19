@@ -136,9 +136,11 @@ PRE-G01: Together key HỢP LỆ (không chỉ "có mặt").
   ⚠️ KHÔNG in key ra output.
 
 PRE-G02: Chốt model LLM cho General Chat.
-  Command: Wyatt chọn 1 model open-weight có trên Together, ưu tiên tiếng Việt tốt
-           (ứng viên: Qwen2.5-72B-Instruct / Llama-3.3-70B-Instruct-Turbo / DeepSeek-V3).
-  Expected: 1 chuỗi model id đặt vào TOGETHER_MODEL.
+  Command: Wyatt chọn 1 model open-weight, ưu tiên tiếng Việt tốt.
+           ⚠️ "Có trong /v1/models" KHÔNG đủ — danh sách đó gồm cả model chỉ chạy
+           trên dedicated endpoint (Qwen2.5-72B-Turbo có mặt, kèm giá, vẫn 400).
+           Điều kiện nghiệm thu là một CUỘC GỌI THẬT trả 200 kèm content khác rỗng.
+  Expected: 1 chuỗi model id đặt vào TOGETHER_MODEL + live smoke PASS.
   If fail: G0 vẫn land được với default trong config (swappable qua env), nhưng
            ghi KNOWN UNCOVERED "model chưa chốt, chưa đo chất lượng tiếng Việt".
   Note: eval-SEED (spec 03d-D3) chưa tồn tại ⇒ chưa có cách ĐO. Đây là chọn tạm có chủ ý.
@@ -176,15 +178,17 @@ REVIEW: PASS ref=docs/reviews/2026-07-19-spec07-G0.json
 
 ### Phase G1 — `POST /api/chat` + ranh giới an toàn
 <!-- ADP:PHASE G1 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 GOAL: Seller đã đăng nhập POST `/api/chat` nhận phản hồi thật từ Together; `shop_id` chỉ từ JWT; thiếu cookie → 401, thiếu CSRF → 403; body claim `shop_id` khác JWT → dùng JWT; **gate ranh giới: `api/chat.py` KHÔNG với tới sender/`PendingReply`/`policy_gate`**; log `model_id`/`token_in`/`token_out`/`latency_ms`/`shop_id`.
 APPROACH: `api/chat.py` follow shape `api/inbox.py` (router builder + `identity_dep`). LLM client **inject qua tham số** để test dùng fake, không gọi mạng. Mount trong `app/main.py` TRƯỚC `StaticFiles`. Response `{reply, model, grounded: false, usage:{...}}` — cờ `grounded` tường minh để consumer sau không nhầm. Gate ranh giới đọc module `api.chat` + toàn bộ import transitive, FAIL nếu chạm `bridge.*sender*` / `PendingReply` / `agent.policy_gate`.
-ALLOWED_FILES: api/chat.py, app/main.py, tests/test_chat_endpoint.py, docs/reviews/, docs/tasks/07-Task-OhanaAISeller-GeneralChat.md
-GATE: .venv/bin/python -m pytest tests/test_chat_endpoint.py -x -q
+ALLOWED_FILES: api/chat.py, app/main.py, tests/test_chat_endpoint.py, app/config.py, agent/providers/together_client.py, tests/test_together_client.py, tests/test_together_live.py, tests/test_config.py, .env.example, docs/reviews/, docs/tasks/07-Task-OhanaAISeller-GeneralChat.md
+SCOPE_EXTENSION (Wyatt duyệt 2026-07-19): +5 file để vá lỗi G0 phát hiện lúc smoke thật ở G1. `.env` có `TOGETHER_MODEL=` RỖNG → chuỗi rỗng ghi đè default trong `Settings` → `default_model or settings.together_model` = "" → `OpenAIClient` fallback tiếp `"" or settings.openai_model` ⇒ **TogetherClient gọi Together bằng `gpt-4o-mini`**, 404 `model_not_available`. 90/90 test xanh vì fake client không chạm model id thật. Hai khuyết tật: (1) env rỗng âm thầm thắng default — áp cho MỌI field str có default; (2) fallback rò sang provider khác — TogetherClient lẽ ra không có đường nào tới `openai_model`. Kèm live gate `tests/test_together_live.py` (`@pytest.mark.live`, deselect khỏi CI) vì đây là lớp lỗi fake KHÔNG BAO GIỜ bắt được. **+`tests/test_config.py`** (thêm sau review vòng 1): validator blank-env chạm path bảo mật `get_jwt_secret()`; ban đầu tôi chỉ kiểm tay rồi ghi kết quả vào comment — reviewer đúng khi từ chối coi đó là bằng chứng. Đã chuyển thành test thật.
+GATE: .venv/bin/python -m pytest tests/test_chat_endpoint.py tests/test_together_client.py -x -q
 GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && .venv/bin/mypy app agent retrieval parsing storage db bridge tools && .venv/bin/ruff check . && .venv/bin/ruff format --check .
 RETRY: 0/3
-RISK: medium (proposed — `api/chat.py` thêm vào RISK_PATHS ở MANIFEST spec này: endpoint có auth gọi LLM, cùng hạng `api/inbox.py`; floor ⇒ ≥medium. Wyatt ký)
+RISK: medium (Wyatt ký 2026-07-18 — `api/chat.py` thêm vào RISK_PATHS ở MANIFEST spec này: endpoint có auth gọi LLM, cùng hạng `api/inbox.py`; floor ⇒ ≥medium)
 BLOCKED_BY: G0
+REVIEW: PASS ref=docs/reviews/2026-07-19-spec07-G1.json
 <!-- /ADP -->
 
 6. `tests/test_chat_endpoint.py` (RED): (a) happy path với fake client → 200 + reply; (b) không cookie → 401; (c) không CSRF header → 403; (d) **adversarial**: body `{"shop_id":"X"}` + JWT shop=Y → dùng Y; (e) **gate ranh giới** import-graph; (f) `grounded` là `false` trong response.
@@ -293,7 +297,20 @@ Adversarial:
 ## §14 — Assumptions & Open (Wyatt chốt trước execute)
 
 **Wyatt ĐÃ KÝ 2026-07-18:**
-- [x] **PRE-G02 model = `Qwen/Qwen2.5-72B-Instruct-Turbo`** ✅ (id chính xác, verified có trên Together — PRE-G01 liệt kê 272 model). Lý do chọn: Qwen train nặng ngôn ngữ châu Á → prior tốt nhất cho tiếng Việt. ⚠️ **Đây là suy luận, KHÔNG phải số đo** — chưa có eval-SEED. Swappable qua `TOGETHER_MODEL`.
+- [x] ~~**PRE-G02 model = `Qwen/Qwen2.5-72B-Instruct-Turbo`**~~ ❌ **THU HỒI 2026-07-19 — model KHÔNG dùng được.** Together trả `400 model_not_available: non-serverless model … create a dedicated endpoint`. Lời khai "verified có trên Together" ở bản ký 18/07 là **SAI**: nó dựa trên việc model có mặt trong `/v1/models` (kèm cả bảng giá), nhưng danh sách đó liệt kê cả model chỉ chạy trên dedicated endpoint. **Danh sách model không phải bằng chứng về khả năng phục vụ — chỉ một cuộc gọi thật mới là.** Lỗi lọt qua 3 vòng review G0 vì mọi test đều tiêm fake client; fake không quan tâm model id có thật hay không.
+- [x] **PRE-G02 (ký lại 2026-07-19) model = `meta-llama/Llama-3.3-70B-Instruct-Turbo`** ✅ — verified bằng **cuộc gọi thật**, không phải bằng danh sách. Dò 148 ứng viên chat ⇒ **6 model thật sự phục vụ**:
+
+  | Model | $/M in→out | Bịa số liệu? | Reasoning? |
+  |---|---|---|---|
+  | `google/gemma-3n-E4B-it` | 0.06 → 0.12 | không | không |
+  | `openai/gpt-oss-120b` | 0.15 → 0.60 | không | **có** |
+  | `Qwen/Qwen2.5-7B-Instruct-Turbo` | 0.30 → 0.30 | **CÓ** ("2-3 ngày") | không |
+  | `meta-llama/Llama-3.3-70B-Instruct-Turbo` ← **chọn** | 1.04 → 1.04 | không | không |
+  | `deepcogito/cogito-v2-1-671b` | 1.25 → 1.25 | không | không |
+  | `zai-org/GLM-5.2` | 1.4 → 4.4 | — | có (content rỗng) |
+
+  Lý do chọn: **non-reasoning** (model reasoning trả `content` RỖNG khi `max_tokens` không đủ — Kimi-K2.6 đốt sạch 300 token vẫn rỗng, không exception; `api/chat.py` giờ bắt và trả 502, nhưng tránh vẫn hơn), không bịa số liệu dưới `_SYSTEM_PROMPT`, tiếng Việt đúng ngữ vực bán hàng ("Dạ", "anh/chị"), open-weight ⇒ giữ nguyên lập luận portability của ADR PRE-007. ~$0.36/1000 tin. ⚠️ Vẫn là **suy luận + smoke thủ công, KHÔNG phải eval-SEED** — chốt cuối ở Spec 03d-D3. Swappable qua `TOGETHER_MODEL`; đổi xong PHẢI chạy `pytest tests/test_together_live.py -m live`.
+- [x] **Đo thật (2026-07-19, end-to-end qua `/api/chat` với Together thật):** cold start **24.8s**, call thứ hai **1.2s**. ⚠️ G2 phải có loading state thật — 25s không có phản hồi thị giác là hỏng UX.
 - [x] **RISK tier:** G0 **medium** · G1 **medium** (Wyatt ký "risk medium" khi duyệt phương án A).
 - [ ] **G2 tier** — spec đề xuất `low` (chỉ `web/`, không giao RISK_PATHS). Wyatt chưa tick riêng; **agent KHÔNG tự hạ tier** ⇒ nếu tới G2 mà chưa có tick, chạy ở **medium**.
 - [x] **`api/chat.py` vào RISK_PATHS** ✅ — endpoint có auth gọi LLM, cùng hạng `api/inbox.py`.
