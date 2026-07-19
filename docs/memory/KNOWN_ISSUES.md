@@ -145,7 +145,39 @@ _Empty. Log ở đây khi port drnickv4 phát hiện bug nhưng defer fix per sp
   Bản thân S603 ở đây là **báo nhầm**: lệnh chạy là `[sys.executable, "-c", probe]` với `probe` là literal viết trong file test, không có input ngoài. Đó là subprocess CỐ Ý — probe đo thứ chỉ quan sát được ở tiến trình sạch (thứ tự `dictConfig` vs `import app.main`), in-process không đo được.
 - **Nguyên nhân gốc — quan trọng hơn cái lỗi:** `pyproject.toml:27` khai `ruff>=0.4`, không pin. Local đang **0.15.22**. Một bản ruff mới bật thêm rule là CI đỏ mà **không ai đổi một dòng code nào**. Nghĩa là gate của repo phụ thuộc ngày cài đặt — chạy hôm nay xanh, chạy tuần sau đỏ. Hệ quả thứ hai: một phase từng checkpoint DONE với `GATE_FULL` chứa `ruff check .` giờ không tái lập được kết quả đó, tức EVIDENCE cũ mất tính kiểm chứng.
 - **Why not blocking E0:** lỗi nằm ở `tests/test_chat_endpoint.py` — ngoài `ALLOWED_FILES` của E0 kể cả sau khi Wyatt mở rộng. Sửa kèm = scope drift đúng loại mà ADP dựng lên để chặn. **Nhưng nó CHẶN checkpoint E0**, vì `GATE_FULL` của E0 có `ruff check .` trong đó.
-- **Action:** (1) ✅ Pin `ruff==0.15.22` trong `pyproject.toml`. (2) ✅ Chặn S603 tại đúng dòng `test_chat_endpoint.py` kèm lý do — KHÔNG tắt S603 toàn repo. (3) ✅ Commit riêng, không nhét vào E0. (4) ⏳ **CÒN LẠI:** rà các phase đã DONE xem còn phase nào không tái lập được `GATE_FULL` với ruff pin hiện tại. Chưa ai làm. Cách rà: `git checkout <sha_phase>` rồi chạy `GATE_FULL` với ruff 0.15.22 — phase nào đỏ nghĩa là EVIDENCE của nó chưa từng được verify ở phiên bản này.
+- **Action:** (1) ✅ Pin `ruff==0.15.22`. (2) ✅ Chặn S603 tại đúng dòng — KHÔNG tắt toàn repo. (3) ✅ Commit riêng. (4) ✅ Rà 22 phase DONE — kết quả ở AMENDMENT dưới. (5) ✅ `--no-cache` vào mọi bước ruff (ci.yml + CLAUDE.md §1 + GATE_FULL spec 08 E1/E2). (6) ⏳ **CÒN LẠI:** `mypy>=1.10` + `pytest>=8.0` vẫn chưa pin — cùng lớp rủi ro, chưa ai nhận.
+
+---
+
+#### AMENDMENT 2026-07-19 — chẩn đoán ban đầu THIẾU. Nguyên nhân trực tiếp là CACHE, không phải version.
+
+Pin version là đúng nhưng không đủ. Thứ thật sự làm gate nói dối:
+
+```
+ruff check .              →  All checks passed!     ← đúng lệnh GATE_FULL đang chạy
+ruff check . --no-cache   →  Found 4 errors
+```
+
+Cùng source, cùng binary. Xoá `.ruff_cache` rồi chạy lại lệnh CŨ ⇒ FAIL 4, ổn định qua nhiều lần chạy. `.ruff_cache` do một bản ruff trước ghi ra **không bị vô hiệu khi ruff nâng cấp**.
+
+4 lỗi thật (I001, import chưa sắp — đã `--fix`): `agent/providers/openai_embedder.py:4` · `tests/test_tenant_isolation.py:36,66,114`.
+
+**Hệ quả phải ghi ra, không giấu:**
+- **Checkpoint spec 08 E0 (`8ba4fef`) có một bước gate xanh giả.** `GATE_FULL: PASS` bao gồm `ruff check .`, mà bước đó đọc cache. Ba bước còn lại (pytest/mypy/format) hợp lệ. Đã re-verify sau khi vá — xem `docs/reviews/08-E0-gate-reverify.md`.
+- Trong session phát hiện, "ruff sạch" bị báo sai **hai lần theo hai cơ chế khác nhau**: lần đầu do chạy **scoped** (`ruff check app/config.py` rồi khai như toàn repo — đúng hình dạng ISSUE-018), lần sau do **cache** dù đã chạy đúng lệnh. Bài học: chạy đúng lệnh vẫn chưa đủ để lời khai thành bằng chứng.
+- **CI đáng lẽ đã đỏ.** Runner không restore `.ruff_cache` (chỉ cache pip) ⇒ CI thấy 4 lỗi này. Chưa ai xác nhận trạng thái Actions — **cần kiểm tab Actions**, đây là suy luận từ config, không phải quan sát.
+
+**Rà 22 phase DONE dưới ruff pin + `--no-cache`** (bung tree bằng `git archive <sha>`, chạy ruff lên source lúc phase đó ký DONE):
+
+| Kết quả | Số phase |
+|---|---|
+| `ruff check` PASS | **3/22** — `02:1.0`, `02:1.1`, `01:phase-1` |
+| `ruff check` FAIL | **19/22** (3–5 lỗi, tăng dần theo thời gian) |
+| `ruff format` FAIL | 7/22 |
+
+Đọc cho đúng: **19 phase đó KHÔNG làm sai.** Chúng pass gate hợp lệ dưới ruff đương thời. Bảng này trả lời đúng một câu — *"EVIDENCE cũ có tái lập được dưới ruff hôm nay không"* — và câu trả lời là không, với 19/22. Đó là chi phí của `>=` không pin, lần đầu đo được bằng số.
+
+**KHÔNG sửa 19 phase cũ.** Chúng DONE hợp lệ theo tiêu chuẩn lúc đó; viết lại lịch sử không mua được gì. Giá trị nằm ở chỗ từ nay gate không tự lừa nữa.
 - **Ghi chú cho lần sau:** lỗi lộ ra vì `GATE_FULL` chạy `ruff check .` (toàn repo). Trong session này tôi từng báo "ruff sạch" sau khi chỉ chạy `ruff check app/config.py` — scoped. Gate scoped trả lời câu hỏi hẹp hơn câu mình đang khẳng định; đó chính là hình dạng của ISSUE-018. Khi báo trạng thái gate, chạy đúng lệnh mà gate khai.
 
 ### ISSUE-017 — `channels/identity.py`: thiếu unique constraint → race có thể tạo 2 Conversation cho 1 khách

@@ -33,9 +33,10 @@ VECTOR_DIM = 1536
 @pytest.mark.asyncio
 async def test_sql_row_scope_isolates_shops() -> None:
     """Layer 1 — SQL WHERE shop_id filter: query for shop A never returns shop B rows."""
-    from db.models import Base, Message  # step 6 lands these
     from sqlalchemy import select
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    from db.models import Base, Message  # step 6 lands these
 
     engine = create_async_engine(DATABASE_URL, echo=False)
     async with engine.begin() as conn:
@@ -63,9 +64,9 @@ async def test_pgvector_retriever_shop_scope_hard_filter() -> None:
     """Layer 2 — pgvector: PgvectorRetriever(shop_scope='A') never surfaces shop B rows even
     when B's vector is nearer in cosine distance. This must be a SQL-level WHERE, NOT post-filter.
     """
-    from db.models import Base, Embedding  # step 6
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+    from db.models import Base, Embedding  # step 6
     from retrieval.pgvector import PgvectorRetriever  # step 8 adds shop_scope param
 
     engine = create_async_engine(DATABASE_URL, echo=False)
@@ -112,6 +113,7 @@ def test_jwt_identity_carries_shop_id() -> None:
     from the signed claim, never from the request body (R1_TIER_HINT / R1_TIER_FROM_BODY analog).
     """
     import jwt as pyjwt
+
     from auth.identity import Identity, verify_token  # step 7
 
     secret = "test-secret-do-not-use-in-prod"  # noqa: S105 — fixture literal, not a real secret

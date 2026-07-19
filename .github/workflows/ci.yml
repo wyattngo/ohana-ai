@@ -60,11 +60,16 @@ jobs:
         run: |
           python .claude/hooks/guardrail.py $(find app agent retrieval parsing storage -name '*.py' 2>/dev/null)
 
+      # `--no-cache` CỐ Ý, dù runner vốn không có `.ruff_cache` (chỉ cache pip). Giữ ở đây để
+      # lệnh CI và lệnh local GIỐNG NHAU TỪNG KÝ TỰ. Đã trả giá: `.ruff_cache` cũ trên máy dev
+      # do một bản ruff trước ghi ra không bị vô hiệu khi ruff nâng cấp ⇒ `ruff check .` local
+      # trả "All checks passed!" trong khi `--no-cache` trả 4 lỗi trên CÙNG source. Gate local
+      # nói dối, GATE_FULL của ADP nuốt lời nói dối đó vào EVIDENCE (ISSUE-019).
       - name: Ruff lint (incl S / bandit)
-        run: ruff check .
+        run: ruff check . --no-cache
 
       - name: Ruff format check
-        run: ruff format --check .
+        run: ruff format --check . --no-cache
 
       # spec 06 F2: db/bridge/tools added EXPLICITLY. mypy already reached them via
       # follow-imports, so this does not change what is checked — it pins the intent so a

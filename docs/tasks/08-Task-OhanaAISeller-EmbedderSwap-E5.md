@@ -203,7 +203,7 @@ GOAL: Cột `embeddings.embedding` là `Vector(1024)`; `_EMBED_DIM` một nguồ
 APPROACH: Migration **destructive có chủ ý** — 1536→1024 KHÔNG phải phép chiếu, vector cũ vô nghĩa ở không gian mới. `DELETE FROM embeddings` rồi `ALTER TYPE`, ghi rõ trong docstring migration + §8. Down-migration cũng xoá — reversible về SCHEMA, KHÔNG reversible về DỮ LIỆU; nói thẳng thay vì giả vờ. `default_embedder()` ưu tiên Together, fallback OpenAI, cuối cùng dev-embedder; giữ nguyên tính chất không-raise-ở-factory (spec 05 P1).
 ALLOWED_FILES: db/models.py, db/migrations/versions/, api/admin.py, app/config.py, tests/test_embedder_wiring.py, tests/test_config.py, tests/test_embedding_dim.py, docs/reviews/, docs/smokes/, docs/tasks/08-Task-OhanaAISeller-EmbedderSwap-E5.md
 GATE: .venv/bin/python -m pytest tests/test_embedding_dim.py tests/test_embedder_wiring.py -x -q
-GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && .venv/bin/mypy app agent retrieval parsing storage db bridge tools && .venv/bin/ruff check . && .venv/bin/ruff format --check .
+GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && .venv/bin/mypy app agent retrieval parsing storage db bridge tools && .venv/bin/ruff check . --no-cache && .venv/bin/ruff format --check . --no-cache
 RETRY: 0/3
 RISK: high (SIGNED Wyatt 2026-07-19 — chốt theo đề xuất. Nâng trên floor `medium` vì migration ĐỔI schema và XOÁ dữ liệu, không chỉ chạm file. ⇒ per-step confirm + human review artifact `human=<file>` ký `REVIEWED_BY` bound cùng diff; auto-verdict Haiku KHÔNG đủ.)
 BLOCKED_BY: E0, PRE-E02 ✅, PRE-E03 ✅, PRE-E04 ⏳
@@ -224,7 +224,7 @@ GOAL: `tests/test_wiki_rag_live.py -m live` PASS **trên e5 thật** — ingest 
 APPROACH: Sửa live test trỏ e5 (không phải OpenAI). Test phải kiểm **thứ hạng**, không chỉ "có trả về gì đó": chunk đúng chủ đề phải xếp TRÊN chunk sai chủ đề — đó mới là điều F1 hứa. Skip sạch khi thiếu key (không FAIL giả).
 ALLOWED_FILES: tests/test_wiki_rag_live.py, docs/memory/KNOWN_ISSUES.md, CLAUDE.md, docs/reviews/, docs/smokes/, docs/tasks/08-Task-OhanaAISeller-EmbedderSwap-E5.md
 GATE: .venv/bin/python -m pytest tests/test_wiki_rag_live.py -m live -x -q
-GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && .venv/bin/ruff check . && .venv/bin/ruff format --check .
+GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && .venv/bin/ruff check . --no-cache && .venv/bin/ruff format --check . --no-cache
 RETRY: 0/3
 RISK: low (SIGNED Wyatt 2026-07-19 — chốt theo đề xuất. ALLOWED_FILES KHÔNG giao RISK_PATHS; chỉ test + docs.)
 BLOCKED_BY: E1

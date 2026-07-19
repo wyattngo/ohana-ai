@@ -18,8 +18,8 @@ Backend (dùng `.venv/bin/…` nếu có venv; CI dùng `pip install -e ".[dev]"
 ```bash
 pytest -q                   # default gate — live test bị loại (addopts: -m 'not live')
 pytest -q -x                # GATE_RUNNER của ADP, dừng ở lỗi đầu
-ruff check .                # lint (E,F,I,B,UP,S — gồm bandit S)
-ruff format --check .
+ruff check . --no-cache     # lint (E,F,I,B,UP,S — gồm bandit S). --no-cache BẮT BUỘC: xem §4
+ruff format --check . --no-cache
 mypy app agent retrieval parsing storage db bridge tools   # strict; scope CỐ ĐỊNH (api/ auth/ OUT)
 alembic upgrade head        # cần DATABASE_URL trỏ Postgres+pgvector
 
@@ -116,6 +116,7 @@ Bất biến bảo mật. `.claude/hooks/guardrail.py` chặn cơ học **một 
   ⚠️ **Nó KHÔNG phủ complex field.** Validator chạy `mode="before"` nhưng *sau* khi `EnvSettingsSource` parse JSON ⇒ `REASONING_MODELS=` rỗng vẫn làm `Settings()` **RAISE** (`frozenset[str]`). Muốn rỗng thì **bỏ hẳn dòng**, đừng để `=` rỗng. Docstring trong code khai "áp cho MỌI field" là **sai** — ISSUE-018.
 - **Security path đọc `Settings()` fresh mỗi call**, KHÔNG `get_settings()` cached — né cache-staleness.
 - **Chat model = `meta-llama/Llama-3.3-70B-Instruct-Turbo`.** KHÔNG đổi sang MiniMax-M3 (bịa 6/6 ca an toàn, đắt hơn 2.4× khi dùng thật — DEC-OHANA-02). **Danh sách `/v1/models` KHÔNG chứng minh model dùng được** — có model kèm bảng giá vẫn 400 "non-serverless". Đổi model xong **PHẢI** chạy `pytest tests/test_together_live.py -m live`. Cold start ~24.8s, call sau ~1.2s ⇒ UI bắt buộc có loading state.
+- **`ruff` LUÔN chạy với `--no-cache`, và version bị PIN.** `.ruff_cache` do một bản ruff cũ ghi ra **không bị vô hiệu khi ruff nâng cấp**: `ruff check .` trả `All checks passed!` trong khi `ruff check . --no-cache` trả 4 lỗi trên **cùng source**. Gate local nói dối, và `GATE_FULL` của ADP nuốt lời nói dối đó vào EVIDENCE — spec 08 E0 đã bị stamp một bước ruff xanh giả trước khi phát hiện. Rà lại 22 phase DONE dưới ruff pin: **19/22 không tái lập được** `ruff check` (ISSUE-019). Vì vậy `pyproject.toml` pin `ruff==0.15.22` (KHÔNG `>=`) — gate phải là hàm của source, không phải của ngày cài đặt. ⚠️ `mypy>=1.10` và `pytest>=8.0` **vẫn chưa pin** — cùng lớp rủi ro, chưa ai nhận.
 - **Embedding dim là BREAKING:** `db/models.py` `_EMBED_DIM = 1536` → `Vector(_EMBED_DIM)`. ADR 2026-07-18 chốt chuyển OpenAI `text-embedding-3-small` (1536) → Together `intfloat/multilingual-e5-large-instruct` (1024): cần Alembic migration đổi dim + re-embed corpus. e5 cần prefix `query:` / `passage:` — mà `Embedder` ABC hiện **không phân biệt query vs passage** (`tools/wiki.py` embed query, `parsing/ingest.py` embed passage, cùng một `embed()`). Spec 08 sửa ABC trước.
 
 ---
