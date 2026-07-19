@@ -45,6 +45,21 @@ DEFAULT_TOGETHER_MODEL = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
 # bằng chứng.)
 DEFAULT_TOGETHER_EMBED_MODEL = "intfloat/multilingual-e5-large-instruct"
 
+# Số chiều vector — NGUỒN SỰ THẬT DUY NHẤT. `db/models.py` import hằng số này thay vì khai
+# một số riêng; hai hằng số độc lập cùng mô tả một thực tế vật lý (số cột trong Postgres) là
+# cách chắc chắn nhất để một ngày chúng lệch nhau, và khi lệch thì triệu chứng là insert bị
+# từ chối ở một đường code còn đường khác vẫn chạy.
+#
+# **HẰNG SỐ MODULE, CỐ Ý KHÔNG PHẢI field của `Settings`** (Wyatt duyệt 2026-07-19, spec 08 E1
+# DEVIATION_APPROVED). `Settings` đọc env ⇒ để nó thành field env là cho phép biến môi trường
+# điều khiển SỐ CHIỀU CỘT DB, trong khi cột thật do migration cố định. Đặt sai env thì hoặc
+# insert bị từ chối hàng loạt, hoặc — tệ hơn — hai đường code lệch nhau âm thầm. Schema không
+# phải thứ để cấu hình lúc chạy.
+#
+# 1024 = đo THẬT, không đọc doc: E0 gọi e5 qua mạng và đếm (`docs/smokes/08-E0.md` R1).
+# Đổi số này là BREAKING — cần Alembic migration đổi `Vector(...)` + re-embed toàn bộ corpus.
+EMBED_DIM = 1024
+
 
 class Settings(BaseSettings):
     # No `env_file` — read from process env only, matching how every other env-reader in this
@@ -104,9 +119,11 @@ class Settings(BaseSettings):
     # tests/test_config.py::test_openai_api_key_reads_from_env, not just assumed from docs).
     openai_api_key: str | None = None
 
-    # Q1 (spec §14) LOCKED — 1536 dims, matches `Embedding.embedding Vector(1536)`
-    # (db/models.py `_EMBED_DIM`). Changing this needs an Alembic migration + reindex; do not
-    # edit the default here without one (see spec §8).
+    # ⚠️ 1536 dims — KHÔNG còn khớp cột DB kể từ spec 08 E1 (cột giờ là `Vector(EMBED_DIM)` =
+    # 1024). `OpenAIEmbedder` được GIỮ có chủ ý làm adapter thay thế (spec 08 §3 "Out of
+    # scope"), nhưng dùng nó để ingest vào schema hiện tại sẽ bị Postgres TỪ CHỐI vì sai chiều
+    # — ồn ào, không âm thầm. Muốn quay lại OpenAI thì cần migration đổi `EMBED_DIM` + re-embed,
+    # không phải chỉ đổi dòng này.
     openai_embed_model: str = "text-embedding-3-small"
 
     # `agent/providers/openai_client.py OpenAIClient.__init__` needs this field to exist so the

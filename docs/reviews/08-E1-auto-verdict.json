@@ -1,0 +1,43 @@
+{
+  "verdict": "APPROVE",
+  "phase": "E1",
+  "spec": "08-Task-OhanaAISeller-EmbedderSwap-E5.md",
+  "reviewer": "output-evaluator (sonnet) — vòng 1 trả NEEDS_REVIEW, vòng 2 sau khi vá",
+  "scores": {
+    "correctness": 9,
+    "completeness": 9,
+    "safety": 9
+  },
+  "summary": "Migration destructive thiết kế đúng: up/down đối xứng về schema, down_revision 0003 khớp chuỗi, KHÔNG có FK nào trỏ tới embeddings nên không cascade ngoài ý muốn, index idx_emb_shop_ns sống sót qua ALTER TYPE (xác nhận bằng smoke thật). default_embedder() together->openai->dev không có ca chọn sai; nhánh OpenAI sinh 1536 vào cột 1024 hỏng ỒN ÀO — verify không có try/except nào nuốt exception trên đường ingest.",
+  "findings": [
+    {
+      "severity": "medium",
+      "file": "db/migrations/versions/0004_embedding_dim_1024.py",
+      "issue": "Không có guard cơ học chặn xoá khi row vượt ngưỡng. Docstring cảnh báo dài nhưng migration vẫn xoá vô điều kiện dù n=2 hay n=200000. Bảo vệ duy nhất là kỷ luật con người đọc docstring — cùng hình dạng đã hỏng với `_DEV_EMBED_DIM = 1536  # must match db.models`.",
+      "status": "ĐÃ VÁ — thêm _SAFE_ROW_THRESHOLD=10 + env override OHANA_MIGRATION_ALLOW_EMBEDDING_DATA_LOSS; migration raise và TỪ CHỐI chạy khi vượt. Kèm test bắn thật `test_migration_refuses_when_rows_exceed_safe_threshold` kiểm CẢ hai vế: chặn khi không override (dữ liệu còn nguyên 12/12), và cho chạy khi có override (guard là phanh, không phải tường)."
+    },
+    {
+      "severity": "medium",
+      "file": "docs/tasks/08-...E5.md",
+      "issue": "Dòng SMOKE: còn placeholder dù docs/smokes/08-E1.md đã PASS.",
+      "status": "ĐÃ VÁ — ghi SMOKE:/REVIEW: trước khi stamp."
+    },
+    {
+      "severity": "high",
+      "file": "process",
+      "issue": "RISK:high đòi human review artifact bound-diff; auto-verdict LLM KHÔNG đủ. Chính reviewer tự nêu điều này.",
+      "status": "CHUYỂN CHO WYATT — human=docs/reviews/08-E1-human.md"
+    },
+    {
+      "severity": "low",
+      "file": "0004:93",
+      "issue": "Né S608 bằng đổi chữ, phụ thuộc heuristic ruff không được test canh.",
+      "status": "CHẤP NHẬN — ruff đã pin (ISSUE-019), heuristic không tự đổi."
+    }
+  ],
+  "blocking": false,
+  "note_tier_high": "Artifact này KHÔNG đủ để advance E1. Cần human= do Wyatt ký.",
+  "diff_sha256": "3dab502233818e795f0fe5fac2e359f57c62c721a4837ea288c6e3e3555c0837",
+  "stamped_at": "2026-07-19T23:09",
+  "model": "unknown"
+}

@@ -31,9 +31,14 @@ def _clear_settings_cache() -> None:
 
 
 def test_openai_embed_model_default_locked() -> None:
-    """Q1 (spec §14) locks `text-embedding-3-small` — 1536 dims, matches the existing
-    `Embedding.embedding Vector(1536)` column. Changing this default needs a migration; it is
-    NOT this test's job to allow that silently."""
+    """Q1 (spec 05 §14) locks `text-embedding-3-small` — 1536 dims.
+
+    ⚠️ Cập nhật spec 08 E1: 1536 KHÔNG còn khớp cột DB. Cột giờ là `Vector(EMBED_DIM)` = 1024
+    (Together e5). Test này vẫn đúng và vẫn cần: nó khoá DEFAULT của adapter OpenAI, thứ được
+    giữ lại có chủ ý làm adapter thay thế. Nó KHÔNG còn khẳng định "khớp schema" — dùng
+    `OpenAIEmbedder` để ingest vào schema hiện tại sẽ bị Postgres từ chối vì sai chiều (ồn ào,
+    đúng ý muốn). Ràng buộc "một nguồn sự thật về số chiều" nay do
+    `tests/test_embedding_dim.py` canh."""
     from app.config import get_settings
 
     assert get_settings().openai_embed_model == "text-embedding-3-small"

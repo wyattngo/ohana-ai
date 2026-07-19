@@ -22,5 +22,11 @@
     "red_exit": "1",
     "red_ts": "2026-07-19T19:25:57+0700",
     "files": "agent/embedder.py,agent/providers/together_embedder.py,app/config.py,parsing/ingest.py,tools/wiki.py"
+  },
+  "08-E1-embedding-dim": {
+    "acc_sha": "1a57c03ac3956f56e94cb40f168f434237782b1cdca40fc611e85633438d8971",
+    "red_exit": "1",
+    "red_ts": "2026-07-19T22:44:55+0700",
+    "files": "db/models.py,db/migrations/versions/,api/admin.py,app/config.py"
   }
 }

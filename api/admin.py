@@ -18,11 +18,17 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from agent.embedder import Embedder
 from agent.providers.openai_embedder import OpenAIEmbedder
-from app.config import get_settings
+from agent.providers.together_embedder import TogetherEmbedder
+from app.config import EMBED_DIM, get_settings
 from auth.identity import Identity
 from parsing.ingest import PLATFORM_SHOP_ID, ingest_wiki
 
-_DEV_EMBED_DIM = 1536  # must match db.models.Embedding.embedding (Vector(_EMBED_DIM))
+# Alias tới nguồn sự thật duy nhất, KHÔNG phải bản sao. Trước spec 08 E1 đây là `1536` viết
+# cứng kèm comment "must match db.models" — comment đó là lời nhắc cho con người, và nó đã
+# KHÔNG giữ được lời hứa: đổi cột sang 1024 thì hằng số này vẫn 1536, dev-embedder sinh vector
+# sai chiều, và triệu chứng chỉ hiện ra ở `test_admin_ui` khi ingest chạm DB thật. Import thì
+# máy giữ hộ.
+_DEV_EMBED_DIM = EMBED_DIM
 
 
 class _EmbedderProto(Protocol):
@@ -77,8 +83,16 @@ class _DeterministicDevEmbedder(Embedder):
 def default_embedder() -> _EmbedderProto:
     """Factory `app/main.py` calls at wiring time (spec 05 §3 Sub-task B). Env-selecting:
 
-    - `OPENAI_API_KEY` set (any env, incl. dev) -> real `OpenAIEmbedder` (ISSUE-016 fix).
-    - No key (any env) -> `_DeterministicDevEmbedder`.
+    - `TOGETHER_API_KEY` set -> `TogetherEmbedder` (e5, 1024-dim). ƯU TIÊN CAO NHẤT kể từ
+      spec 08 E1: cột DB giờ là `Vector(1024)`, tức đây là adapter DUY NHẤT sinh ra vector
+      khớp schema hiện tại.
+    - `OPENAI_API_KEY` set, không có Together key -> `OpenAIEmbedder` (1536).
+      ⚠️ Nhánh này sinh vector SAI CHIỀU so với cột DB ⇒ ingest sẽ bị Postgres TỪ CHỐI. Giữ
+      lại có chủ ý (spec 08 §3 "Out of scope": `OpenAIEmbedder` là adapter thay thế, và là
+      bằng chứng lớp abstraction hoạt động thật). Hỏng ở đây ỒN ÀO — Postgres raise, không
+      ghi được vector vô nghĩa nào. Đó là lý do để nhánh này tồn tại mà không nguy hiểm:
+      thà từ chối rõ ràng còn hơn im lặng chọn provider khác sau lưng người vận hành.
+    - Không key nào -> `_DeterministicDevEmbedder` (đúng chiều, nhưng raise ngoài dev).
 
     **Deviation from spec §3 B's proposed pseudocode, flagged at ANCHOR:** the spec's factory
     sketch raises `RuntimeError` directly in this function for the "no key + not dev" branch.
@@ -99,6 +113,8 @@ def default_embedder() -> _EmbedderProto:
     only caller happens to run at import time.
     """
     settings = get_settings()
+    if settings.together_api_key:
+        return TogetherEmbedder()
     if settings.openai_api_key:
         return OpenAIEmbedder()
     return _DeterministicDevEmbedder()

@@ -22,12 +22,17 @@ import os
 
 import pytest
 
+from app.config import EMBED_DIM
+
 DATABASE_URL = os.environ.get(
     "DATABASE_URL", "postgresql+psycopg://ohana:ohana@localhost:5432/ohana"
 )
 
 # OpenAI text-embedding-3-small default; step 6 wires this into Embedding.embedding column
-VECTOR_DIM = 1536
+# Đọc từ nguồn sự thật, KHÔNG khai lại số. Trước spec 08 E1 đây là `1536` viết cứng —
+# và khi cột DB đổi sang 1024 thì test này vỡ với lỗi dim mismatch, tức nó đang khoá
+# một hằng số thay vì khoá một hành vi. Import thì nó đi theo schema.
+VECTOR_DIM = EMBED_DIM
 
 
 @pytest.mark.asyncio

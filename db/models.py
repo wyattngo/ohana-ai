@@ -32,7 +32,16 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-_EMBED_DIM = 1536
+from app.config import EMBED_DIM
+
+# Alias, KHÔNG phải bản sao — mọi chỗ trong file này vẫn đọc `_EMBED_DIM` như trước, nhưng giá
+# trị chỉ tồn tại ở MỘT nơi (`app/config.EMBED_DIM`). Trước spec 08 E1 đây là số 1536 viết
+# cứng, tức nguồn sự thật thứ hai: đổi một bên mà quên bên kia thì insert bị từ chối ở một
+# đường code còn đường khác vẫn chạy. `tests/test_embedding_dim.py` canh đúng ca lệch đó.
+#
+# Hướng phụ thuộc `db/` → `app/config` đã kiểm: `app/config.py` không import gì từ `db/`, nên
+# không có vòng lặp. Nó chỉ import một hằng số, không kéo theo `Settings`/env.
+_EMBED_DIM = EMBED_DIM
 
 
 class Base(DeclarativeBase):

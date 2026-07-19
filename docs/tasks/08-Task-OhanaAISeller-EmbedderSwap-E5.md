@@ -157,8 +157,13 @@ PRE-E03: Số migration chưa bị ai lấy — kiểm CẢ trên đĩa LẪN tr
 PRE-E04: Wyatt chốt số phận vector cũ.
   Câu hỏi: 2 row hiện có là test fixture — XOÁ khi migrate (đơn giản, đúng bản chất)
            hay phải giữ (cần chiến lược re-embed)?
-  Status: ⏳ CHỜ WYATT — xem §14.
-  If "giữ": E1 phải thêm bước re-embed, spec này phải sửa trước khi chạy.
+  Status: ✅ WYATT KÝ 2026-07-19 — **XOÁ**. `DELETE FROM embeddings` rồi `ALTER TYPE`.
+          Re-verify sống ngay trước khi ký (không tin audit cũ): 2 row (`_platform` 1,
+          `shop_a` 1), cột `Vector(1536)`, alembic head `0003`. Cả 2 là test fixture.
+          Vector 1536 KHÔNG chiếu được sang không gian 1024 — giữ lại cũng vô nghĩa.
+  ⚠️ Kèm theo chữ ký này: down-migration CŨNG xoá. Reversible về SCHEMA, KHÔNG reversible
+     về DỮ LIỆU. Khi corpus thật land (PRE-003), chạy lại migration này = mất corpus —
+     lúc đó phải có bước re-embed, đừng đọc chữ ký hôm nay như giấy phép vĩnh viễn.
 ```
 
 ---
@@ -197,17 +202,30 @@ REVIEW: PASS ref=docs/reviews/08-E0-auto-verdict.json
 
 ### Phase E1 — Migration 1536→1024 + wire factory
 <!-- ADP:PHASE E1 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 ROADMAP: GD0-EMBED
 GOAL: Cột `embeddings.embedding` là `Vector(1024)`; `_EMBED_DIM` một nguồn sự thật; `default_embedder()` trả `TogetherEmbedder` khi có `together_api_key`, KHÔNG raise ở factory; vector sai dim bị Postgres TỪ CHỐI (chứng minh bằng test, không bằng lời).
 APPROACH: Migration **destructive có chủ ý** — 1536→1024 KHÔNG phải phép chiếu, vector cũ vô nghĩa ở không gian mới. `DELETE FROM embeddings` rồi `ALTER TYPE`, ghi rõ trong docstring migration + §8. Down-migration cũng xoá — reversible về SCHEMA, KHÔNG reversible về DỮ LIỆU; nói thẳng thay vì giả vờ. `default_embedder()` ưu tiên Together, fallback OpenAI, cuối cùng dev-embedder; giữ nguyên tính chất không-raise-ở-factory (spec 05 P1).
-ALLOWED_FILES: db/models.py, db/migrations/versions/, api/admin.py, app/config.py, tests/test_embedder_wiring.py, tests/test_config.py, tests/test_embedding_dim.py, docs/reviews/, docs/smokes/, docs/tasks/08-Task-OhanaAISeller-EmbedderSwap-E5.md
+ALLOWED_FILES: db/models.py, db/migrations/versions/, api/admin.py, app/config.py, tests/test_embedder_wiring.py, tests/test_config.py, tests/test_embedding_dim.py, tests/test_wiki_rag.py, tests/test_tenant_isolation.py, docs/.adp-red-proof.json, docs/reviews/, docs/smokes/, docs/tasks/08-Task-OhanaAISeller-EmbedderSwap-E5.md
+ALLOWED_FILES_AMENDED: 2026-07-19 — Wyatt duyệt +3. `tests/test_wiki_rag.py` + `tests/test_tenant_isolation.py`
+  hard-code `VECTOR_DIM = 1536` và chèn `Embedding(embedding=[...]*1536)` vào bảng THẬT qua fixture
+  `fresh_db` — mà fixture tạo bảng từ `Base.metadata`, tức đọc thẳng `_EMBED_DIM`. Đổi `_EMBED_DIM`
+  ở bước 7 là chúng vỡ NGAY, không cần chờ alembic. Hệ quả bắt buộc của scope E1, spec bản đầu
+  bỏ sót (cùng lỗ đã xảy ra ở E0 — lần này nêu TRƯỚC khi viết code, không phải lúc GATE_FULL đỏ).
+  `docs/.adp-red-proof.json` = artifact máy sinh của bước TDD-RED. TIER KHÔNG ĐỔI: E1 đã là high.
+DEVIATION_APPROVED: 2026-07-19 — `EMBED_DIM` là HẰNG SỐ MODULE trong `app/config.py`, KHÔNG phải
+  field của `Settings`. Spec §3 chỉ nói "đọc từ app/config.EMBED_DIM" mà không nói dạng gì.
+  Lý do: `Settings` đọc env ⇒ field env sẽ cho phép biến môi trường điều khiển SỐ CHIỀU CỘT DB,
+  trong khi cột thật do migration cố định. Đặt sai env = insert bị từ chối hàng loạt, hoặc tệ hơn
+  là lệch âm thầm giữa hai đường code. Hằng số module vẫn thoả "một nguồn sự thật" mà không mở
+  đường cho env đổi schema.
 GATE: .venv/bin/python -m pytest tests/test_embedding_dim.py tests/test_embedder_wiring.py -x -q
 GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && .venv/bin/mypy app agent retrieval parsing storage db bridge tools && .venv/bin/ruff check . --no-cache && .venv/bin/ruff format --check . --no-cache
 RETRY: 0/3
 RISK: high (SIGNED Wyatt 2026-07-19 — chốt theo đề xuất. Nâng trên floor `medium` vì migration ĐỔI schema và XOÁ dữ liệu, không chỉ chạm file. ⇒ per-step confirm + human review artifact `human=<file>` ký `REVIEWED_BY` bound cùng diff; auto-verdict Haiku KHÔNG đủ.)
-BLOCKED_BY: E0, PRE-E02 ✅, PRE-E03 ✅, PRE-E04 ⏳
-SMOKE: (điền khi chạy — có mặt runtime: migration trên Postgres thật)
+BLOCKED_BY: E0 ✅, PRE-E02 ✅, PRE-E03 ✅, PRE-E04 ✅ (Wyatt ký XOÁ 2026-07-19)
+SMOKE: PASS ref=docs/smokes/08-E1.md
+REVIEW: PASS ref=docs/reviews/08-E1-auto-verdict.json human=docs/reviews/08-E1-human.md
 <!-- /ADP -->
 
 6. `tests/test_embedding_dim.py` (RED): (a) cột là `Vector(1024)` sau migrate; (b) **chèn vector 1536 ⇒ Postgres RAISE** (chứng minh dim mismatch không lọt âm thầm); (c) migration up→down→up sạch; (d) `_EMBED_DIM` khớp `EMBED_DIM` của config (không hai nguồn sự thật).
