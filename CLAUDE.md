@@ -91,10 +91,45 @@ Chuyển sang project này khi user nhắc:
 
 <!-- ADP:MANIFEST -->
 GATE_RUNNER: .venv/bin/python -m pytest -q -x
-RISK_PATHS: agent/orchestrator.py, agent/policy_gate.py, tools/registry.py, bridge/, auth/, db/migrations, api/webhook.py, api/inbox.py, api/admin.py
+RISK_PATHS: agent/orchestrator.py, agent/policy_gate.py, tools/registry.py, bridge/, auth/, db/migrations, api/webhook.py, api/inbox.py, api/admin.py, api/chat.py
 SPEC_DIR: docs/tasks
 EXECUTOR_SKILL: drnick-coder
 CHECKPOINT_PREFIX: adp
+
+### SMOKE gate (bắt buộc từ 2026-07-19 — Wyatt directive sau spec 07)
+
+Mỗi ADP phase block **PHẢI** có dòng `SMOKE:`. `adp-checkpoint.sh` REFUSE nếu thiếu.
+
+```
+SMOKE: PASS ref=docs/smokes/<spec>-<phase>.md    # có mặt runtime
+SMOKE: N/A <lý do cụ thể, ≥12 ký tự>             # không có mặt runtime
+```
+
+**Vì sao có gate này.** Spec 07 ship **3 lỗi** mà 107 test xanh + mypy 0 + 3 vòng review đều KHÔNG thấy:
+
+| Lỗi | Vì sao test không thấy |
+|---|---|
+| `TogetherClient` gọi Together bằng `gpt-4o-mini` → 404 | mọi test tiêm fake client; fake không quan tâm model id có thật không |
+| Model đã ký không tồn tại dạng serverless → 400 | có trong `/v1/models` **kèm bảng giá** mà gọi vẫn hỏng — danh sách không phải bằng chứng |
+| `logger.info` bị uvicorn nuốt (root không handler, mức WARNING) | `caplog.at_level(INFO)` **tự ép mức**; nó chứng minh "code có gọi logger", không chứng minh "log tới production" |
+
+Cộng thêm 2 lỗi layout G2 (ô nhập bị bóp còn một sợi; ô nhập bị đẩy khỏi màn hình khi hội thoại dài) — repo không có Playwright nên **không test nào có khả năng thấy**.
+
+Mẫu chung: **test đo môi trường TEST; smoke đo môi trường THẬT.** Không cái nào thay được cái nào.
+
+**Thứ tự thao tác (đừng đảo bước 3–4):**
+```bash
+bash .claude/tools/adp-smoke.sh new "$PWD" docs/smokes/<spec>-<phase>.md <phase>
+# → chạy tay, điền OBSERVED bằng output THẬT (dán vào, không viết "OK")
+# → ghi 'SMOKE: PASS ref=…' vào ADP block        ← TRƯỚC stamp
+bash .claude/tools/adp-smoke.sh stamp "$PWD" docs/smokes/<spec>-<phase>.md
+bash .claude/tools/adp-checkpoint.sh
+```
+Ghi dòng SMOKE **là** một thay đổi trong `git diff HEAD` — stamp trước rồi ghi sau ⇒ hash lệch ⇒ REFUSE. (Đã dính đúng bẫy này với `REVIEW:` ở spec 06 F1.)
+
+**Chống con dấu cao su:** `stamp` từ chối nếu artifact còn placeholder `(dán…)`, thiếu `SMOKED_BY`, hoặc `VERDICT` chưa `PASS`. Checkpoint kiểm lại y hệt + đòi `diff_sha256` khớp `git diff HEAD` — smoke cũ **không** áp dụng cho code đã đổi.
+
+**`N/A` là lối thoát hợp lệ, không phải lối tắt.** Phase không có mặt runtime (vd spec 06 F2: typing + conftest) thì ghi N/A kèm lý do. Bắt smoke cho những phase đó chỉ đẻ ra tick bừa — mà tick bừa tệ hơn không có ô tick, vì nó *trông như* đã kiểm.
 <!-- /ADP -->
 
 **Isolation**: Ohana AI dùng ADP v2.3 riêng (`ohana-ai/.claude/`), KHÔNG dùng workspace v1.3 của Onfa/DrNick. Sandbox: an toàn để calibrate decision-gate (SHADOW → hard-block sau ≥5 real decisions).

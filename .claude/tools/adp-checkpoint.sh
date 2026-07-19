@@ -43,6 +43,53 @@ except Exception:
 PY
 }
 
+# ----------------------------------------------------------
+# SMOKE gate (2026-07-19, Wyatt directive sau spec 07).
+#
+# Spec 07 ship 3 lỗi mà 107 test xanh + mypy sạch + 3 vòng review KHÔNG thấy:
+# model id sai provider, model không serverless, log bị uvicorn nuốt. Cả ba chỉ
+# lộ khi có gói tin thật / tiến trình thật / pixel thật. Test chứng minh code
+# đúng trong môi trường TEST; smoke chứng minh hệ thống đúng trong môi trường THẬT.
+#
+# Chặn cứng như REVIEW, nhưng có lối thoát `SMOKE: N/A <lý do>` — vì bắt smoke
+# cho phase không có mặt runtime (vd spec 06 F2: typing + conftest) sẽ đẻ ra tick
+# bừa, mà tick bừa tệ hơn không có ô tick: nó TRÔNG như đã kiểm.
+# Bắt buộc là KHAI BÁO, không phải CHẠY.
+# ----------------------------------------------------------
+smoke_validate() {  # dùng global SMOKE_VAL/SMOKE_REF/ROOT; set SMOKE_NOTE; exit 1 nếu xấu
+    local f art_sha work_sha
+    case "$SMOKE_REF" in /*) f="$SMOKE_REF" ;; *) f="$ROOT/$SMOKE_REF" ;; esac
+    [ -f "$f" ] || {
+        echo "CHECKPOINT REFUSED — SMOKE: artifact '${SMOKE_REF}' không tồn tại."
+        exit 1
+    }
+    grep -qE '^VERDICT:[[:space:]]*PASS' "$f" || {
+        echo "CHECKPOINT REFUSED — SMOKE: '${SMOKE_REF}' chưa có 'VERDICT: PASS'."
+        exit 1
+    }
+    grep -qE '^SMOKED_BY:[[:space:]]*[^[:space:]]' "$f" || {
+        echo "CHECKPOINT REFUSED — SMOKE: '${SMOKE_REF}' thiếu SMOKED_BY (ai chạy?)."
+        exit 1
+    }
+    # Placeholder còn nguyên = scaffold rồi stamp, chưa chạy gì.
+    if grep -qE '^\(dán\)?$|^\(dán output\)$' "$f"; then
+        echo "CHECKPOINT REFUSED — SMOKE: '${SMOKE_REF}' còn placeholder '(dán…)' — smoke chưa chạy thật."
+        exit 1
+    fi
+    art_sha=$(sed -n 's/^- diff_sha256:[[:space:]]*//p' "$f" | head -1)
+    [ -n "$art_sha" ] || {
+        echo "CHECKPOINT REFUSED — SMOKE: '${SMOKE_REF}' chưa bind diff. Bind: bash .claude/tools/adp-smoke.sh stamp \"$ROOT\" ${SMOKE_REF}"
+        exit 1
+    }
+    work_sha=$(adp_work_diff_sha "$ROOT")
+    [ "$art_sha" = "$work_sha" ] || {
+        echo "CHECKPOINT REFUSED — SMOKE: diff ĐỔI sau smoke (artifact=${art_sha:0:12} ≠ working=${work_sha:0:12}). Smoke cũ không áp dụng cho code hiện tại — chạy lại rồi stamp."
+        exit 1
+    }
+    SMOKE_NOTE="PASS(bound=${work_sha:0:12})"
+    echo "SMOKE GATE: PASS · diff=${work_sha:0:12} · ref=${SMOKE_REF}"
+}
+
 review_validate_artifact() {  # $1=tier; dùng global REVIEW_VAL/REVIEW_REF/ROOT; set REVIEW_NOTE; exit 1 nếu xấu
     local tier="$1" verd
     if [ -z "$REVIEW_REF" ]; then
@@ -133,6 +180,9 @@ RISK_VAL=$(echo "$BLOCK" | adp_block_get RISK)
 TIER=$(adp_risk_tier "$RISK_VAL")
 REVIEW_VAL=$(echo "$BLOCK" | adp_block_get REVIEW)
 REVIEW_REF=$(printf '%s' "$REVIEW_VAL" | sed -n 's/.*ref=\([^[:space:]]*\).*/\1/p')
+SMOKE_VAL=$(echo "$BLOCK" | adp_block_get SMOKE)
+SMOKE_REF=$(printf '%s' "$SMOKE_VAL" | sed -n 's/.*ref=\([^[:space:]]*\).*/\1/p')
+SMOKE_NOTE=""
 WAIVER=$(echo "$BLOCK" | adp_block_get RISK_WAIVER)
 ALLOWED=$(echo "$BLOCK" | adp_block_get ALLOWED_FILES)
 RISK_PATHS_M=$(adp_manifest_get "$ROOT" RISK_PATHS)
@@ -159,6 +209,37 @@ if [ $VERIFY_ONLY -eq 0 ]; then
             echo "⚠️ FLOOR WAIVED: '${OVERLAP}' chạm RISK_PATHS — RISK_WAIVER: ${WAIVER}"
         fi
     fi
+
+    # SMOKE gate (2026-07-19). Chạy TRƯỚC review: smoke đo hệ thống thật, và nếu nó đỏ
+    # thì không có lý do gì tốn một vòng review cho code chưa chạy được.
+    case "$SMOKE_VAL" in
+        PASS*)
+            [ -n "$SMOKE_REF" ] || {
+                echo "CHECKPOINT REFUSED — SMOKE: 'SMOKE: PASS' phải kèm 'ref=<artifact>'. Lời khai trần không phải bằng chứng — đó chính là thứ đã để 3 lỗi lọt ở spec 07."
+                exit 1
+            }
+            smoke_validate
+            ;;
+        N/A*|NA*|n/a*)
+            reason=$(printf '%s' "$SMOKE_VAL" | sed -E 's#^(N/A|NA|n/a)[[:space:]]*##')
+            if [ ${#reason} -lt 12 ]; then
+                echo "CHECKPOINT REFUSED — SMOKE: 'N/A' phải kèm LÝ DO cụ thể (≥12 ký tự), vd 'N/A — phase chỉ sửa typing + conftest, không có mặt runtime nào'. N/A trần là tick bừa."
+                exit 1
+            fi
+            SMOKE_NOTE="N/A(${reason})"
+            echo "SMOKE GATE: N/A — ${reason}"
+            ;;
+        *)
+            echo "CHECKPOINT REFUSED — SMOKE GATE: phase ${PHASE_ID} chưa có dòng 'SMOKE:' trong ADP block."
+            echo "  Spec 07 ship 3 lỗi mà 107 test xanh + mypy sạch + 3 vòng review đều KHÔNG thấy"
+            echo "  (model id sai provider · model không serverless · log bị uvicorn nuốt). Cả ba chỉ"
+            echo "  lộ khi chạy THẬT. Test đo môi trường test; smoke đo môi trường thật."
+            echo "  Có mặt runtime  → bash .claude/tools/adp-smoke.sh new \"$ROOT\" docs/smokes/<spec>-<phase>.md ${PHASE_ID}"
+            echo "                    chạy tay → điền OBSERVED → stamp → ghi 'SMOKE: PASS ref=…'"
+            echo "  Không có        → ghi 'SMOKE: N/A <lý do cụ thể>' vào block."
+            exit 1
+            ;;
+    esac
 
     # REVIEW gate: review là GATE, không phải advice (rider Wyatt 2026-06-10).
     case "$TIER" in
@@ -241,7 +322,7 @@ fi
 # 3. STATUS → DONE + EVIDENCE (script ghi, không phải agent)
 # ----------------------------------------------------------
 TS=$(date +%Y-%m-%dT%H:%M)
-EVLINE="EVIDENCE: commit=${HASH}, gate_exit=0, duration=${DUR}s, review=${REVIEW_NOTE:-n/a}, ran=${TS}"
+EVLINE="EVIDENCE: commit=${HASH}, gate_exit=0, duration=${DUR}s, review=${REVIEW_NOTE:-n/a}, smoke=${SMOKE_NOTE:-n/a}, ran=${TS}"
 python3 - "$SPEC_FILE" "$PHASE_ID" "$EVLINE" <<'PY' || { echo "FATAL: không update được spec STATUS." >&2; exit 1; }
 import sys, re
 path, phase, ev = sys.argv[1], sys.argv[2], sys.argv[3]
@@ -305,7 +386,7 @@ if [ "$TIER" != "high" ]; then
     QF="$ROOT/docs/memory/REVIEW_QUEUE.md"
     mkdir -p "$ROOT/docs/memory"
     [ -f "$QF" ] || printf '# ADP Review Queue — async diff review (v1.3, DEC-019)\n\nCheckpoint tier medium/low ghi vào đây; Wyatt review batch, tick [x] khi đã xem.\nRevert 1 lệnh kèm sẵn (evidence commit revert riêng nếu cần).\n\n' > "$QF"
-    echo "- [ ] ${TS} · ${SPEC_ID} phase-${PHASE_ID} · tier=${TIER} · review=${REVIEW_NOTE} · commit=${HASH} · revert: git revert ${HASH}" >> "$QF"
+    echo "- [ ] ${TS} · ${SPEC_ID} phase-${PHASE_ID} · tier=${TIER} · review=${REVIEW_NOTE} · smoke=${SMOKE_NOTE:-n/a} · commit=${HASH} · revert: git revert ${HASH}" >> "$QF"
 fi
 
 git add "$SPEC_FILE" "docs/.adp-state-hash" 2>/dev/null

@@ -358,12 +358,17 @@ adp_exec_state_get() {
 adp_spec_lock_path() { echo "$1/docs/.sprint-spec.lock"; return 0; }
 
 # adp_spec_lock_compute <spec_file> — 12-hex hash of the IMMUTABLE spec contract:
-# every line EXCEPT per-phase progress fields (STATUS/EVIDENCE/RETRY/REVIEW) which
-# change legitimately during execution. E10 change-control: GOAL/APPROACH/GATE/
+# every line EXCEPT per-phase progress fields (STATUS/EVIDENCE/RETRY/REVIEW/SMOKE)
+# which change legitimately during execution. E10 change-control: GOAL/APPROACH/GATE/
 # ALLOWED_FILES/RISK frozen; flipping STATUS or appending REVIEW: PASS ref=…
 # (v1.3 reviewer gate, DEC-019) must NOT break the lock. rc0.
+#
+# SMOKE excluded for the same reason as REVIEW (added 2026-07-19): it is written
+# DURING execution, after the contract was frozen. Without this exclusion the smoke
+# gate would deadlock — writing the SMOKE line to satisfy the gate would itself trip
+# the spec-lock and refuse the checkpoint.
 adp_spec_lock_compute() {
-    grep -vE '^(STATUS|EVIDENCE|RETRY|REVIEW):' "$1" 2>/dev/null | shasum -a 256 2>/dev/null | cut -c1-12
+    grep -vE '^(STATUS|EVIDENCE|RETRY|REVIEW|SMOKE):' "$1" 2>/dev/null | shasum -a 256 2>/dev/null | cut -c1-12
     return 0
 }
 
