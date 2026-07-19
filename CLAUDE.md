@@ -170,7 +170,7 @@ CHECKPOINT_PREFIX: adp
 - ⏳ Spec 03 (acceptance backfill, 0/10, 4 BLOCKED chờ Tân) · Spec 08 (embedder swap → e5, 0/3).
 - **Gate hiện tại:** pytest xanh (`-m 'not live'`, 109 test) · ruff sạch · mypy 0 lỗi trên scope cố định.
 - `main` == `origin/main` (`github.com:wyattngo/ohana-ai`). STATE_HASH `d61ee0d167e0` @ spec 07 G2.
-- **OPEN:** ISSUE-010 (alerting) · ISSUE-016 (live embedding chưa nghiệm thu với e5) · ISSUE-017 (`channels/identity.py` thiếu unique `(shop_id, customer_id, channel)` — PHẢI thêm trước khi Spec 03c mount webhook) · ISSUE-018 (blank-env không phủ complex field).
+- **OPEN:** ISSUE-010 (alerting) · ISSUE-017 (`channels/identity.py` thiếu unique `(shop_id, customer_id, channel)` — PHẢI thêm trước khi Spec 03c mount webhook) · ISSUE-018 (blank-env không phủ complex field).
 - **Blocked backfill** (chờ Tân — không chặn gate, chặn real-content): PRE-002 platform REST API spec · PRE-003 real wiki corpus · PRE-004 Zalo OA creds + webhook signature.
 
 | Cần gì | Đọc đâu |

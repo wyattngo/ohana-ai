@@ -237,7 +237,7 @@ REVIEW: PASS ref=docs/reviews/08-E1-auto-verdict.json human=docs/reviews/08-E1-h
 
 ### Phase E2 — Live acceptance trên e5 (đóng ISSUE-016)
 <!-- ADP:PHASE E2 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 ROADMAP: GD0-EMBED
 GOAL: `tests/test_wiki_rag_live.py -m live` PASS **trên e5 thật** — ingest doc mẫu → search trả đúng chunk, có bằng chứng dán vào SMOKE artifact. ISSUE-016 chuyển RESOLVED, cảnh báo F1 trong CLAUDE.md gỡ.
 APPROACH: Sửa live test trỏ e5 (không phải OpenAI). Test phải kiểm **thứ hạng**, không chỉ "có trả về gì đó": chunk đúng chủ đề phải xếp TRÊN chunk sai chủ đề — đó mới là điều F1 hứa. Skip sạch khi thiếu key (không FAIL giả).
@@ -247,7 +247,8 @@ GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && .venv/bin/ruff 
 RETRY: 0/3
 RISK: low (SIGNED Wyatt 2026-07-19 — chốt theo đề xuất. ALLOWED_FILES KHÔNG giao RISK_PATHS; chỉ test + docs.)
 BLOCKED_BY: E1
-SMOKE: (điền khi chạy — chính phase này LÀ smoke; artifact phải dán output live test thật)
+SMOKE: PASS ref=docs/smokes/08-E2.md
+REVIEW: PASS ref=docs/reviews/08-E2-auto-verdict.json
 <!-- /ADP -->
 
 11. Sửa `test_wiki_rag_live.py` sang e5 + assert **thứ hạng** chunk.

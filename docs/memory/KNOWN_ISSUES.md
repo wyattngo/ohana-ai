@@ -203,7 +203,26 @@ Cùng source, cùng binary. Xoá `.ruff_cache` rồi chạy lại lệnh CŨ ⇒
 - **Why not blocking:** `reasoning_models` là field phức DUY NHẤT hiện tại, và `.env.example` không liệt kê `REASONING_MODELS`. Lỗi là fail-loud (raise lúc khởi động), không phải silent-wrong.
 - **Action:** (1) Sửa docstring cho đúng phạm vi — ưu tiên cao hơn sửa code, vì docstring sai đang được chép đi. (2) Cân nhắc `settings_customise_sources` hoặc `NoDecode` + validator riêng để chuẩn hoá rỗng trước khi source parse. (3) Thêm test `REASONING_MODELS=` rỗng khoá hành vi đã chọn (dù chọn "raise" hay "coi như unset" — hiện KHÔNG có test nào chạm ca này).
 
-### ISSUE-016 — F1 wiki-RAG chưa từng chạy với embedding thật (⚠️ ĐỔI BẢN CHẤT 2026-07-18: provider chuyển sang Together e5)
+### ISSUE-016 — ✅ RESOLVED 2026-07-19 (spec 08 E2) — F1 wiki-RAG chạy THẬT trên Together e5
+
+- **Đóng bằng gì:** `tests/test_wiki_rag_live.py -m live` PASS **4/4** với key thật, e5 thật,
+  Postgres thật. Bằng chứng: `docs/smokes/08-E2.md`. Ba spec-phase đưa nó tới đây — 08 E0
+  (`TogetherEmbedder` + tách query/passage), E1 (migration `Vector(1536)`→`Vector(1024)` +
+  wire factory), E2 (live acceptance).
+- **Định nghĩa "đóng" mà tôi dùng, nói rõ để không ai đọc rộng hơn:** live test chứng minh
+  **thứ hạng** — hỏi về phí ship thì đoạn phí ship xếp ĐẦU, 3/3 truy vấn xoay vòng, mỗi câu
+  kéo một chunk khác lên. Bản test cũ chỉ assert `any(...)` trên cả danh sách, tức chunk đúng
+  nằm CUỐI dưới ba đoạn lạc đề vẫn xanh — đó không phải điều F1 hứa với seller.
+- **CÁI NÀY VẪN CHƯA CHỨNG MINH:** corpus dùng để đo là **văn bản mẫu 3 đoạn do tôi viết**,
+  không phải corpus thật của seller (PRE-003 chưa land). Retrieval tốt trên 3 chunk tách bạch
+  chủ đề là bài dễ. Khi corpus thật land — hàng trăm chunk, chủ đề chồng lấn, văn phong seller
+  thật — phải đo LẠI. ISSUE-016 đóng đúng phạm vi "đường ống chạy được với embedding thật",
+  KHÔNG phải "chất lượng retrieval đã nghiệm thu ở quy mô thật".
+- **Nợ kèm theo:** chưa có index vector (ivfflat/hnsw). Với 3 row thì seq-scan đúng; với corpus
+  thật thì thiếu index sẽ thành vấn đề hiệu năng. Chưa ai nhận.
+
+<details><summary>Lịch sử (giữ nguyên, không xoá)</summary>
+
 
 - **Cập nhật 2026-07-19 — ADR PRE-007 đã ACCEPTED, blocker đổi từ 'chờ ký' sang 'chờ làm':** provider + embedding giờ là quyết định chốt (Together, `intfloat/multilingual-e5-large-instruct` 1024-dim). Việc còn lại KHÔNG còn là chờ ai duyệt mà là công việc thật: (1) `TogetherEmbedder` thay `OpenAIEmbedder`; (2) Alembic migration `Vector(1536)` → `Vector(1024)` (`db/models.py:_EMBED_DIM`); (3) re-embed corpus khi PRE-003 land; (4) chạy live acceptance **trên e5, KHÔNG phải OpenAI** — kết quả cũ trên OpenAI không áp dụng. Chưa có spec/phase nào nhận 4 việc này.
 - **Origin:** phát hiện lúc executor P2 wire `api/admin.py` mount (spec 04) 2026-07-17
@@ -218,6 +237,8 @@ Cùng source, cùng binary. Xoá `.ruff_cache` rồi chạy lại lệnh CŨ ⇒
   - P2: env-reading gom qua `Settings()` fresh.
   - **CÒN LẠI (lý do vẫn OPEN):** `tests/test_wiki_rag_live.py -m live` CHƯA chạy với real `OPENAI_API_KEY` — không ai chứng minh F1 trả chunk đúng với embedding thật. Cả spec 05 thiết kế để checkpoint KHÔNG tự-tuyên-bố cái này (tránh lặp lại chính bẫy ISSUE-016).
 - **Action còn lại:** Wyatt/Tân chạy `OPENAI_API_KEY=sk-... DATABASE_URL=<pg> .venv/bin/python -m pytest tests/test_wiki_rag_live.py -m live -x -q` → PASS → log vào SESSION_LOG → chuyển ISSUE-016 RESOLVED + xoá cảnh báo F1 trong CLAUDE.md. **Phải xong TRƯỚC khi tuyên bố F1 dùng được cho khách thật.** (PRE-003 wiki thật là bước content riêng, không chặn live acceptance — verify được với sample doc.)
+
+</details>
 
 ### ISSUE-015 — Ngưỡng `min 100 chars` cho wiki ingest là phỏng đoán, chưa có dữ liệu
 - **Origin:** spec 04 §3 C · reviewer P2 flag backend `min_length=1` lệch spec

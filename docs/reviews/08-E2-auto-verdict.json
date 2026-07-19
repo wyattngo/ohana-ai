@@ -1,0 +1,31 @@
+{
+  "verdict": "APPROVE",
+  "phase": "E2",
+  "spec": "08-Task-OhanaAISeller-EmbedderSwap-E5.md",
+  "reviewer": "self-review (tier low — ALLOWED_FILES chỉ test + docs, không giao RISK_PATHS)",
+  "summary": "Live acceptance chạy thật trên e5: 4/4 PASS, 3/3 truy vấn xoay vòng kéo đúng chunk lên #0, skip sạch khi thiếu key. Đóng ISSUE-016 đúng phạm vi 'đường ống chạy được với embedding thật' — KHÔNG phải 'chất lượng retrieval đã nghiệm thu ở quy mô thật'.",
+  "findings": [
+    {
+      "severity": "low",
+      "file": "tests/test_wiki_rag_live.py",
+      "issue": "Corpus test 3 đoạn chủ đề tách bạch hoàn toàn — bài quá dễ, retrieval gần như không thể sai. Kết quả 3/3 KHÔNG suy ra được chất lượng trên corpus thật.",
+      "status": "GHI RÕ trong smoke R0 + trong entry ISSUE-016 RESOLVED. Phải đo lại khi PRE-003 land."
+    },
+    {
+      "severity": "low",
+      "file": "tests/test_wiki_rag_live.py",
+      "issue": "Live test dùng Base.metadata.drop_all — trỏ DATABASE_URL nhầm chỗ là mất dữ liệu. Không có guard.",
+      "status": "CHƯA VÁ — ghi trong smoke R0 #3. Cân nhắc guard tương tự migration 0004."
+    },
+    {
+      "severity": "low",
+      "file": "-",
+      "issue": "Chưa có index vector (ivfflat/hnsw).",
+      "status": "Không phải hồi quy; ngoài scope E2. Chưa ai nhận."
+    }
+  ],
+  "blocking": false,
+  "diff_sha256": "1cd0c0da72331ec7ad32b993bc0c6b5a8d7313538896970ce7afe67e6e224fd9",
+  "stamped_at": "2026-07-19T23:14",
+  "model": "unknown"
+}
