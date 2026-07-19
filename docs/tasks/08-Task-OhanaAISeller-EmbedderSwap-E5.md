@@ -202,7 +202,8 @@ REVIEW: PASS ref=docs/reviews/08-E0-auto-verdict.json
 
 ### Phase E1 — Migration 1536→1024 + wire factory
 <!-- ADP:PHASE E1 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=a82785d, gate_exit=0, duration=10s, review=PASS(judge=APPROVE,model=unknown,bound=3dab50223381,tier=high), smoke=PASS(bound=3dab50223381), ran=2026-07-19T23:10
 ROADMAP: GD0-EMBED
 GOAL: Cột `embeddings.embedding` là `Vector(1024)`; `_EMBED_DIM` một nguồn sự thật; `default_embedder()` trả `TogetherEmbedder` khi có `together_api_key`, KHÔNG raise ở factory; vector sai dim bị Postgres TỪ CHỐI (chứng minh bằng test, không bằng lời).
 APPROACH: Migration **destructive có chủ ý** — 1536→1024 KHÔNG phải phép chiếu, vector cũ vô nghĩa ở không gian mới. `DELETE FROM embeddings` rồi `ALTER TYPE`, ghi rõ trong docstring migration + §8. Down-migration cũng xoá — reversible về SCHEMA, KHÔNG reversible về DỮ LIỆU; nói thẳng thay vì giả vờ. `default_embedder()` ưu tiên Together, fallback OpenAI, cuối cùng dev-embedder; giữ nguyên tính chất không-raise-ở-factory (spec 05 P1).
