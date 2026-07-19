@@ -33,10 +33,31 @@ dev = [
     # quả cũ, tức EVIDENCE mất tính kiểm chứng — mà EVIDENCE tái lập được chính là thứ ADP
     # bán. Nâng ruff từ nay là một commit CÓ CHỦ ĐÍCH, đọc changelog, sửa cái nó bắt.
     "ruff==0.15.22",
-    "mypy>=1.10",
-    "pytest>=8.0",
-    "pytest-asyncio>=0.23",
+    # Pin cả bộ, cùng lý do: cả bốn công cụ này ĐỀU là bước trong GATE_FULL, nên phiên bản
+    # của chúng là một phần định nghĩa của "gate". `>=` biến gate thành hàm của ngày cài đặt.
+    #
+    # Đo lúc pin (2026-07-19) — cả ba đã trôi QUA MAJOR mà không ai chủ ý nâng:
+    #   mypy           khai >=1.10   → đang cài 2.3.0
+    #   pytest         khai >=8.0    → đang cài 9.1.1
+    #   pytest-asyncio khai >=0.23   → đang cài 1.4.0   (0.23 → 1.x có breaking change
+    #                                                    quanh asyncio_mode/fixture loop)
+    # Tức CI (`pip install -e ".[dev]"`, luôn lấy mới nhất) và máy dev có thể đang chạy hai
+    # bộ công cụ khác nhau, và không ai biết cho tới khi kết quả lệch.
+    #
+    # Pin = phiên bản ĐÃ verify xanh, không phải phiên bản mới nhất. Nâng là commit có chủ
+    # đích: đọc changelog, chạy GATE_FULL, sửa cái nó bắt.
+    "mypy==2.3.0",
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
 ]
+
+# ⚠️ CHƯA PIN: toàn bộ `[project].dependencies` runtime vẫn dùng `>=`. Đo 2026-07-19, 4 gói
+# đã trôi qua major mà không ai chủ ý nâng: `openai` >=1.30 → 2.45.0 · `redis` >=5.0 → 8.0.1
+# · `pypdf` >=4.0 → 6.14.2 · `sse-starlette` >=2.1 → 3.4.5. Đáng lo nhất là `openai`: đó là
+# SDK mà `TogetherClient` + `TogetherEmbedder` dùng để gọi Together. Pin runtime là quyết
+# định KHÁC LOẠI với pin dev-tool — nó đổi thứ chạy trong production, cần test rồi mới ký,
+# và đúng ra nên dùng lockfile chứ không phải `==` trong pyproject (pin `==` không khoá được
+# transitive dep). Chưa ai nhận — xem ISSUE-019.
 
 [tool.ruff]
 line-length = 100
