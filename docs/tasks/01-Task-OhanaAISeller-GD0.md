@@ -167,6 +167,7 @@ PRE-005: Confirm channel đầu = Zalo OA (memory: recommended, chưa Wyatt lock
 ### Phase 1 — Bootstrap repo + port engine (Sub-task A)
 <!-- ADP:PHASE 1 -->
 STATUS: DONE
+ROADMAP: GD0-BOOTSTRAP
 EVIDENCE: commit=299f4c8, gate_exit=0, duration=0s, review=PASS(judge=APPROVE,model=output-evaluator@haiku,bound=50349fe23478,tier=medium), ran=2026-07-17T07:43
 GOAL: Repo `ohana-ai` chạy được `uvicorn app.main:app`; llm_client + embedder + retrieval + parsing port sạch, test smoke pass; financial modules KHÔNG có mặt.
 APPROACH: Copy module generic; strip import ONFA/money; giữ CI + guardrail + ADP. Reviewer subagent port kèm. Delegated to spec 02 (4 sub-phases 1.0/1.1/1.2/1.3 all DONE, tagged phase-1-bootstrap).
@@ -185,6 +186,7 @@ RISK: medium (finalized Wyatt 2026-07-16 — chạm agent/ + .claude/hooks/ tron
 ### Phase 2 — Multi-tenancy foundation (Sub-task B) — RISK
 <!-- ADP:PHASE 2 -->
 STATUS: DONE
+ROADMAP: GD0-MULTITENANT
 EVIDENCE: commit=bd7e6ce, gate_exit=0, duration=9s, review=PASS(judge=APPROVE,model=output-evaluator@haiku,bound=0e1e61c9f89f,tier=high), ran=2026-07-17T08:18
 GOAL: JWT verify trả `(user_id, shop_id, role)`; mọi bảng có `shop_id`; retrieval namespace filter SQL-level include shop_id; adversarial test: hàng out-of-shop bị loại.
 APPROACH: models tenant-first; Alembic 0001; auth/identity mở rộng claim; Retriever.search bắt buộc shop scope (no default).
@@ -203,6 +205,7 @@ RISK: high (finalized Wyatt 2026-07-16 — thay đổi auth + schema behavior; p
 ### Phase 3 — Feature 1 Wiki RAG (Sub-task C)
 <!-- ADP:PHASE 3 -->
 STATUS: DONE
+ROADMAP: GD0-WIKI
 EVIDENCE: commit=a19dafc, gate_exit=0, duration=0s, review=PASS(judge=APPROVE,model=output-evaluator@haiku,bound=30857328e051,tier=low), ran=2026-07-17T08:27
 GOAL: Ingest 1 wiki doc → chunk → embed → `search_wiki(query)` trả kết quả đúng namespace platform_wiki.
 APPROACH: parsing pipeline + admin ingest endpoint + read-tool trong registry. Platform-shared docs sit at sentinel shop_id="_platform" (PgvectorRetriever hard-filter còn giữ nguyên; search_wiki dựng retriever scope="_platform"). Wiki source deferred (PRE-003) — dùng inline text fixture cho gate, backfill real docs sau.
@@ -221,6 +224,7 @@ RISK: low (finalized Wyatt 2026-07-16 — additive Wiki RAG, no auth/schema muta
 ### Phase 4 — Feature 2 API Q&A tools (Sub-task D)
 <!-- ADP:PHASE 4 -->
 STATUS: DONE
+ROADMAP: GD0-TOOLS
 EVIDENCE: commit=9a596f2, gate_exit=0, duration=0s, review=PASS(judge=APPROVE,model=output-evaluator@haiku,bound=ea3e7883f364,tier=medium), ran=2026-07-17T08:53
 GOAL: `bridge/ohana_client.py` gọi được platform API (verify=True); ≥1 read-tool (order_status) trả shape `{success, data}`.
 APPROACH: port REST client pattern; read-tools kind=READ; user_id/shop_id là handler arg riêng (R1.1). PRE-002 unresolved — gate là contract-shape only qua httpx.MockTransport; real endpoint content backfill khi platform API spec landed.
@@ -239,6 +243,7 @@ BLOCKED_BY: PRE-002 (real endpoint content backfill only; contract-shape gate cl
 ### Phase 5 — Feature 3 pipeline + policy gate (Sub-task E) — RISK
 <!-- ADP:PHASE 5 -->
 STATUS: DONE
+ROADMAP: GD0-POLICY
 EVIDENCE: commit=cc12ce3, gate_exit=0, duration=9s, review=PASS(judge=APPROVE,model=output-evaluator@haiku,bound=c31f12744402,tier=high), ran=2026-07-17T09:19
 GOAL: webhook inbound → draft (F1+F2 context) → policy_gate quyết định → auto_send HOẶC park pending_reply; seller approve async → send. Intent nhạy cảm luôn park kể cả auto.
 APPROACH: orchestrator adapt async; policy_gate risk-scored; pending_reply shape (bỏ 2FA, ownership S4 theo shop_id); inbox REST scaffold (UI framework deferred §12). PRE-004 unresolved — bridge/zalo_sender.py mock (logs, doesn't call Zalo), signature-verify path deferred. ANCHOR confirm 2026-07-17 = "proceed with phase 5" (per-step confirm collapsed into batch review at STOP boundary per Phase 2 pattern).

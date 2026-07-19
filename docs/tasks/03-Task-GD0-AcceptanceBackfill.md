@@ -249,6 +249,7 @@ PRE-007/008/009 = NEW cho Spec 03.
 ### Phase 1 — shops table + JWT extension từ real onboard flow
 <!-- ADP:PHASE 1 -->
 STATUS: TODO
+ROADMAP: GD0-SHOPS
 GOAL: `shops` table tồn tại; onboard flow tạo real shop → JWT include `shop_id` từ verified DB record; test: JWT của shop A không đọc được data shop B (cross-shop rejection).
 APPROACH: Add `Shop` model + Alembic 0004; extend `auth/identity.py` load `shop_id` từ DB thay stub; onboard endpoint `POST /api/admin/shops` (admin auth); JWT issuance include `shop_id` claim; adversarial test cross-shop.
 ALLOWED_FILES: db/models.py, db/migrations/0004_shops.py, auth/identity.py, api/admin.py, tests/test_shops_onboard.py, tests/conftest.py, docs/reviews/, docs/tasks/03-Task-GD0-AcceptanceBackfill.md
@@ -268,6 +269,7 @@ BLOCKED_BY: PRE-007 (hosting region ADR phải ACCEPTED trước)
 ### Phase 2 — Real ZaloSender + webhook signature + idempotency
 <!-- ADP:PHASE 2 -->
 STATUS: BLOCKED
+ROADMAP: GD0-ZALO
 GOAL: `RealZaloSender` gọi được Zalo Send API thật (staging OA); webhook inbound có signature verify; retry cùng event_id → duplicate rejected (idempotency).
 APPROACH: Replace `MockZaloSender` bằng `RealZaloSender` (interface stable); wire httpx client với retry + timeout; `WebhookEventLog` table + middleware verify signature + dedup theo event_id; contract test qua httpx.MockTransport (không call Zalo staging thật trong CI, verify shape).
 ALLOWED_FILES: bridge/zalo_sender.py, api/webhook.py, api/middleware.py, db/models.py, db/migrations/0005_webhook_log.py, tests/test_zalo_sender.py, tests/test_webhook_idempotency.py, tests/conftest.py, docs/reviews/, docs/tasks/03-Task-GD0-AcceptanceBackfill.md
@@ -288,6 +290,7 @@ BLOCKED_BY: PRE-004 (Zalo creds + signature spec + rate-limit)
 ### Phase 3 — Real Wiki corpus ingest (batch + delta) + admin UI
 <!-- ADP:PHASE 3 -->
 STATUS: BLOCKED
+ROADMAP: GD0-WIKI
 GOAL: Batch ingest N doc thật từ PRE-003 source → chunk → embed → pgvector `platform_wiki` namespace; delta ingest re-run không duplicate; `search_wiki(query)` trả kết quả grounded (≥1 hit từ corpus thật).
 APPROACH: Extend `parsing/chunk.py` cho batch mode; extend `parsing/ingest.py` với dedup theo doc_hash + delta detection; extend `api/admin.py` với multipart upload endpoint; giữ `search_wiki` tool + `PgvectorRetriever` interface không đổi (contract stable từ spec 01 Phase 3).
 ALLOWED_FILES: parsing/chunk.py, parsing/ingest.py, parsing/extract.py, api/admin.py, tests/test_wiki_batch_ingest.py, tests/test_wiki_delta.py, tests/conftest.py, docs/reviews/, docs/tasks/03-Task-GD0-AcceptanceBackfill.md
@@ -307,6 +310,7 @@ BLOCKED_BY: PRE-003 (real wiki corpus source + format + pilot fixtures)
 ### Phase 4 — F2 tools 2/3/4 (shipping_info, product_info, account_lookup)
 <!-- ADP:PHASE 4 -->
 STATUS: BLOCKED
+ROADMAP: GD0-TOOLS
 GOAL: 3 read-tool mới trong registry: `shipping_info(order_id)`, `product_info(product_id)`, `account_lookup(customer_id)`. Contract test qua MockTransport khớp shape PRE-002. Tool-call qua orchestrator sinh param đúng schema (validated trước execute).
 APPROACH: Extend `bridge/ohana_client.py` với 3 method mới (verify=True, retry); `tools/ohana_read.py` add 3 handler kind=READ; `tools/registry.py` register (R1.4 update ALL sources); param validation schema trước execute (guard tool hallucination).
 ALLOWED_FILES: bridge/ohana_client.py, tools/ohana_read.py, tools/registry.py, tests/test_f2_tools.py, tests/conftest.py, docs/reviews/, docs/tasks/03-Task-GD0-AcceptanceBackfill.md
@@ -326,6 +330,7 @@ BLOCKED_BY: PRE-002 (Ohana REST endpoint list)
 ### Phase 5 — Credit metering + per-shop rate-limit
 <!-- ADP:PHASE 5 -->
 STATUS: TODO
+ROADMAP: GD0-METER
 GOAL: `credit_ledger` table tenant-scope; middleware trừ credit per-lượt theo PRE-008 rule; per-shop rate-limit chặn abuse; bypass test call API trực tiếp với body giả không lách được.
 APPROACH: Add `CreditLedger` model + Alembic 0006; `agent/metering.py` implement debit + balance check; metering hook tại **biên orchestrator** (không có chat endpoint để wrap — xem bước 23) + rate-limit **Redis-backed BẮT BUỘC** (in-memory chỉ đúng khi 1 worker; nhiều uvicorn worker → đếm sai, chặn sai); adversarial bypass test.
 ALLOWED_FILES: db/models.py, db/migrations/0006_credit_ledger.py, agent/metering.py, api/middleware.py, api/inbox.py, tests/test_credit_metering.py, tests/test_metering_bypass.py, tests/conftest.py, docs/reviews/, docs/tasks/03-Task-GD0-AcceptanceBackfill.md
@@ -346,6 +351,7 @@ BLOCKED_BY: PRE-008 (credit pricing model per-lượt cụ thể)
 ### Phase 6 — Eval harness (golden fixtures + multi-dim + regression gate CI)
 <!-- ADP:PHASE 6 -->
 STATUS: TODO
+ROADMAP: GD0-EVAL
 GOAL: Golden set N case per intent family (Roadmap §2, 15 loại); harness chạy 5 assertion dim (structural + grounding + action-correctness + tone + safety); rule-based + LLM-as-Judge combined; regression pass-rate < PRE-009 threshold → CI block merge; Manual Override Rate baseline metric persisted.
 APPROACH: `agent/eval/` module với harness + judge + 5 assertion; `tests/eval/golden/*.jsonl` fixtures theo intent family; `agent/eval/harness.py` orchestrate run + report; CI workflow `.github/workflows/eval.yml` chạy trên PR + block nếu pass-rate < threshold; Manual Override Rate hook trong `api/inbox.py` (seller sửa/bỏ → log override event).
 ALLOWED_FILES: agent/eval/__init__.py, agent/eval/harness.py, agent/eval/judge.py, agent/eval/structural.py, agent/eval/grounding.py, agent/eval/action.py, agent/eval/tone.py, agent/eval/safety.py, agent/eval/override.py, tests/eval/golden/, tests/test_eval_harness.py, .github/workflows/eval.yml, api/inbox.py, docs/reviews/, docs/tasks/03-Task-GD0-AcceptanceBackfill.md
@@ -368,6 +374,7 @@ BLOCKED_BY: PRE-003 (pilot conv fixtures cho golden set) + PRE-009 (N + threshol
 ### Phase 7 — Model router (plan_tier → model_id abstraction)
 <!-- ADP:PHASE 7 -->
 STATUS: TODO
+ROADMAP: GD0-ROUTER
 GOAL: `agent/model_router.py` map `plan_tier → model_id`; orchestrator gọi router thay hardcode; credit cost tính theo model tier internal; đổi model chỉ sửa router config, không touch orchestrator; eval harness Phase 6 pass sau khi swap model.
 APPROACH: `agent/model_router.py` với config `{Free: haiku, Normal: sonnet, Pro: opus}` (placeholder — Wyatt chốt cụ thể model id ở PRE-008 phần plan-tier mapping); orchestrator refactor gọi router.get(plan_tier); internal cost table theo tier (không expose seller-facing); regression eval sau swap phải pass.
 ALLOWED_FILES: agent/model_router.py, agent/orchestrator.py, agent/metering.py, tests/test_model_router.py, tests/conftest.py, docs/reviews/, docs/tasks/03-Task-GD0-AcceptanceBackfill.md
@@ -388,6 +395,7 @@ BLOCKED_BY: Phase 6 (eval harness) + PRE-008 (plan tier mapping)
 ### Phase 8 — Intent classifier + confidence-gated escalation
 <!-- ADP:PHASE 8 -->
 STATUS: TODO
+ROADMAP: GD0-INTENT
 GOAL: `agent/intent_classifier.py` route 15 loại intent (Roadmap §2); `agent/escalation.py` implement 4 trigger (query ngoài catalog + tranh chấp nhóm 12 + tone giận nhóm 13 + đa nghĩa cao); low-conf escalation → không draft, `pending_reply` status=`ESCALATED`, seller UI hiện "cần bạn tự trả lời" + context summary; spam nhóm 15 → suppress không tốn credit.
 APPROACH: LLM classify + rule-based fallback cho intent; escalation module trigger check trước draft; `policy_gate.py` extend include escalation branch (không chỉ auto_send vs park mà thêm ESCALATED); `api/inbox.py` render UI hint; `agent/metering.py` skip debit khi intent=spam.
 ALLOWED_FILES: agent/intent_classifier.py, agent/escalation.py, agent/policy_gate.py, agent/orchestrator.py, api/inbox.py, agent/metering.py, tests/test_intent_classifier.py, tests/test_escalation.py, tests/eval/golden/, docs/reviews/, docs/tasks/03-Task-GD0-AcceptanceBackfill.md
@@ -412,6 +420,7 @@ BLOCKED_BY: Phase 6 (eval harness — cần để verify classifier accuracy tr�
 ### Phase 9 — LLM observability + latency instrumentation
 <!-- ADP:PHASE 9 -->
 STATUS: TODO
+ROADMAP: GD0-OBS
 GOAL: OTel span quanh `orchestrator.step` với attributes: `token_in/out`, `cost`, `model_id`, `tool_calls[]` (+ success/fail), `rag_hit`, `fallback_triggered`, `latency_ms`, `override`; trace correlation (conversation ID xuyên suốt LLM call + tool call + external API); cost attribution per shop/plan; latency p95 gate <5s trên 100+ msg fixture.
 APPROACH: `agent/observability.py` OTel init + span helper; instrument `agent/orchestrator.py` + `bridge/ohana_client.py` + `bridge/zalo_sender.py` với span; conversation ID inject vào trace context; p95 gate qua test fixture 100+ msg.
 ALLOWED_FILES: agent/observability.py, agent/orchestrator.py, bridge/ohana_client.py, bridge/zalo_sender.py, agent/llm_client.py, tests/test_observability.py, tests/test_latency_p95.py, tests/conftest.py, pyproject.toml, docs/reviews/, docs/tasks/03-Task-GD0-AcceptanceBackfill.md
@@ -431,6 +440,7 @@ RISK: low (proposed, pending Wyatt sign — instrumentation additive, không đ�
 ### Phase 10 — Zalo 48h reactive window scheduler + seller notification
 <!-- ADP:PHASE 10 -->
 STATUS: BLOCKED
+ROADMAP: GD0-WINDOW
 GOAL: Scheduler track window 48h reactive per conversation; cảnh báo seller khi còn <T giờ trước hết window (T configurable, mặc định 6h); hết window mà chưa reply → notification + mark conversation expired-window.
 APPROACH: `agent/scheduler.py` cron task (APScheduler hoặc similar) chạy mỗi 30min; query conversations với last_inbound_at + 48h - T còn active; emit notification event; `pending_reply` status=`WINDOW_EXPIRED` nếu quá hạn.
 ALLOWED_FILES: agent/scheduler.py, db/models.py, api/inbox.py, tests/test_reactive_window.py, tests/conftest.py, pyproject.toml, docs/reviews/, docs/tasks/03-Task-GD0-AcceptanceBackfill.md

@@ -168,6 +168,7 @@ PRE-E04: Wyatt chốt số phận vector cũ.
 ### Phase E0 — `TogetherEmbedder` + query/passage split
 <!-- ADP:PHASE E0 -->
 STATUS: TODO
+ROADMAP: GD0-EMBED
 GOAL: `TogetherEmbedder` gọi được e5 thật (1024-dim), prefix `query:`/`passage:` đặt ĐÚNG bên; `Embedder` ABC có `embed_query`/`embed_documents` với default delegate ⇒ `OpenAIEmbedder` + `_DeterministicDevEmbedder` KHÔNG vỡ; gate BẤT ĐỐI XỨNG đỏ khi prefix lệch bên.
 APPROACH: ABC thêm 2 concrete method (KHÔNG abstract — thêm abstract sẽ phá mọi impl hiện có). `TogetherEmbedder` bám shape `together_client.py` spec 07 G0: base_url hằng số, model/key từ `Settings`, resolve model bằng `.strip() or DEFAULT` để chuỗi rỗng không trượt sang provider khác (đúng bug 2026-07-19). Call-site (`ingest.py`/`wiki.py`) chuyển sang `embed_documents`/`embed_query` — prefix là việc của ADAPTER, không phải của call-site, vì OpenAI không dùng prefix.
 ALLOWED_FILES: agent/embedder.py, agent/providers/together_embedder.py, app/config.py, parsing/ingest.py, tools/wiki.py, tests/test_together_embedder.py, docs/reviews/, docs/smokes/, docs/tasks/08-Task-OhanaAISeller-EmbedderSwap-E5.md
@@ -188,6 +189,7 @@ SMOKE: (điền khi chạy — có mặt runtime: gọi e5 thật)
 ### Phase E1 — Migration 1536→1024 + wire factory
 <!-- ADP:PHASE E1 -->
 STATUS: TODO
+ROADMAP: GD0-EMBED
 GOAL: Cột `embeddings.embedding` là `Vector(1024)`; `_EMBED_DIM` một nguồn sự thật; `default_embedder()` trả `TogetherEmbedder` khi có `together_api_key`, KHÔNG raise ở factory; vector sai dim bị Postgres TỪ CHỐI (chứng minh bằng test, không bằng lời).
 APPROACH: Migration **destructive có chủ ý** — 1536→1024 KHÔNG phải phép chiếu, vector cũ vô nghĩa ở không gian mới. `DELETE FROM embeddings` rồi `ALTER TYPE`, ghi rõ trong docstring migration + §8. Down-migration cũng xoá — reversible về SCHEMA, KHÔNG reversible về DỮ LIỆU; nói thẳng thay vì giả vờ. `default_embedder()` ưu tiên Together, fallback OpenAI, cuối cùng dev-embedder; giữ nguyên tính chất không-raise-ở-factory (spec 05 P1).
 ALLOWED_FILES: db/models.py, db/migrations/versions/, api/admin.py, app/config.py, tests/test_embedder_wiring.py, tests/test_config.py, tests/test_embedding_dim.py, docs/reviews/, docs/smokes/, docs/tasks/08-Task-OhanaAISeller-EmbedderSwap-E5.md
@@ -208,6 +210,7 @@ SMOKE: (điền khi chạy — có mặt runtime: migration trên Postgres thậ
 ### Phase E2 — Live acceptance trên e5 (đóng ISSUE-016)
 <!-- ADP:PHASE E2 -->
 STATUS: TODO
+ROADMAP: GD0-EMBED
 GOAL: `tests/test_wiki_rag_live.py -m live` PASS **trên e5 thật** — ingest doc mẫu → search trả đúng chunk, có bằng chứng dán vào SMOKE artifact. ISSUE-016 chuyển RESOLVED, cảnh báo F1 trong CLAUDE.md gỡ.
 APPROACH: Sửa live test trỏ e5 (không phải OpenAI). Test phải kiểm **thứ hạng**, không chỉ "có trả về gì đó": chunk đúng chủ đề phải xếp TRÊN chunk sai chủ đề — đó mới là điều F1 hứa. Skip sạch khi thiếu key (không FAIL giả).
 ALLOWED_FILES: tests/test_wiki_rag_live.py, docs/memory/KNOWN_ISSUES.md, CLAUDE.md, docs/reviews/, docs/smokes/, docs/tasks/08-Task-OhanaAISeller-EmbedderSwap-E5.md

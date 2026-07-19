@@ -256,6 +256,7 @@ which node && node --version
 
 <!-- ADP:PHASE P0 -->
 STATUS: DONE
+ROADMAP: GD0-UI
 EVIDENCE: commit=3e07293, gate_exit=0, duration=2s, review=PASS(judge=APPROVE,model=haiku,bound=ee8e9f6b888f,tier=medium), ran=2026-07-17T17:24
 GOAL: Wyatt lock U1 via DEC-OHANA-01 → `web/` subdir scaffolded với chosen framework, `app/main.py` mount static/template, `auth/identity.py` mở rộng cookie-based derive + CSRF, dev-mock `POST /api/mock/authorize` endpoint, gate test `test_web_scaffold.py` PASS.
 APPROACH:
@@ -278,6 +279,7 @@ REVIEW: PASS ref=docs/reviews/04-Task-OhanaAISeller-GD0_5-InboxUI-phase-P0.json
 
 <!-- ADP:PHASE P1 -->
 STATUS: DONE
+ROADMAP: GD0-UI
 EVIDENCE: commit=b557e53, gate_exit=0, duration=1s, review=PASS(judge=APPROVE,model=haiku,bound=985b9d445b08,tier=medium), ran=2026-07-17T17:56
 GOAL: Channel picker + inbox list + review card wire vào backend. E2E test PASS cho flow draft → approve → status='approved'. Design tokens frozen (U2 outcome).
 APPROACH:
@@ -307,6 +309,7 @@ REVIEW: PASS ref=docs/reviews/04-Task-OhanaAISeller-GD0_5-InboxUI-phase-P1.json
 
 <!-- ADP:PHASE P2 -->
 STATUS: DONE
+ROADMAP: GD0-UI
 EVIDENCE: commit=58820b1, gate_exit=0, duration=2s, review=PASS(judge=APPROVE,model=haiku,bound=9cf5238fa540,tier=medium), ran=2026-07-17T18:36
 GOAL: `/admin/wiki` page render form → POST `/api/admin/wiki/ingest` → chunks count feedback. Guard role=admin.
 APPROACH:

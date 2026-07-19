@@ -200,6 +200,7 @@ grep -nE "pydantic-settings|openai>" pyproject.toml   # Expected: cả 2 present
 
 <!-- ADP:PHASE P0 -->
 STATUS: DONE
+ROADMAP: GD0-CONFIG
 EVIDENCE: commit=897ba1f, gate_exit=0, duration=11s, review=PASS(judge=APPROVE,model=haiku,bound=5165de25e1ed,tier=medium), ran=2026-07-17T23:40
 GOAL: `app/config.py` với `Settings(BaseSettings)` + `get_settings()` lru_cache phủ 4 field 2 provider cần; **`OpenAIEmbedder()` import được (hết ModuleNotFoundError — F1 path unblocked)**; gate `test_config.py` PASS.
 AMENDED 2026-07-17 (tại ANCHOR P0): GOAL gốc còn đòi "`OpenAIClient()` import được" — SAI. Executor tìm ra `openai_client.py:28` còn import `from app import alert_service` (module `app/alert_service.py` cũng chưa bao giờ tồn tại — ISSUE-010 đã ghi CẢ 2, audit spec 05 của tôi rớt nửa alert_service). `OpenAIClient` là LLM client (F2/F3) — **out scope spec 05** (§3 Out of scope), F1 KHÔNG cần nó. `app/config.py` unblock nửa config; alert_service là blocker riêng cho LLM-client spec sau. Executor encode đúng: `test_openai_client_import_blocked_by_unported_alert_service` là `xfail(strict=True)` — flip thành hard-fail khi ai đó port alert_service, không rot. F1 deliverable (OpenAIEmbedder import) đạt thật.
@@ -221,6 +222,7 @@ REVIEW: PASS ref=docs/reviews/05-Task-OhanaAISeller-ConfigEmbedder-F1-phase-P0.j
 
 <!-- ADP:PHASE P1 -->
 STATUS: DONE
+ROADMAP: GD0-CONFIG
 EVIDENCE: commit=b4a7119, gate_exit=0, duration=3s, review=PASS(judge=APPROVE,model=haiku,bound=7cfe51e5521f,tier=medium), ran=2026-07-18T00:31
 GOAL: `default_embedder()` chọn embedder theo env (key→real, no-key+dev→fake, no-key+prod→raise); deterministic gate verify selection-logic + dim-contract; live acceptance test (`-m live`) ingest→search với real OpenAIEmbedder soạn sẵn để Wyatt/Tân chạy.
 APPROACH:
@@ -243,6 +245,7 @@ AMENDED 2026-07-18 (tại ANCHOR P1, Wyatt chọn "chấp nhận deviation"): §
 
 <!-- ADP:PHASE P2 -->
 STATUS: DONE
+ROADMAP: GD0-CONFIG
 EVIDENCE: commit=196a4c4, gate_exit=0, duration=3s, review=PASS(judge=APPROVE,model=haiku,bound=7720c55af005,tier=medium), ran=2026-07-18T00:58
 GOAL: `get_jwt_secret()` + `db/session.py get_database_url()` đọc qua `Settings`; ZERO đổi behavior (fail-closed-outside-dev của jwt secret giữ nguyên); mọi test cũ xanh.
 APPROACH:

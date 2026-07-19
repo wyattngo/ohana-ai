@@ -23,7 +23,11 @@
 
 ## 2. Trạng thái hiện tại
 
-- ✅ **Spec 01 (5/5)** · ✅ **02 (4/4)** · ✅ **04 (3/3)** · ✅ **05 (3/3)** · ✅ **06 Foundation (3/3)** · ✅ **07 General Chat (3/3)** · ⏳ Spec 03 = 0/10 (4 BLOCKED). **Overall ADP 21/31 phase gate-passed (67%)** — dashboard: `bash .claude/tools/adp-status.sh`.
+- ✅ **Spec 01 (5/5)** · ✅ **02 (4/4)** · ✅ **04 (3/3)** · ✅ **05 (3/3)** · ✅ **06 Foundation (3/3)** · ✅ **07 General Chat (3/3)** · ⏳ Spec 03 = 0/10 (4 BLOCKED) · ⏳ Spec 08 = 0/3.
+- **Hai bộ đếm, hai câu hỏi khác nhau — đừng lẫn:**
+  - `bash .claude/tools/adp-status.sh` → *phase đã ký đi tới đâu?* **21/34 (61%)**
+  - `bash .claude/tools/adp-roadmap.sh "$PWD"` → *kế hoạch đã phủ tới đâu?* **internal 8/25 (32%)** + external 0/10 (chờ bên thứ ba, KHÔNG tính vào mục tiêu 100%)
+  - Số roadmap thấp hơn vì mẫu số ĐÚNG hơn (25 work item thật, thay vì 34 phase của những spec tình cờ đã viết) — không phải vì tiến độ xấu đi. Xem DEC-OHANA-03.
 - Spec canonical: `docs/tasks/01-Task-OhanaAISeller-GD0.md` (GĐ0 backend) + `docs/tasks/04-Task-OhanaAISeller-GD0_5-InboxUI.md` (GĐ0.5 UI). Mọi phase block DONE đều có EVIDENCE stamped.
 - Latest STATE_HASH: `d61ee0d167e0` @ spec 07 phase-G2 close (2026-07-19).
 - `main` — **đã push, `main` == `origin/main`** (`github.com:wyattngo/ohana-ai`). Spec 06 + 07 commit THẲNG trên `main`. ⚠️ Spec 06 §0 header khai `Branch: adp/06-foundation` — **không đúng thực tế**, branch đó chưa từng được tạo (spec 07 §0 khai `main`, đúng).
@@ -103,8 +107,32 @@ Chuyển sang project này khi user nhắc:
 GATE_RUNNER: .venv/bin/python -m pytest -q -x
 RISK_PATHS: agent/orchestrator.py, agent/policy_gate.py, tools/registry.py, bridge/, auth/, db/migrations, api/webhook.py, api/inbox.py, api/admin.py, api/chat.py
 SPEC_DIR: docs/tasks
+ROADMAP_L1: docs/ROADMAP.md
+ROADMAP_L3: docs/ROADMAP-STATUS.md
 EXECUTOR_SKILL: drnick-coder
 CHECKPOINT_PREFIX: adp
+
+### Khoá nối Roadmap (bắt buộc từ 2026-07-19 — DEC-OHANA-03)
+
+Mỗi ADP phase block **PHẢI** có dòng `ROADMAP:` trỏ về một ID trong `docs/ROADMAP.md §4`:
+
+```
+ROADMAP: GD0-EVAL     # đặt ngay sau STATUS:
+```
+
+**Ba tầng, ba chủ sở hữu — đừng trộn:**
+
+| Tầng | File | Ai viết | Sửa khi nào |
+|---|---|---|---|
+| L1 | `docs/ROADMAP.md` | **người** | đổi ý định/kế hoạch |
+| L2 | `docs/tasks/*.md` | senior-engineer → frozen | mở spec mới |
+| L3 | `docs/ROADMAP-STATUS.md` | **máy** — `bash .claude/tools/adp-roadmap.sh "$PWD"` | không bao giờ sửa tay |
+
+`adp-checkpoint.sh` tự sinh lại L3 sau khi stamp EVIDENCE. **Checkpoint KHÔNG ghi vào L1** — L1 là tầng ý định, chỉ người viết.
+
+⚠️ **L1 nằm NGOÀI spec-lock có chủ ý.** `adp_spec_lock_verify` chỉ khoá `SPEC_DIR`. Kéo L1 vào vùng diff-bound = mỗi lần re-plan giữa sprint bị checkpoint REFUSE vì DRIFT, tức máy cấm đổi ý. Đừng "sửa" điều này.
+
+**Mục tiêu 100% = mẫu số `internal`** (không gộp `external` chờ bên thứ ba, không gộp GĐ4). L3 phát hiện drift hai chiều: `uncovered` (mục roadmap chưa spec nào nhận) + `unplanned` (phase làm việc ngoài kế hoạch).
 
 ### SMOKE gate (bắt buộc từ 2026-07-19 — Wyatt directive sau spec 07)
 
@@ -196,9 +224,13 @@ ohana-ai/
 ├── tests/
 ├── .claude/               (port từ drnickv4/ khi bootstrap)
 └── docs/
-    ├── tasks/             Spec ADP (01 GĐ0 · 02 bootstrap · 03 backfill · 04 GĐ0.5 UI
-    │                       · 05 config/embedder · 06 foundation · 07 general chat)
-    ├── decisions/         DEC-OHANA-NN (01 = web framework + brand kit)
+    ├── ROADMAP.md         ★ L1 — ý định + lý do + ID bền. NGƯỜI viết. KHÔNG có STATUS.
+    ├── ROADMAP-STATUS.md  ★ L3 — SINH MÁY (adp-roadmap.sh). Đừng sửa tay trên NOTES_HUMAN.
+    ├── tasks/             Spec ADP = L2 (01 GĐ0 · 02 bootstrap · 03 backfill · 04 GĐ0.5 UI
+    │                       · 05 config/embedder · 06 foundation · 07 general chat
+    │                       · 08 embedder-swap). Mỗi phase block PHẢI có `ROADMAP:`.
+    ├── archive/           Tài liệu đã retire (roadmap v3 hoá thạch + 2 PLAN companion)
+    ├── decisions/         DEC-OHANA-NN (01 web framework · 02 chat model · 03 roadmap-ADP spine)
     ├── reviews/           Review artifact JSON (diff-bound, adp-review.sh stamp)
     ├── smokes/            SMOKE artifact chạy tay (diff-bound, adp-smoke.sh stamp) — §5
     ├── adr/               ADR (2026-07-18-hosting-region.md = PRE-007, ACCEPTED)

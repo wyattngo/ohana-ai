@@ -389,12 +389,23 @@ if [ "$TIER" != "high" ]; then
     echo "- [ ] ${TS} · ${SPEC_ID} phase-${PHASE_ID} · tier=${TIER} · review=${REVIEW_NOTE} · smoke=${SMOKE_NOTE:-n/a} · commit=${HASH} · revert: git revert ${HASH}" >> "$QF"
 fi
 
+# L3 roadmap view — sinh lại từ L1×L2 sau khi STATUS đã thành DONE.
+# Generator KHÔNG ghi vào L1 (docs/ROADMAP.md) — L1 là tầng ý định, chỉ người viết.
+# Lỗi generator không được làm hỏng checkpoint: view sai < checkpoint vỡ.
+ROADMAP_OUT=""
+if [ -x "$ROOT/.claude/tools/adp-roadmap.sh" ] && [ -f "$ROOT/docs/ROADMAP.md" ]; then
+    ROADMAP_OUT=$(bash "$ROOT/.claude/tools/adp-roadmap.sh" "$ROOT" 2>&1) || \
+        ROADMAP_OUT="⚠️ adp-roadmap.sh lỗi (checkpoint vẫn tiếp tục): ${ROADMAP_OUT}"
+fi
+
 git add "$SPEC_FILE" "docs/.adp-state-hash" 2>/dev/null
 [ -f "$ROOT/docs/memory/REVIEW_QUEUE.md" ] && git add "docs/memory/REVIEW_QUEUE.md" 2>/dev/null
+[ -f "$ROOT/docs/ROADMAP-STATUS.md" ] && git add "docs/ROADMAP-STATUS.md" "docs/.roadmap-denominator.log" 2>/dev/null
 git commit -q -m "adp/${SPEC_ID} phase-${PHASE_ID}: checkpoint evidence" 2>/dev/null
 EV_HASH=$(git rev-parse --short HEAD)
 
 echo "STATUS: DONE · EVIDENCE stamped (evidence commit ${EV_HASH}) · STATE_HASH: ${STATE_HASH}"
+[ -n "$ROADMAP_OUT" ] && printf 'ROADMAP L3:\n%s\n' "$ROADMAP_OUT"
 [ "$TIER" != "high" ] && echo "REVIEW_QUEUE: appended → docs/memory/REVIEW_QUEUE.md (Wyatt review async; revert: git revert ${HASH})"
 
 if [ "$ADVANCED" -eq 1 ]; then

@@ -182,6 +182,7 @@ PRE-108: Grep ONFA references in port targets.
 
 <!-- ADP:PHASE 1.0 -->
 STATUS: DONE
+ROADMAP: GD0-BOOTSTRAP
 EVIDENCE: commit=ad562e0, gate_exit=0, duration=0s, review=skip(docs-only), ran=2026-07-16T22:48
 GOAL: docs/memory/PHASE1_DISCOVERY.md ghi đầy đủ kết quả PRE-101..108 + version snapshot.
 APPROACH: Run each PRE, capture output, không sửa gì trong drnickv4/.
@@ -202,6 +203,7 @@ RISK: low
 
 <!-- ADP:PHASE 1.1 -->
 STATUS: DONE
+ROADMAP: GD0-BOOTSTRAP
 EVIDENCE: commit=b5b6b62, gate_exit=0, duration=6s, review=PASS(judge=APPROVE,model=output-evaluator@haiku,bound=474c15dc4640,tier=low), ran=2026-07-16T22:55
 GOAL: git init + pyproject.toml + app/main.py FastAPI hello + tests/test_smoke.py RED trước, GREEN sau skeleton.
 APPROACH: Copy pyproject.toml từ drnickv4 (dep list), strip financial deps (nếu có). FastAPI app/main.py chỉ có `/health`. test_smoke import app + assert `/health` returns 200.
@@ -230,6 +232,7 @@ RISK: low
 
 <!-- ADP:PHASE 1.2 -->
 STATUS: DONE
+ROADMAP: GD0-BOOTSTRAP
 EVIDENCE: commit=598ce55, gate_exit=0, duration=1s, review=PASS(judge=APPROVE,model=output-evaluator@haiku,bound=b05123cff661,tier=medium), ran=2026-07-16T23:15
 GOAL: 6 targets (2 files: agent/llm_client.py, agent/embedder.py · 4 packages: agent/providers/, retrieval/, parsing/, storage/) port sạch, mỗi target ZERO ONFA reference, test_ports.py phủ mỗi target 1 case.
 APPROACH: **1 sub-checkpoint per target** (blame granularity, không batch). Loop: cp (file hoặc -R package) → strip imports theo PRE-108 → viết test case → chạy GATE_MODULE → commit → advance target kế (không chờ Wyatt confirm — RISK: medium theo §12 v2 override).
@@ -273,6 +276,7 @@ RISK: medium (chạm agent/, retrieval/ — trong RISK_PATHS)
 
 <!-- ADP:PHASE 1.3 -->
 STATUS: DONE
+ROADMAP: GD0-BOOTSTRAP
 EVIDENCE: commit=cd6b812, gate_exit=0, duration=6s, review=PASS(judge=APPROVE,model=output-evaluator@haiku,bound=8eee59e6309d,tier=medium), ran=2026-07-16T23:27
 GOAL: guardrail.py (adapt R1.13→intent-safety), reviewer agent verify, CI workflow, Alembic skeleton — bổ sung vào ohana-ai/.claude v2.3 sẵn có.
 APPROACH: cp guardrail → adapt DENY rules → verify existing ADP v2.3 hooks không collide → CI workflow adapt project name → alembic init (nếu PRE-106 fail).

@@ -165,6 +165,7 @@ PRE-F04: spec này KHÔNG bị ADR PRE-007 chặn — xác nhận không chạm 
 ### Phase F0 — Core data model + Alembic 0003
 <!-- ADP:PHASE F0 -->
 STATUS: DONE
+ROADMAP: GD0-FOUNDATION
 EVIDENCE: commit=7f786df, gate_exit=0, duration=4s, review=PASS(judge=APPROVE,model=output-evaluator (haiku) — first-pass auto-verdict,bound=f4bc655d650b,tier=high), ran=2026-07-18T12:58
 GOAL: `Conversation` + `Customer` + `OrderDraft` tồn tại, tenant-first (`shop_id Text NOT NULL` + index dẫn đầu `shop_id`); Alembic 0003 apply + downgrade sạch; `PendingReply.conversation_id`/`.customer_id` có FK; test cross-shop rejection PASS trên từng bảng mới; **FK composite (shop_id, …) chặn tham chiếu chéo shop ở tầng DB**.
 APPROACH: Thêm 3 model theo đúng pattern `Message`/`PendingReply` (Text id, shop_id Text NOT NULL, created_at server_default now(), Index dẫn đầu shop_id). Identity type = **Text** theo PRE-F01 (KHÔNG UUID — tránh migrate 3 bảng hiện có + JWT + repos). Alembic 0003 `down_revision="0002"`, có `downgrade()` thật. FK cho 2 cột mồ côi theo kết quả PRE-F02 (rỗng → FK thẳng; có data → backfill trước). Repo mới theo pattern `_shop_scope` của `PendingReplyRepo`.
@@ -201,6 +202,7 @@ gate hở kiểu đó nguy hiểm hơn không có gate.
 ### Phase F1 — Channel abstraction (Zalo migrate lên Protocol)
 <!-- ADP:PHASE F1 -->
 STATUS: DONE
+ROADMAP: GD2-CHANNEL
 EVIDENCE: commit=bbf866b, gate_exit=0, duration=3s, review=PASS(judge=APPROVE,model=output-evaluator (haiku) — first-pass auto-verdict,bound=0fae20e3b664,tier=medium), ran=2026-07-18T13:13
 GOAL: `channels/base.py` Protocol tồn tại; Zalo chạy qua adapter thay vì hardcode; `api/webhook.py` dùng shape generic `/webhook/{channel}/{external_id}`; interface `ZaloSender` KHÔNG đổi; **shim `conversation_id or customer_id` ở `agent/orchestrator.py:89` bị GỠ — channel layer resolve Customer/Conversation thật**; toàn bộ test cũ vẫn xanh; webhook VẪN chưa mount.
 APPROACH: Protocol tối thiểu đủ cho Zalo hôm nay + Messenger GĐ2 (KHÔNG thiết kế thừa cho kênh chưa thấy — §5.2.4). Adapter `channels/zalo/` bọc `bridge/zalo_sender.py`, KHÔNG sửa file đó. Webhook resolve adapter qua registry theo `{channel}`.
@@ -223,6 +225,7 @@ BLOCKED_BY: (đã gỡ) F0 ✅ DONE — Conversation/Customer đã tồn tại
 ### Phase F2 — Test/CI foundation
 <!-- ADP:PHASE F2 -->
 STATUS: DONE
+ROADMAP: GD0-FOUNDATION
 EVIDENCE: commit=95ad405, gate_exit=0, duration=4s, review=PASS(judge=APPROVE,model=output-evaluator (haiku) — first-pass auto-verdict,bound=12ddec027ac1,tier=medium), ran=2026-07-18T13:35
 GOAL: `tests/conftest.py` cung cấp fixture DB dùng chung (ISSUE-014 đóng); mypy **XANH** trên `app agent retrieval parsing storage db bridge tools`; nợ type còn lại thu gọn đúng `api/`.
 APPROACH: conftest dùng `DATABASE_URL` (khớp service pgvector sẵn có trong ci.yml), fixture dựng/dọn schema. 2 test mới của spec này bỏ helper `_fresh_engine`/`_fresh` trùng lặp, chuyển sang fixture chung. **KHÔNG mass-refactor test cũ** — đổi test đang xanh chỉ để "cho đẹp" là rủi ro không được trả công.

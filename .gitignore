@@ -41,3 +41,7 @@ logs/
 .mypy_cache/
 htmlcov/
 .coverage
+
+# Lịch sử mẫu số roadmap (DEC-OHANA-03 §0.2) — là BẰNG CHỨNG chống gian lận
+# chỉ số, phải vào git; đừng để rule `*.log` ở trên nuốt mất.
+!docs/.roadmap-denominator.log

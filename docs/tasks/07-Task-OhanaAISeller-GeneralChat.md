@@ -158,6 +158,7 @@ PRE-G03: Xác nhận hệ quả xfail.
 ### Phase G0 — Together client + config
 <!-- ADP:PHASE G0 -->
 STATUS: DONE
+ROADMAP: GD0-CHAT
 EVIDENCE: commit=a6a0814, gate_exit=0, duration=3s, review=PASS(judge=APPROVE,model=output-evaluator (haiku) — 3 rounds,bound=164b9cf5803e,tier=medium), ran=2026-07-19T01:51
 GOAL: `TogetherClient` implement `LLMClient`, trỏ Together base_url, model + key từ `Settings`; `OpenAIClient` hết coupling module-level `alert_service` (hành vi 429 KHÔNG đổi); `tests/test_config.py` xfail cập nhật cho khớp thực tế mới.
 APPROACH: `OpenAIClient.__init__` nhận `on_rate_limit: Callable[[], Awaitable[None]] | None = None`; `_create` gọi hook nếu có rồi **re-raise nguyên** (không nuốt, không retry — giữ y hệt hành vi cũ). Bỏ `from app import alert_service` + `type: ignore` kèm nó (F2 thêm ignore đó, giờ thành thừa). `TogetherClient(OpenAIClient)` đặt `base_url="https://api.together.xyz/v1"` + `api_key=settings.together_api_key` + `model=settings.together_model`. `app/config.py` += 2 field. **KHÔNG port `alert_service`** — ISSUE-010 vẫn OPEN cho phần alerting.
@@ -179,6 +180,7 @@ REVIEW: PASS ref=docs/reviews/2026-07-19-spec07-G0.json
 ### Phase G1 — `POST /api/chat` + ranh giới an toàn
 <!-- ADP:PHASE G1 -->
 STATUS: DONE
+ROADMAP: GD0-CHAT
 EVIDENCE: commit=3b1883d, gate_exit=0, duration=3s, review=PASS(judge=APPROVE,model=output-evaluator (haiku) — 3 rounds,bound=427f4c2f9f62,tier=medium), ran=2026-07-19T09:38
 GOAL: Seller đã đăng nhập POST `/api/chat` nhận phản hồi thật từ Together; `shop_id` chỉ từ JWT; thiếu cookie → 401, thiếu CSRF → 403; body claim `shop_id` khác JWT → dùng JWT; **gate ranh giới: `api/chat.py` KHÔNG với tới sender/`PendingReply`/`policy_gate`**; log `model_id`/`token_in`/`token_out`/`latency_ms`/`shop_id`.
 APPROACH: `api/chat.py` follow shape `api/inbox.py` (router builder + `identity_dep`). LLM client **inject qua tham số** để test dùng fake, không gọi mạng. Mount trong `app/main.py` TRƯỚC `StaticFiles`. Response `{reply, model, grounded: false, usage:{...}}` — cờ `grounded` tường minh để consumer sau không nhầm. Gate ranh giới đọc module `api.chat` + toàn bộ import transitive, FAIL nếu chạm `bridge.*sender*` / `PendingReply` / `agent.policy_gate`.
@@ -201,6 +203,7 @@ REVIEW: PASS ref=docs/reviews/2026-07-19-spec07-G1.json
 ### Phase G2 — Màn Chat
 <!-- ADP:PHASE G2 -->
 STATUS: DONE
+ROADMAP: GD0-CHAT
 EVIDENCE: commit=e0d0f80, gate_exit=0, duration=7s, review=PASS(judge=APPROVE,model=output-evaluator (haiku),bound=a06543688984,tier=low), ran=2026-07-19T10:05
 GOAL: Seller mở màn Chat trong app, gõ, thấy phản hồi; UI nói RÕ đây là AI tổng quát không có căn cứ dữ liệu shop; build `web/dist/` xanh; toàn suite vẫn xanh.
 APPROACH: `Chat.tsx` tái dụng shell + Astronixa tokens spec 04 (KHÔNG token mới). Gọi qua `apiFetch` (CSRF đã tập trung sẵn). State-based routing như 4 màn hiện có, KHÔNG thêm react-router. Disclaimer VI hiện thường trực, không phải tooltip ẩn.
