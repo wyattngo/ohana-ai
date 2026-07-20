@@ -7,20 +7,22 @@
       "runtimeExecutable": "/bin/sh",
       "runtimeArgs": [
         "-c",
-        "cd /Users/wyattngo/Sites/localhost/ohana-ai && set -a && . ./.env && set +a && OHANA_ENV=dev exec .venv/bin/python -m uvicorn app.main:app --port 8010 --host 127.0.0.1"
+        "cd /Users/wyattngo/Sites/localhost/ohana-ai && set -a && . ./.env && set +a && OHANA_ENV=dev exec .venv/bin/python -m uvicorn app.main:app --port ${PORT:-8010} --host 127.0.0.1"
       ],
+      "//autoPort": "8010 KHÔNG bắt buộc: không vite proxy, không OAuth callback, không CORS allowlist, webhook chưa mount — app serve web/dist qua StaticFiles CÙNG origin. Nên cho phép đổi port khi 8010 bận (thường là do chính server này còn sống mồ côi từ phiên trước). `${PORT:-8010}` giữ 8010 làm mặc định khi chạy tay để khớp doc smoke cũ.",
+      "autoPort": true,
       "port": 8010
     },
     {
       "name": "ohana-web",
-      "runtimeExecutable": "/Users/wyattngo/.nvm/versions/node/v23.6.1/bin/pnpm",
+      "//shell": "Qua /bin/sh -c chứ KHÔNG gọi pnpm trực tiếp: autoPort cấp port qua biến PORT, mà runtimeArgs không đi qua shell thì ${PORT} không expand, và Vite KHÔNG tự đọc process.env.PORT (mặc định của nó là server.port/5173). Gọi thẳng pnpm ⇒ port được cấp bị phớt lờ và va chạm lại y như cũ.",
+      "runtimeExecutable": "/bin/sh",
       "runtimeArgs": [
-        "--dir",
-        "/Users/wyattngo/Sites/localhost/ohana-ai/web",
-        "dev",
-        "--port",
-        "5174"
+        "-c",
+        "exec /Users/wyattngo/.nvm/versions/node/v23.6.1/bin/pnpm --dir /Users/wyattngo/Sites/localhost/ohana-ai/web dev --port ${PORT:-5174}"
       ],
+      "//autoPort": "5174 KHÔNG bắt buộc: backend không có CORSMiddleware nào, vite.config.ts không có proxy, và 5174 không được tham chiếu ở bất kỳ file nào khác ngoài chính launch.json.",
+      "autoPort": true,
       "port": 5174
     }
   ]

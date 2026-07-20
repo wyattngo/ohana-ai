@@ -79,7 +79,7 @@ Cùng họ **ISSUE-020** (`last_inbound_at`/`window_status` luồng qua schema, 
 |---|---|---|
 | **Safety** | Composite FK `(shop_id, conversation_id)` → `conversations(shop_id, id)` khiến Postgres TỪ CHỐI message trỏ conversation của shop khác. FK đơn KHÔNG chặn được — nó chỉ đòi id tồn tại, không đòi cùng shop. Đọc qua `MessageRepo(shop_scope=)` ⇒ scope ở tầng SQL, không post-filter. | PASS |
 | **User trust** | History đúng ⇒ AI phân giải được đại từ, không hỏi lại thứ khách vừa nói. Đây là điều kiện để sản phẩm dùng được, không phải cải thiện. | PASS |
-| **Stability** | Bảng rỗng (PRE-1002 phải đo lại) ⇒ thêm NOT NULL không cần backfill. Migration reversible thật (drop cột), khác `0004`. | PASS |
+| **Stability** | Bảng rỗng (PRE-1002 ✅ đo thật 2026-07-20 = 0 row) ⇒ thêm NOT NULL không cần backfill. Migration reversible thật (drop cột), khác `0004`. | PASS |
 | **Growth** | Gỡ 1 trong 2 điều kiện tiên quyết của mount webhook (còn lại: PRE-004). | PASS |
 
 **RED FLAG scan:**
@@ -87,7 +87,7 @@ Cùng họ **ISSUE-020** (`last_inbound_at`/`window_status` luồng qua schema, 
 - [x] **FK phải composite, không phải đơn.** Đây chính là lỗi spec 06 F0 đã vá cho 3 bảng khác. Test phải chứng minh cross-shop bị TỪ CHỐI, không chỉ chứng minh FK tồn tại.
 - [x] **`last_n` phải scope shop_id ở SQL.** Truy vấn chỉ lọc `conversation_id` là lỗ R1.22 — `conversation_id` là Text tự sinh, không chứng minh được quyền sở hữu.
 - [x] **Ghi message KHÔNG được nằm ngoài `policy_gate`.** Ghi `messages` là lưu trữ, không phải gửi. Nhưng nếu ai đó sau này drain `messages` để gửi thì bypass gate — docstring `MessageRepo` phải nói rõ nó là **append-only log**, không phải hàng đợi gửi.
-- [x] **NOT NULL trên bảng đã có dữ liệu sẽ FAIL.** PRE-1002 phải đo row count THẬT trước khi chạy, không giả định "chắc rỗng vì chưa ai ghi".
+- [x] **NOT NULL trên bảng đã có dữ liệu sẽ FAIL.** ✅ Đã đo thật (0 row) — KHÔNG suy từ "grep 0 hit", vì code-không-ghi không chứng minh bảng rỗng.
 - [ ] ⚠️ **Cap N chưa đo** — cùng họ ISSUE-022. Đặt số tạm để có ràng buộc cứng, không phải vì tin nó đúng.
 
 ---
@@ -111,14 +111,19 @@ PRE-1001: Số migration `0006` đã bị ai lấy chưa — kiểm CẢ đĩa L
   Verify:     ls db/migrations/versions/ && grep -n "000[6-9]" docs/tasks/03-*.md
 
 PRE-1002: `messages` có bao nhiêu row THẬT (NOT NULL có backfill được không)?
-  Trạng thái: ❌ CHƯA ĐO — `psql` không có trong shell phiên này.
-              KHÔNG được suy ra "0 row" từ "grep 0 hit". Code không ghi
-              KHÔNG chứng minh bảng rỗng: seed thủ công, fixture test rớt lại,
-              hay môi trường khác đều tạo row mà grep không thấy.
-  Verify:     psql "$DATABASE_URL" -tAc "select count(*) from messages"
-  Expected:   0
-  Nếu > 0:    STOP. Thêm cột NULLABLE trước, backfill, rồi mới SET NOT NULL —
-              tách thành 2 migration. Đừng ép NOT NULL lên dữ liệu có sẵn.
+  Trạng thái: ✅ ĐO 2026-07-20 trên Postgres THẬT — **count(*) = 0**.
+              DB `ohana` @ 127.0.0.1:5432 · PG **16.14** · alembic head **0005**.
+              Cùng lần chạy xác nhận `messages` đúng 5 cột (id, shop_id, role,
+              content, created_at) — không có conversation_id/customer_id, khớp
+              audit đọc từ `db/models.py`. Và `0006` còn trống trên DB thật.
+  Verify:     .venv/bin/python -c "import psycopg;c=psycopg.connect('postgresql://ohana:ohana@127.0.0.1:5432/ohana');\
+              print(c.execute('select count(*) from messages').fetchone())"
+              (⚠️ `psql` KHÔNG có trên máy Wyatt — dùng psycopg trong venv.
+               Và URL trong DATABASE_URL là dạng SQLAlchemy `postgresql+psycopg://`,
+               psycopg cần bỏ hậu tố `+psycopg`.)
+  Kết luận:   ADD COLUMN NOT NULL chạy được, KHÔNG cần tách migration,
+              KHÔNG cần backfill. H0 giữ RISK: medium — điều kiện nâng high
+              (>0 row) không kích hoạt.
 
 PRE-1003: Cap N message + cap ký tự — Wyatt chốt.
   Trạng thái: ✅ WYATT KÝ 2026-07-20 — 20 message HOẶC 4000 ký tự, cái nào chạm trước.
@@ -149,7 +154,7 @@ GATE: .venv/bin/python -m pytest tests/test_message_history.py -x -q
 GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && .venv/bin/mypy app agent retrieval parsing storage db bridge tools && .venv/bin/ruff check . --no-cache && .venv/bin/ruff format --check . --no-cache
 RETRY: 0/3
 RISK: medium (KÝ: Wyatt 2026-07-20. Floor rule: ALLOWED_FILES giao RISK_PATHS ở `db/migrations`. KHÔNG đề xuất high: thêm cột + FK, không đổi hành vi tiền/gửi; reversible thật; bảng rỗng theo PRE-1002. Nếu PRE-1002 trả > 0 row ⇒ nâng lên high, vì lúc đó có backfill trên dữ liệu thật.)
-BLOCKED_BY: PRE-1001, PRE-1002
+BLOCKED_BY: PRE-1001 (PRE-1002 ✅ đo 2026-07-20 = 0 row)
 SMOKE:
 <!-- /ADP -->
 
@@ -264,7 +269,7 @@ Commit: `adp/10-Task-OhanaAISeller-ConversationHistory phase-H{0,1,2}: <concern>
 
 ## §12 — Constraints
 
-**STOP nếu:** PRE-1002 trả > 0 row · PRE-1003/1004/1005 chưa có chữ ký Wyatt khi tới phase cần nó · RETRY chạm 3/3.
+**STOP nếu:** PRE-1003/1004/1005 chưa có chữ ký Wyatt khi tới phase cần nó · RETRY chạm 3/3.
 
 **Anti-pattern — KHÔNG làm:**
 
@@ -283,7 +288,7 @@ Commit: `adp/10-Task-OhanaAISeller-ConversationHistory phase-H{0,1,2}: <concern>
 
 | Phase | Concern | STATUS | RISK (đã ký) | Blocked by |
 |---|---|---|---|---|
-| H0 | Schema + composite FK + migration `0006` | TODO | **medium** (ký) | PRE-1001, PRE-1002 |
+| H0 | Schema + composite FK + migration `0006` | TODO | **medium** (ký) | PRE-1001 |
 | H1 | Write path (inbound + auto_send) | TODO | **medium** (ký) | H0 |
 | H2 | Read path last-N + cap | TODO | **medium** (ký) | H1 |
 
