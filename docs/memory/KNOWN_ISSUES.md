@@ -303,6 +303,17 @@ Cùng source, cùng binary. Xoá `.ruff_cache` rồi chạy lại lệnh CŨ ⇒
 
 ---
 
+### ISSUE-020 — `last_inbound_at` / `window_status` chưa từng được GHI ⇒ scheduler 48h sẽ luôn trả rỗng
+- **Origin:** spec 09 C0 follow-up — audit câu hỏi mở "window_status hết hạn có mở conversation MỚI không"
+- **Discovered:** 2026-07-20
+- **Severity:** medium (chưa chạm được — Phase 10 BLOCKED; nhưng sẽ hỏng ÂM THẦM ngay khi build)
+- **Status:** OPEN
+- **Detail:** `conversations.last_inbound_at` và `conversations.window_status` tồn tại trong `db/models.py` + migration `0003`, có cả index `idx_conv_shop_last_inbound`, nhưng **KHÔNG dòng code nào ghi vào chúng**. Verify bằng grep toàn repo (loại trừ khai báo cột): 0 hit.
+  Spec 03 Phase 10 dự định query `conversations WHERE last_inbound_at + 48h - T`. Với `last_inbound_at IS NULL` ở mọi row, query trả **rỗng** ⇒ scheduler chạy đều, log sạch, seller KHÔNG BAO GIỜ được cảnh báo, và **không có exception nào**. Index cũng là index chết.
+- **Cùng họ với ISSUE-017:** một cột được luồng qua schema nhưng không luồng qua code. Khác ở chỗ ISSUE-017 hỏng khi có tải, cái này hỏng ngay từ dòng đầu tiên.
+- **Action:** `resolve_conversation()` là nơi tự nhiên để đóng dấu — nó chạy trên MỌI tin nhắn vào. Stamp `last_inbound_at=now()` và reset `window_status='active'` mỗi lần inbound. **Làm TRƯỚC khi build Phase 10**, đừng để scheduler dựng trên cột chết.
+- **Ghi chú:** việc này KHÔNG chặn `GD0-WINDOW` về mặt thiết kế (ngữ nghĩa đã rõ, xem dưới), chỉ chặn nó hoạt động đúng.
+
 ## Waivers / trade-offs
 
 ### WAIVER-001 — EVIDENCE của 22 phase DONE trước khi CI xanh lần đầu
