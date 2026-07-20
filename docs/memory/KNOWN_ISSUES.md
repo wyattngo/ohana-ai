@@ -4,7 +4,7 @@
 >
 > Last updated: 2026-07-20 · Status: Spec 01/02/04/05/06/07/08/09 DONE (**ADP 25/35**, internal 9/25). Gate: 137 test xanh · ruff sạch (`--no-cache`, pin) · mypy 0 lỗi/40 file. Live 6/6 PASS tay. **CI XANH** (`08c030a`, đủ 11 step trên container sạch).
 > · ✅ ĐÓNG session này: ISSUE-016 (F1 wiki-RAG chạy thật trên e5).
-> · ⚠️ MỞ session này: ISSUE-018 (blank-env không phủ complex field) · ISSUE-019 (gate ADP từng cho kết quả sai vì cache+version trôi — **19/22 phase DONE cũ không tái lập được `ruff check`**).
+> · ⚠️ MỞ session này: ISSUE-018 (blank-env không phủ complex field) · ISSUE-019 (gate ADP từng cho kết quả sai vì cache+version trôi — **19/22 phase DONE cũ không tái lập được `ruff check`**) · ISSUE-021 (L1 gỡ `shipping_info`, spec 03 Phase 4 frozen vẫn khai 3 tool) · ISSUE-022 (cap 2000 ký tự persona là số đặt tạm, chưa đo).
 > · Chưa ai nhận: trạng thái CI THẬT chưa ai mở tab Actions xác nhận · runtime deps chưa pin · PRE-002/003/004 chờ Tân.
 
 ---
@@ -313,6 +313,31 @@ Cùng source, cùng binary. Xoá `.ruff_cache` rồi chạy lại lệnh CŨ ⇒
 - **Cùng họ với ISSUE-017:** một cột được luồng qua schema nhưng không luồng qua code. Khác ở chỗ ISSUE-017 hỏng khi có tải, cái này hỏng ngay từ dòng đầu tiên.
 - **Action:** `resolve_conversation()` là nơi tự nhiên để đóng dấu — nó chạy trên MỌI tin nhắn vào. Stamp `last_inbound_at=now()` và reset `window_status='active'` mỗi lần inbound. **Làm TRƯỚC khi build Phase 10**, đừng để scheduler dựng trên cột chết.
 - **Ghi chú:** việc này KHÔNG chặn `GD0-WINDOW` về mặt thiết kế (ngữ nghĩa đã rõ, xem dưới), chỉ chặn nó hoạt động đúng.
+
+---
+
+### ISSUE-021 — L1 gỡ `shipping_info` khỏi `GD0-TOOLS` nhưng spec 03 Phase 4 vẫn frozen ở "3 read-tool"
+- **Origin:** audit kickoff persona (2026-07-20) — 4 patch L1 `docs/ROADMAP.md`
+- **Discovered:** 2026-07-20
+- **Severity:** low (chưa chạm được — spec 03 Phase 4 BLOCKED chờ PRE-002; hỏng khi unblock)
+- **Status:** OPEN
+- **Detail:** Theo D7 (phân tầng theo HÌNH DẠNG DỮ LIỆU), intent 4/5/6 chuyển sang `lookup_size`/`lookup_shipping` đọc JSONB trên `shop_profile` ⇒ `shipping_info` không còn intent GĐ0 nào dùng. `docs/ROADMAP.md` §4.1 đã gỡ, `GD0-TOOLS` còn 2 tool (`product_info`, `account_lookup`).
+  Nhưng `docs/tasks/03-Task-GD0-AcceptanceBackfill.md` **frozen** vẫn khai 3 tool ở 5 chỗ, gồm Phase 4 block: `GOAL: 3 read-tool mới trong registry: shipping_info(order_id), product_info(...), account_lookup(...)`.
+  ⇒ Khi PRE-002 unblock, executor đọc spec (L2) sẽ build đúng cái L1 vừa bỏ. Không có gate nào bắt được: spec frozen là nguồn thật của executor, và L1 nằm NGOÀI vùng diff-bound có chủ ý (§5 CLAUDE.md).
+- **Cố ý KHÔNG sửa:** `tools/ohana_read.py:13` docstring và `docs/memory/SHIPPED-SURFACE.md:96` mô tả **danh sách endpoint PRE-002 của Tân** — danh sách đó không đổi chỉ vì ta thôi dùng một cái. `docs/tasks/01-*.md` (DONE) và `docs/archive/*` là lịch sử, giữ nguyên.
+- **Action:** khi PRE-002 unblock — TRƯỚC khi chạy spec 03 Phase 4, đối chiếu L1 §4.1 với Phase 4 block; hoặc sửa spec xuống 2 tool (cần Wyatt duyệt tường minh — sửa spec frozen ngoài `adp-checkpoint.sh`), hoặc phục hồi `shipping_info` vào L1 nếu API Tân có thứ `lookup_shipping` không thay được.
+
+---
+
+### ISSUE-022 — Cap 2000 ký tự cho persona là con số ĐẶT TẠM, chưa đo
+- **Origin:** audit kickoff persona (2026-07-20) — §4.2 brief để mở "ngân sách token persona"
+- **Discovered:** 2026-07-20
+- **Severity:** low
+- **Status:** OPEN (chờ đo)
+- **Detail:** `GD0-SHOPS` acceptance vừa chốt `persona ≤ 2000 ký tự (≈600 token)`. Con số này **suy ra từ ước lượng, không từ đo đạc**: prompt hôm nay ~134 token (`api/chat.py`), tỉ lệ ký tự→token tiếng Việt lấy xấp xỉ 3.3. Chưa ai đo token thật của tiếng Việt có dấu trên tokenizer Llama-3.3, và chưa ai đo persona thật dài bao nhiêu vì **chưa có shop nào**.
+  Đặt số để có ràng buộc cứng ngay từ migration đầu (nới cột sau rẻ, siết lại sau khi UI đã bind thì đắt) — không phải vì tin nó đúng.
+- **Cùng họ với ISSUE-015** (ngưỡng `min 100 chars` wiki ingest cũng là phỏng đoán chưa có dữ liệu).
+- **Action:** khi có ≥3 shop pilot viết persona thật — đo (a) độ dài thực tế, (b) token thật qua tokenizer, (c) `token_cached` mà `api/chat.py` đang log. Rồi chốt số chính thức hoặc bỏ cap nếu thực tế không ai chạm ngưỡng. Cho tới lúc đó **đừng trích 2000 như một quyết định đã ký**.
 
 ## Waivers / trade-offs
 
