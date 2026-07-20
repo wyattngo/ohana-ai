@@ -143,7 +143,7 @@ _Empty. Log ở đây khi port drnickv4 phát hiện bug nhưng defer fix per sp
 - **Origin:** phát hiện lúc chạy GATE_FULL của spec 08 E0 (không phải do E0 gây ra)
 - **Discovered:** 2026-07-19 · session spec-08-E0
 - **Severity:** medium (CI đỏ, không phải bug runtime)
-- **Status:** ✅ RESOLVED 2026-07-19 — commit "fix(ci): pin ruff…" (action 1+2+3). Action 4 (rà phase DONE cũ) vẫn OPEN, xem cuối entry.
+- **Status:** ✅ RESOLVED — action 1+2+3 (2026-07-19, pin ruff) · action 4 ĐÓNG bằng WAIVER-001 / DEC-OHANA-04 (2026-07-20) · **action 6 XONG 2026-07-20: pin toàn bộ 16 runtime dep.** Đo trước khi pin: 4 đã qua đổi MAJOR — `openai` 1.30→2.45 (SDK của cả TogetherClient lẫn TogetherEmbedder), `pypdf` 4→6.14, `redis` 5→8.0, `sse-starlette` 2.1→3.4. Version pin = đúng thứ CI run 29709797545 chạy xanh đủ 11 step. Toàn bộ toolchain (4 dev + 16 runtime) giờ pin cứng.
 
 - **🔴 BẰNG CHỨNG CI THẬT (2026-07-20, sau khi GitHub Actions hồi phục) — action 4 ĐÓNG, và kết quả tệ hơn ước lượng local:**
 
