@@ -240,7 +240,8 @@ REVIEW: PASS ref=docs/reviews/11-S1-auto-verdict.json human=docs/reviews/11-S1-h
 ### Phase S2 — `lookup_size` / `lookup_shipping` + `build_persona_prompt`
 
 <!-- ADP:PHASE S2 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=7a7c673, gate_exit=0, duration=14s, review=PASS(judge=APPROVE,model=claude-haiku-4-5-20251001,bound=cad3452061c0,tier=medium), smoke=PASS(bound=cad3452061c0), ran=2026-07-21T00:06
 ROADMAP: GD0-SHOPS
 GOAL: `lookup_size(160,50)=="M"` assert được không cần LLM; thiếu data ⇒ `not_found` TƯỜNG MINH (không rỗng, không None); cả hai tool scope `shop_id` từ handler-arg, KHÔNG từ `parameters`; `build_persona_prompt` cap cứng và không bao giờ nhả chuỗi "Ohana".
 APPROACH: `tools/shop_kb.py` theo shape `tools/wiki.build_tool`. `ToolHandler` nhận `(user_id, shop_id, args)` và `shop_id` KHÔNG được có trong `parameters` — đó là lý do LLM không chĩa tool sang shop khác được; giữ nguyên bất biến đó. `not_found` là giá trị trả về TƯỜNG MINH (`{"success": True, "result": "not_found"}` chứ không phải `success: False`) — thiếu data là câu trả lời hợp lệ, không phải lỗi hệ thống; nhầm hai cái này làm confidence gate đọc sai tín hiệu. `build_persona_prompt` là hàm THUẦN (profile → str), không chạm DB, không chạm LLM — để test được bằng assertion tất định.
