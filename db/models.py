@@ -18,10 +18,13 @@ from decimal import Decimal
 from typing import Any
 
 from pgvector.sqlalchemy import Vector
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import (
     BigInteger,
+    CheckConstraint,
     DateTime,
     Float,
+    ForeignKey,
     ForeignKeyConstraint,
     Index,
     Numeric,
@@ -32,6 +35,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
+from agent.persona import PERSONA_MAX_CHARS
 from app.config import EMBED_DIM
 
 # Alias, KHÔNG phải bản sao — mọi chỗ trong file này vẫn đọc `_EMBED_DIM` như trước, nhưng giá
@@ -300,5 +304,104 @@ class PendingReply(Base):
             ["shop_id", "customer_id"],
             ["customers.shop_id", "customers.id"],
             name="fk_pending_reply_customer_same_shop",
+        ),
+    )
+
+
+# =====================================================================================
+# Spec 11 S0 — `shops` là BẢNG CHA đầu tiên của `shop_id`.
+#
+# Trước nó, `shop_id` là Text trần ở mọi bảng và không FK về đâu: một JWT hợp lệ mang
+# `shop_id` là chuỗi BẤT KỲ và mọi tầng dưới đều tin. Composite FK của spec 06/10 chặn
+# được row shop A trỏ row shop B, nhưng KHÔNG chặn được một shop chưa từng tồn tại.
+# =====================================================================================
+
+
+class SizeRule(BaseModel):
+    """Một dòng bảng size. Khoảng ĐÓNG hai đầu — biên là chỗ seller hay hiểu nhầm nhất."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    size: str
+    height_min_cm: int
+    height_max_cm: int
+    weight_min_kg: int
+    weight_max_kg: int
+
+
+class ShippingZone(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    zone: str
+    fee_vnd: int
+    eta_days: int
+
+
+class ShopKnowledge(BaseModel):
+    """Fact CÓ CẤU TRÚC của shop — đi hàm tra cứu tất định, KHÔNG đi RAG (D8/D9).
+
+    Validate lúc **GHI** (`ShopProfileRepo.upsert`), không phải lúc đọc. Validate lúc đọc
+    là hoãn lỗi tới thời điểm đắt nhất: `lookup_size` nổ ở production, trên dữ liệu một
+    shop thật, giữa cuộc trò chuyện với khách.
+
+    `extra="forbid"` là phần có ý nghĩa nhất ở đây, không phải sự khắt khe thừa: seller gõ
+    `size_charts` (thừa `s`) mà model lặng lẽ bỏ qua ⇒ họ thấy "lưu thành công" rồi
+    `lookup_size` trả `not_found` mãi mãi, và không có gì trên màn hình giải thích vì sao.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    size_chart: list[SizeRule] = []
+    shipping_zones: list[ShippingZone] = []
+
+
+class Shop(Base):
+    """Một shop có thật. `id` do onboard sinh (spec 11 S1), KHÔNG do client tự khai."""
+
+    __tablename__ = "shops"
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="active")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class ShopProfile(Base):
+    """Persona (văn xuôi → prompt) + knowledge (JSONB → lookup tất định) của một shop.
+
+    **`shop_id` vừa là PK vừa là FK ⇒ đúng MỘT profile mỗi shop.** Nếu sau này cần
+    versioning thì đó là bảng khác, KHÔNG phải nới PK này: hai profile "đang hoạt động"
+    cho một shop nghĩa là không ai biết AI đang nói bằng giọng nào.
+
+    **`published_at NULL` = chưa phát hành** (PRE-1102, Wyatt ký 2026-07-20). Cố ý KHÔNG có
+    `profile_status`/`approved_by`/`approved_at`: chưa có người duyệt thứ hai nào tồn tại,
+    nên một cột tên "approved" sẽ dựng tên cho một quy trình không có thật — và về sau sẽ
+    có người đọc nó như bằng chứng đã qua kiểm duyệt. Khi Ohana review thật land thì thêm
+    cột lúc đó, kèm role + queue + UI.
+
+    **Cap `persona_md` sống ở CHECK constraint**, không chỉ ở Pydantic: Pydantic bảo vệ
+    đường ứng dụng, CHECK bảo vệ mọi đường còn lại (psql tay, script seed, data-fix). Ngân
+    sách token là ràng buộc của hệ thống, không nên phụ thuộc việc người ghi có nhớ dùng
+    repo hay không.
+    """
+
+    __tablename__ = "shop_profile"
+
+    shop_id: Mapped[str] = mapped_column(
+        Text, ForeignKey("shops.id", name="fk_shop_profile_shop"), primary_key=True
+    )
+    persona_md: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    knowledge: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False, server_default="{}")
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            f"char_length(persona_md) <= {PERSONA_MAX_CHARS}",
+            name="ck_shop_profile_persona_len",
         ),
     )

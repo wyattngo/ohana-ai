@@ -26,7 +26,8 @@ from sqlalchemy import select, update
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.models import Conversation, Message, PendingReply
+from agent.persona import PERSONA_MAX_CHARS
+from db.models import Conversation, Message, PendingReply, ShopKnowledge, ShopProfile
 
 # Khai tường minh thay vì nhận string tuỳ ý: `role` sai chính tả (vd "Assistant") sẽ làm
 # `last_n` trả đúng row nhưng LLM đọc sai vai — hỏng âm thầm, không exception nào.
@@ -223,3 +224,66 @@ class MessageRepo:
         rows = list((await self._session.execute(stmt)).scalars().all())
         rows.reverse()
         return rows
+
+
+class ShopProfileRepo:
+    """Shop-scoped access to `shop_profile` (spec 11 Phase S0).
+
+    **Validate `knowledge` ở ĐÂY, không ở tầng API.** Đặt ở repo nghĩa là MỌI đường ghi đều
+    đi qua nó — endpoint admin, script seed, test, data-fix. Đặt ở API thì mọi đường còn lại
+    đều là lỗ, và cái lọt qua sẽ không nổ lúc ghi mà nổ lúc `lookup_size` chạy: ở production,
+    trên dữ liệu một shop thật, giữa cuộc trò chuyện với khách.
+
+    **Cap `persona_md` kiểm ở đây LẪN ở CHECK constraint.** Không thừa: lớp này cho thông
+    báo lỗi người đọc được, CHECK là thứ raw SQL không lách được. Ngân sách token là ràng
+    buộc của hệ thống, nó không nên phụ thuộc vào việc người ghi có nhớ dùng repo hay không.
+    """
+
+    def __init__(self, session: AsyncSession, *, shop_scope: str) -> None:
+        if not shop_scope:
+            raise ValueError("shop_scope is required — no default, no cross-tenant surface")
+        self._session = session
+        self._shop_scope = shop_scope
+
+    async def get(self) -> ShopProfile | None:
+        """Profile của THIS shop, hoặc None.
+
+        Profile của shop khác trả **None**, KHÔNG raise — raise sẽ phân biệt được "không
+        tồn tại" với "tồn tại nhưng của shop khác", tức rò rỉ chính sự TỒN TẠI của dữ liệu
+        shop khác. Cùng hình dạng `PendingReplyRepo.get`.
+        """
+        stmt = select(ShopProfile).where(ShopProfile.shop_id == self._shop_scope)
+        return (await self._session.execute(stmt)).scalar_one_or_none()
+
+    async def upsert(
+        self,
+        *,
+        persona_md: str,
+        knowledge: dict[str, Any],
+        published_at: datetime | None = None,
+    ) -> ShopProfile:
+        """Ghi/đè profile. `shop_id` BAKED từ scope repo — caller KHÔNG truyền.
+
+        Không có tham số `shop_id` nghĩa là không có tham số nào để bẻ: caller lỗi hoặc bị
+        chiếm quyền vẫn không ghi được sang shop khác. FK về `shops.id` là lớp thứ hai —
+        Postgres từ chối nếu shop không tồn tại.
+
+        `knowledge` đi qua `ShopKnowledge.model_validate` (extra="forbid") TRƯỚC khi chạm
+        DB. Field lạ bị TỪ CHỐI chứ không bỏ qua im lặng: seller gõ `size_charts` thừa `s`
+        mà bị nuốt ⇒ họ thấy "lưu thành công" rồi `lookup_size` trả `not_found` mãi mãi.
+        """
+        if len(persona_md) > PERSONA_MAX_CHARS:
+            raise ValueError(f"persona_md {len(persona_md)} ký tự, vượt cap {PERSONA_MAX_CHARS}")
+        # Validate rồi ghi lại dạng đã chuẩn hoá — KHÔNG ghi dict thô của caller.
+        validated = ShopKnowledge.model_validate(knowledge)
+
+        row = await self.get()
+        if row is None:
+            row = ShopProfile(shop_id=self._shop_scope)
+            self._session.add(row)
+        row.persona_md = persona_md
+        row.knowledge = validated.model_dump()
+        if published_at is not None:
+            row.published_at = published_at
+        await self._session.commit()
+        return row

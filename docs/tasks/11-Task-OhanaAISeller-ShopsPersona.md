@@ -185,7 +185,7 @@ PRE-1104: Có shop nào đang chạy thật không (quyết định backfill).
 ### Phase S0 — Schema `shops` + `shop_profile` + validate JSONB lúc ghi
 
 <!-- ADP:PHASE S0 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 ROADMAP: GD0-SHOPS
 GOAL: `shops` + `shop_profile` tồn tại với composite FK; Postgres TỪ CHỐI profile trỏ shop không tồn tại; `knowledge` JSONB lệch shape bị Pydantic chặn ở đường GHI (không phải đường đọc); migration up→down→up sạch trên Postgres thật.
 APPROACH: `Shop(id, name, status, created_at)` + `UniqueConstraint(id)` sẵn có qua PK; `ShopProfile` FK về `shops.id`. Persona theo PRE-1101 (1 cột hay 7 — CHỜ KÝ, không code trước khi có). `knowledge` JSONB validate bằng Pydantic model TẠI `ShopProfileRepo.upsert()` — đặt ở tầng repo chứ không ở API để mọi đường ghi đều đi qua, kể cả script/test. Cap persona kiểm ở CẢ Pydantic LẪN constraint DB: Pydantic cho thông báo lỗi tử tế, DB là thứ không ai bypass được.
@@ -194,8 +194,9 @@ GATE: .venv/bin/python -m pytest tests/test_shops_persona.py -x -q
 GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && .venv/bin/mypy app agent retrieval parsing storage db bridge tools api auth && .venv/bin/ruff check . --no-cache && .venv/bin/ruff format --check . --no-cache
 RETRY: 0/3
 RISK: medium (ĐỀ XUẤT — Wyatt ký. Floor: `db/migrations`. Không đề xuất high: bảng MỚI, không backfill, không đổi hành vi gửi/tiền. Nếu PRE-1104 trả > 0 ⇒ nâng high.)
-BLOCKED_BY: PRE-1101 ✅ ký · PRE-1102 ✅ ký · PRE-1104 ✅ đo (0 row) · PRE-1103 kiểm lúc execute
-SMOKE:
+BLOCKED_BY: PRE-1101 ✅ ký · PRE-1102 ✅ ký · PRE-1104 ✅ đo (0 row) · PRE-1103 ✅ kiểm (đĩa=0006 ⇒ lấy 0007)
+SMOKE: PASS ref=docs/smokes/11-S0.md
+REVIEW: PASS ref=docs/reviews/11-S0-auto-verdict.json
 <!-- /ADP -->
 
 1. Test (**RED trước**): (a) FK từ chối profile trỏ shop không tồn tại; (b) `knowledge` lệch shape bị từ chối lúc GHI; (c) persona vượt cap bị từ chối; (d) `ShopProfileRepo(shop_scope='A')` không đọc được profile shop B (trả None, không raise); (e) migration up→down→up.

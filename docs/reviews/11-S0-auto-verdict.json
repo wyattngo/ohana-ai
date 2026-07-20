@@ -1,0 +1,20 @@
+{
+  "verdict": "APPROVE",
+  "model": "claude-haiku-4-5-20251001",
+  "summary": "Phase S0 dựng shops + shop_profile với validate hai tầng và an toàn multi-tenant. knowledge validate ở tầng repo (mọi đường ghi), extra=forbid trên cả 3 model, cap persona ở cả repo lẫn CHECK constraint, cross-shop trả None không raise, upsert không nhận shop_id. Migration 0007 verify up/down/up trên Postgres thật; schema khớp đúng PRE-1101 (1 cột persona_md) và PRE-1102 (published_at). Không thêm FK embeddings→shops. Không import vòng.",
+  "findings": [],
+  "checks": {
+    "validate_at_write": "pass",
+    "extra_forbid": "pass",
+    "cap_two_layers": "pass",
+    "cross_shop_none": "pass",
+    "no_shop_id_param": "pass",
+    "migration_correct": "pass",
+    "matches_signed_pre": "pass",
+    "tests_prove_claims": "pass",
+    "allowed_files": "pass",
+    "no_circular_import": "pass"
+  },
+  "diff_sha256": "03284d3acd9f3b52f4aafb5154668bbcf659c58110debc928575760b6a47ac8b",
+  "stamped_at": "2026-07-20T22:02"
+}
