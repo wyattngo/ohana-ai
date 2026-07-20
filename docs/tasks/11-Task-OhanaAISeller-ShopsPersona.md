@@ -185,7 +185,8 @@ PRE-1104: Có shop nào đang chạy thật không (quyết định backfill).
 ### Phase S0 — Schema `shops` + `shop_profile` + validate JSONB lúc ghi
 
 <!-- ADP:PHASE S0 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=8a087c8, gate_exit=0, duration=20s, review=PASS(judge=APPROVE,model=claude-haiku-4-5-20251001,bound=03284d3acd9f,tier=medium), smoke=PASS(bound=03284d3acd9f), ran=2026-07-20T22:10
 ROADMAP: GD0-SHOPS
 GOAL: `shops` + `shop_profile` tồn tại với composite FK; Postgres TỪ CHỐI profile trỏ shop không tồn tại; `knowledge` JSONB lệch shape bị Pydantic chặn ở đường GHI (không phải đường đọc); migration up→down→up sạch trên Postgres thật.
 APPROACH: `Shop(id, name, status, created_at)` + `UniqueConstraint(id)` sẵn có qua PK; `ShopProfile` FK về `shops.id`. Persona theo PRE-1101 (1 cột hay 7 — CHỜ KÝ, không code trước khi có). `knowledge` JSONB validate bằng Pydantic model TẠI `ShopProfileRepo.upsert()` — đặt ở tầng repo chứ không ở API để mọi đường ghi đều đi qua, kể cả script/test. Cap persona kiểm ở CẢ Pydantic LẪN constraint DB: Pydantic cho thông báo lỗi tử tế, DB là thứ không ai bypass được.
