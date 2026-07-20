@@ -54,19 +54,51 @@ class Message(Base):
     `shop_id` is the tenant scope — never derived from client input, always from a verified
     JWT (auth.identity.verify_token). Cross-shop reads MUST include `WHERE shop_id = :scope`
     at the SQL level; post-filter is an R1.22 breach.
+
+    **Append-only log, KHÔNG phải hàng đợi gửi.** Ghi vào đây nghĩa là "việc này đã xảy ra",
+    không phải "hãy gửi cái này". Đường duy nhất tới khách đi qua `agent/policy_gate.py`;
+    drain bảng này để gửi là bypass gate.
+
+    **Composite FK, không phải FK đơn (spec 10 H0).** Trước H0, bảng này là entity DUY NHẤT
+    trong repo không có FK nào — spec 06 F0 gắn composite FK cho `Conversation`/`OrderDraft`/
+    `PendingReply` rồi bỏ sót `Message`. Hệ quả không phải thẩm mỹ: không có `conversation_id`
+    thì câu "load last-N của conversation này" KHÔNG viết được, và AI không phân giải nổi đại
+    từ ở lượt thứ hai ("cái áo đó còn size M không").
+    Lý do phải COMPOSITE giống hệt `Conversation`: `FK (conversation_id) → conversations(id)`
+    chỉ khẳng định conversation TỒN TẠI, nên nó cho phép message của shop A trỏ conversation
+    của shop B. Dạng composite ghim row được tham chiếu vào CÙNG shop, và Postgres tự từ chối
+    thay vì trông chờ code review bắt được.
+    Gate: tests/test_message_history.py::test_cross_shop_message_rejected_by_database.
     """
 
     __tablename__ = "messages"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     shop_id: Mapped[str] = mapped_column(Text, nullable=False)
+    conversation_id: Mapped[str] = mapped_column(Text, nullable=False)
+    customer_id: Mapped[str] = mapped_column(Text, nullable=False)
     role: Mapped[str] = mapped_column(Text, nullable=False)  # user | assistant | seller | system
     content: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
-    __table_args__ = (Index("idx_msg_shop_created", "shop_id", "created_at"),)
+    __table_args__ = (
+        Index("idx_msg_shop_created", "shop_id", "created_at"),
+        # Index thứ hai, KHÔNG thay thế cái trên: cái cũ phục vụ truy vấn theo shop, cái này
+        # phục vụ đường đọc history của H2 (`last-N của conversation này`).
+        Index("idx_msg_shop_conv_created", "shop_id", "conversation_id", "created_at"),
+        ForeignKeyConstraint(
+            ["shop_id", "conversation_id"],
+            ["conversations.shop_id", "conversations.id"],
+            name="fk_messages_conversation_same_shop",
+        ),
+        ForeignKeyConstraint(
+            ["shop_id", "customer_id"],
+            ["customers.shop_id", "customers.id"],
+            name="fk_messages_customer_same_shop",
+        ),
+    )
 
 
 class Embedding(Base):

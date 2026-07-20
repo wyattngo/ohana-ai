@@ -145,17 +145,18 @@ PRE-1005: `role` khi seller sửa draft rồi gửi — Wyatt chốt.
 ### Phase H0 — Schema: `Message` gắn conversation + composite FK
 
 <!-- ADP:PHASE H0 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 ROADMAP: GD0-HISTORY
 GOAL: `messages` có `conversation_id`/`customer_id` NOT NULL + 2 composite FK; Postgres TỪ CHỐI message trỏ conversation của shop khác (test chứng minh bằng `IntegrityError`, không bằng đọc code); index `(shop_id, conversation_id, created_at)` tồn tại; migration up→down→up sạch.
 APPROACH: Đúng shape composite FK mà spec 06 F0 đã áp cho `Conversation`/`OrderDraft`/`PendingReply` — `ForeignKeyConstraint(["shop_id","conversation_id"], ["conversations.shop_id","conversations.id"])`. Lý do phải composite chứ không FK đơn đã viết sẵn trong docstring `PendingReply`: FK đơn chỉ đòi id TỒN TẠI, không đòi cùng shop, nên nó cho phép message của shop A trỏ conversation shop B và Postgres im lặng chấp nhận. Thêm `customer_id` luôn (cùng migration) để đối xứng với `PendingReply` và để truy vấn "mọi message của khách này xuyên conversation" không phải join. Index mới đặt cạnh `idx_msg_shop_created` chứ không thay nó — cái cũ phục vụ truy vấn theo shop, cái mới phục vụ đọc history.
-ALLOWED_FILES: db/models.py, db/migrations/versions/, tests/test_message_history.py, docs/tasks/03-Task-GD0-AcceptanceBackfill.md, docs/tasks/10-Task-OhanaAISeller-ConversationHistory.md, docs/reviews/, docs/smokes/
+ALLOWED_FILES: db/models.py, db/migrations/versions/, tests/test_message_history.py, tests/test_tenant_isolation.py, docs/smokes/, docs/reviews/, docs/tasks/03-Task-GD0-AcceptanceBackfill.md, docs/tasks/10-Task-OhanaAISeller-ConversationHistory.md, docs/reviews/, docs/smokes/
 GATE: .venv/bin/python -m pytest tests/test_message_history.py -x -q
 GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && .venv/bin/mypy app agent retrieval parsing storage db bridge tools && .venv/bin/ruff check . --no-cache && .venv/bin/ruff format --check . --no-cache
 RETRY: 0/3
 RISK: medium (KÝ: Wyatt 2026-07-20. Floor rule: ALLOWED_FILES giao RISK_PATHS ở `db/migrations`. KHÔNG đề xuất high: thêm cột + FK, không đổi hành vi tiền/gửi; reversible thật; bảng rỗng theo PRE-1002. Nếu PRE-1002 trả > 0 row ⇒ nâng lên high, vì lúc đó có backfill trên dữ liệu thật.)
-BLOCKED_BY: PRE-1001 (PRE-1002 ✅ đo 2026-07-20 = 0 row)
-SMOKE:
+BLOCKED_BY: PRE-1001 ✅ (dịch spec 03 → 0007/0008/0009), PRE-1002 ✅ (đo 2026-07-20 = 0 row)
+SMOKE: PASS ref=docs/smokes/10-H0.md
+REVIEW: PASS ref=docs/reviews/10-H0-auto-verdict.json
 <!-- /ADP -->
 
 1. `tests/test_message_history.py` (**RED trước**): (a) 2 cột tồn tại + NOT NULL, đọc từ `information_schema`; (b) 2 composite FK tồn tại, đọc từ `pg_constraint`; (c) **cross-tenant bị TỪ CHỐI** — insert message `shop_id='A'` trỏ conversation của shop `B` ⇒ `IntegrityError`; (d) index tồn tại; (e) migration up→down→up sạch.

@@ -41,7 +41,7 @@ async def test_sql_row_scope_isolates_shops() -> None:
     from sqlalchemy import select
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-    from db.models import Base, Message  # step 6 lands these
+    from db.models import Base, Conversation, Customer, Message  # step 6 lands these
 
     engine = create_async_engine(DATABASE_URL, echo=False)
     async with engine.begin() as conn:
@@ -50,8 +50,40 @@ async def test_sql_row_scope_isolates_shops() -> None:
 
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
     async with session_factory() as s:
-        s.add(Message(shop_id="shop_a", role="user", content="from shop a — private"))
-        s.add(Message(shop_id="shop_b", role="user", content="from shop b — private"))
+        # Spec 10 H0 làm `conversation_id`/`customer_id` thành NOT NULL + composite FK, nên
+        # `Message` không còn dựng trần được nữa — phải có parent thật cho từng shop. Đây là
+        # thay đổi ĐÚNG hướng: message mồ côi (không thuộc conversation nào) chính là thứ
+        # khiến "load last-N của conversation" vô nghĩa. Test vẫn kiểm đúng một điều như cũ —
+        # WHERE shop_id lọc sạch cross-shop — chỉ là giờ nó chạy trên dữ liệu hợp lệ.
+        # Flush theo TỪNG TẦNG, không gộp: unit-of-work của SQLAlchemy không suy ra được
+        # thứ tự từ composite FK khai trong `__table_args__`, nên gộp một flush sẽ đẩy
+        # `conversations` đi trước `customers` và Postgres từ chối. customers → conversations
+        # → messages, mỗi tầng một flush.
+        for shop in ("shop_a", "shop_b"):
+            s.add(Customer(id=f"cus_{shop}", shop_id=shop, channel="zalo", external_id=shop))
+        await s.flush()
+
+        for shop in ("shop_a", "shop_b"):
+            s.add(
+                Conversation(
+                    id=f"conv_{shop}", shop_id=shop, customer_id=f"cus_{shop}", channel="zalo"
+                )
+            )
+        await s.flush()
+
+        for shop, body in (
+            ("shop_a", "from shop a — private"),
+            ("shop_b", "from shop b — private"),
+        ):
+            s.add(
+                Message(
+                    shop_id=shop,
+                    conversation_id=f"conv_{shop}",
+                    customer_id=f"cus_{shop}",
+                    role="user",
+                    content=body,
+                )
+            )
         await s.commit()
 
     async with session_factory() as s:

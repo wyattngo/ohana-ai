@@ -1,0 +1,17 @@
+{
+  "verdict": "APPROVE",
+  "model": "claude-haiku-4-5-20251001",
+  "summary": "Phase H0 schema changes are correct: composite FKs enforce tenant isolation at DB level, tests prove cross-tenant rejection via IntegrityError with a same-shop control, migration is safe (0 rows confirmed), both old and new indexes preserved, files within ALLOWED_FILES, test_tenant_isolation.py updated without weakening assertions.",
+  "findings": [],
+  "checks": {
+    "composite_fk": "pass",
+    "cross_tenant_proof": "pass",
+    "migration_safety": "pass",
+    "index_preserved": "pass",
+    "allowed_files": "pass",
+    "no_weakened_tests": "pass",
+    "no_send_path_change": "pass"
+  },
+  "diff_sha256": "31d5d34fc39c0dceeff08665cc9e6bebaaff7430504b142ae65821af48e54ed6",
+  "stamped_at": "2026-07-20T12:24"
+}
