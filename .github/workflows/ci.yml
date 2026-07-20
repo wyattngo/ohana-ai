@@ -75,17 +75,17 @@ jobs:
       # follow-imports, so this does not change what is checked — it pins the intent so a
       # future import-graph change cannot silently drop them.
       #
-      # `api` added 2026-07-20 (ISSUE-024 follow-up). Lý do loại nó trước đây — "10
+      # `api` + `auth` added 2026-07-20 (ISSUE-024 follow-up) ⇒ scope giờ là TOÀN BỘ code
+      # sản phẩm, không còn thư mục nào bị loại. Lý do loại chúng trước đây — "10
       # pre-existing FastAPI Depends typing errors" — ĐÃ HẾT ĐÚNG: đo thật ra 0 lỗi, các
       # lỗi đó được vá dần trong spec 04–07 mà không ai gỡ dòng loại trừ. Một exclusion
       # sống lâu hơn lý do của nó chính là cách ISSUE-024 tồn tại được: `api/webhook.py`
       # giữ một Protocol lệch suốt mà không gate nào có cơ hội nhìn thấy.
       #
-      # `auth` VẪN OUT — nhưng chỉ vì chưa ai yêu cầu, KHÔNG phải vì nó bẩn: đo cùng lúc
-      # cũng ra 0 lỗi (49 file). Thêm nó là một dòng. Đừng trích dòng này như bằng chứng
-      # rằng auth/ có vấn đề.
+      # ⚠️ Không còn exclusion nào ⇒ **đừng thêm lại mà không kèm điều kiện gỡ**. Thư mục
+      # mới bị loại "tạm thời" sẽ ở ngoài vĩnh viễn, vì không ai nhớ quay lại đo.
       - name: Mypy (strict)
-        run: mypy app agent retrieval parsing storage db bridge tools api
+        run: mypy app agent retrieval parsing storage db bridge tools api auth
 
       - name: DB migrate (empty tree at Phase 1.3 — first migration lands at Phase 2)
         run: alembic upgrade head

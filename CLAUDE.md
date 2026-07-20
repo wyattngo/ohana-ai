@@ -20,7 +20,7 @@ pytest -q                   # default gate — live test bị loại (addopts: -
 pytest -q -x                # GATE_RUNNER của ADP, dừng ở lỗi đầu
 ruff check . --no-cache     # lint (E,F,I,B,UP,S — gồm bandit S). --no-cache BẮT BUỘC: xem §4
 ruff format --check . --no-cache
-mypy app agent retrieval parsing storage db bridge tools api   # strict; api/ vào scope 2026-07-20, auth/ còn OUT
+mypy app agent retrieval parsing storage db bridge tools api auth   # strict; TOÀN BỘ code sản phẩm, không loại thư mục nào
 alembic upgrade head        # cần DATABASE_URL trỏ Postgres+pgvector
 
 # Live smoke — real net, nondeterministic, KHÔNG chạy trong CI. Chạy tay khi đổi model/endpoint:
@@ -145,8 +145,9 @@ Bất biến bảo mật. `.claude/hooks/guardrail.py` chặn cơ học **một 
   Kết quả: `api/` có `chat.py`/`inbox.py`/`admin.py`/`webhook.py` với `shop_id` chạy qua mà
   không gate nào nhìn. ISSUE-024 (Protocol `_Drafter` lệch) sống được chính nhờ khoảng mù đó
   — cộng thêm một `# type: ignore` dán đúng lên dòng Protocol. Đo lại 2026-07-20: `api/` 0 lỗi,
-  `auth/` cũng 0 lỗi. `api/` đã vào scope; `auth/` còn ngoài **chỉ vì chưa ai yêu cầu**.
+  `auth/` cũng 0 lỗi. **Cả hai đã vào scope 2026-07-20 ⇒ không còn thư mục nào bị loại.**
   ⇒ Khi viết một exclusion, viết luôn điều kiện gỡ nó. Không có điều kiện thì nó là vĩnh viễn.
+  ⇒ Và giờ scope đã đầy: thêm lại bất kỳ exclusion nào PHẢI kèm điều kiện gỡ đo được.
 - **Embedding dim là BREAKING — đã swap sang e5 (spec 08, 2026-07-19).** Nguồn sự thật DUY NHẤT là `app/config.EMBED_DIM = 1024`; `db/models._EMBED_DIM` và `api/admin._DEV_EMBED_DIM` là **alias import**, không phải bản sao. Trước spec 08 chúng là ba số `1536` viết cứng kèm comment "must match" — comment là lời nhắc cho người, và nó đã không giữ được lời hứa.
   Đổi `EMBED_DIM` ⇒ **BẮT BUỘC** Alembic migration đổi cột + re-embed corpus. `0004` là migration destructive có chủ ý: `DELETE FROM embeddings` rồi `ALTER TYPE`. Nó có guard cơ học `_SAFE_ROW_THRESHOLD = 10` — vượt ngưỡng thì RAISE, mở bằng `OHANA_ALLOW_EMBEDDING_WIPE=1`. **`downgrade` CŨNG xoá**: reversible về schema, KHÔNG về dữ liệu.
 - **e5 bất đối xứng — prefix là việc của ADAPTER, không phải call-site.** `Embedder` ABC có `embed_query`/`embed_documents` (concrete delegate, KHÔNG abstract — thêm abstract sẽ phá mọi impl cũ). `TogetherEmbedder` override cả hai để gắn `query: `/`passage: `; `OpenAIEmbedder` không cần prefix nên dùng default. Call-site chỉ khai *ý định*: `tools/wiki.py` → query, `parsing/ingest.py` → passage.
@@ -202,7 +203,7 @@ CHECKPOINT_PREFIX: adp
 
 - ✅ **DONE:** Spec 01 (GĐ0 backend) · 02 (bootstrap) · 04 (GĐ0.5 UI) · 05 (config/embedder) · 06 (foundation) · 07 (General Chat — chạy THẬT end-to-end) · 08 (embedder swap → Together e5 1024-dim, 3/3) · 09 (unique constraint chặn race Conversation, 1/1 — đóng ISSUE-017) · **10 (conversation history — ghi + đọc `Message`, last-N vào `Drafter`, 3/3)**.
 - ⏳ Spec 03 (acceptance backfill, 0/10, 4 BLOCKED chờ Tân) — migration đã dịch **ba lần** sang `0007`/`0008`/`0009` (spec 08 lấy `0004`, spec 09 lấy `0005`, spec 10 lấy `0006`). Số cấp theo thứ tự LAND, không theo thứ tự lập kế hoạch. ⚠️ §8 của spec 03 từng lệch với §Files của chính nó (hai lớp số khác nhau) — đồng bộ 2026-07-20; xem ISSUE-021.
-- **Gate hiện tại:** pytest xanh (`-m 'not live'`, **154 test**, 6 live deselected) · ruff sạch (`--no-cache`) · mypy 0 lỗi / **47 file** (api/ vào scope 2026-07-20).
+- **Gate hiện tại:** pytest xanh (`-m 'not live'`, **154 test**, 6 live deselected) · ruff sạch (`--no-cache`) · mypy 0 lỗi / **49 file** — scope = toàn bộ code sản phẩm, không loại thư mục nào (2026-07-20).
 - **Live (chạy tay, ngoài CI):** `test_together_live.py` 2 · `test_wiki_rag_live.py` 4 — cả 6 PASS 2026-07-19 với key thật.
 - `main` == `origin/main` (`github.com:wyattngo/ohana-ai`). STATE_HASH `87e21549f981` @ spec 10 H2. **CI xanh** (`31b6716`, đủ 11 step).
 - **OPEN:** ISSUE-010 (alerting — `app/alert_service.py` chưa port, 429 không được đếm ở đâu) · ISSUE-018 (blank-env không phủ complex field) · ISSUE-021 (L1 gỡ `shipping_info` nhưng spec 03 Phase 4 frozen vẫn khai 3 read-tool) · ISSUE-022 (cap persona 2000 chưa đo) · ISSUE-023 (cap history 20/4000 chưa đo tokenizer) · ISSUE-024 (`api/webhook.py` khai Protocol `_Drafter` đã lệch — mypy mù vì `type: ignore`).
