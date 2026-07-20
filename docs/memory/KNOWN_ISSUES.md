@@ -291,7 +291,16 @@ Cùng source, cùng binary. Xoá `.ruff_cache` rồi chạy lại lệnh CŨ ⇒
 
 ---
 
-## Waivers / trade-offs (chưa có)
+## Waivers / trade-offs
+
+### WAIVER-001 — EVIDENCE của 22 phase DONE trước khi CI xanh lần đầu
+- **Ký:** Wyatt · 2026-07-20 · toàn văn: `docs/decisions/DEC-OHANA-04-evidence-waiver-pre-ci-green.md`
+- **Gốc:** ISSUE-019. CI chưa từng xanh cho tới `01c2479` (4 xanh / 19 đỏ / 23 run = toàn bộ lịch sử repo).
+- **Waive:** không re-stamp EVIDENCE của 22 phase DONE trước `01c2479`.
+- **KHÔNG waive:** (1) tính đúng của code hiện tại — HEAD `aae835c` qua **đủ 11 step CI** gồm alembic + pytest trên container sạch; (2) quy tắc `--no-cache` + pin từ nay; (3) nghĩa vụ nói thật.
+- **Cách đọc "DONE" cho phase trước `01c2479`:** = *"gate local pass, CI chưa từng xác nhận"*, KHÔNG phải *"đã qua gate thật"*. Ai trích số liệu giai đoạn đó phải kèm câu này.
+- **Phạm vi hỏng rộng hơn lint:** ruff chết ở step 7 ⇒ step 8–11 skip ⇒ **`mypy`, `alembic upgrade`, `pytest` chưa từng chạy trên CI** suốt giai đoạn đó. Bằng chứng test giai đoạn đó là local-only.
+- **Áp cho đúng 22 phase trước `01c2479`** — không phải giấy phép chung.
 
 _Empty. Log ở đây khi Wyatt approve `RISK_WAIVER` để hạ tier dưới floor, hoặc skip test/gate với rationale._
 
