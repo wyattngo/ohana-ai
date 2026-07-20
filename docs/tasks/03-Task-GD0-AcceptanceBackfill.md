@@ -253,10 +253,20 @@ PRE-007/008/009 = NEW cho Spec 03.
 
 ## §7 — Execute Steps (atomic, one-concern, TDD gate RED trước impl)
 
-### Phase 1 — shops table + JWT extension từ real onboard flow
+### Phase 1 — shops table + JWT extension từ real onboard flow — ⛔ CANCELLED (superseded)
+
+> **CANCELLED 2026-07-21 — việc đã LÀM XONG ở `docs/tasks/11-Task-OhanaAISeller-ShopsPersona.md` (S0–S2, DONE).**
+> Phase này viết khi `BLOCKED_BY: PRE-007` còn treo. PRE-007 ACCEPTED 2026-07-19 (Together US
+> serverless), blocker hết hạn, và scope `GD0-SHOPS` được thực thi trong spec 11 — `shops` +
+> `shop_profile` + JWT từ real onboard + `lookup_size`/`lookup_shipping`. Migration land ở `0007`.
+> Giữ block lại thay vì xoá (ADP v2.2): xoá là mất dấu vết vì sao từng có nó, và người đọc spec 03
+> sau này sẽ tưởng `GD0-SHOPS` vẫn đang chờ ai đó làm.
+> ⚠️ `ROADMAP:` bỏ trống có chủ ý — hai phase cùng khai `GD0-SHOPS` sẽ làm L3 map một work item
+> vào hai chủ, đúng kiểu chồng lấn mà `GD0-DRAFTER` (L1 §4.1) vừa ghi ra để tránh.
+
 <!-- ADP:PHASE 1 -->
-STATUS: TODO
-ROADMAP: GD0-SHOPS
+STATUS: CANCELLED
+ROADMAP:
 GOAL: `shops` table tồn tại; onboard flow tạo real shop → JWT include `shop_id` từ verified DB record; test: JWT của shop A không đọc được data shop B (cross-shop rejection).
 APPROACH: Add `Shop` model + Alembic 0007 (xác nhận số lúc execute); extend `auth/identity.py` load `shop_id` từ DB thay stub; onboard endpoint `POST /api/admin/shops` (admin auth); JWT issuance include `shop_id` claim; adversarial test cross-shop.
 ALLOWED_FILES: db/models.py, db/migrations/versions/, auth/identity.py, api/admin.py, tests/test_shops_onboard.py, tests/conftest.py, docs/reviews/, docs/tasks/03-Task-GD0-AcceptanceBackfill.md

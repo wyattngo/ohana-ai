@@ -268,7 +268,7 @@ APPROACH_DEVIATION: KHÔNG register tool trong `app/main.py` (spec bước 2 có
 ### Phase S3 — Đánh dấu spec 03 Phase 1 SUPERSEDED + đóng vòng roadmap
 
 <!-- ADP:PHASE S3 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 ROADMAP: GD0-SHOPS
 GOAL: `03:1` mang `STATUS: CANCELLED` + dòng trỏ sang spec 11; L3 sinh lại không còn map `GD0-SHOPS → 03:1`; L1 §4.1 ghi work item mới cho `Drafter` (§1.3).
 APPROACH: ADP v2.2 quy định phase bị vô hiệu hoá bởi thay đổi kế hoạch ⇒ `CANCELLED`, **KHÔNG xoá** — xoá là mất dấu vết vì sao từng có nó. Ghi kèm lý do blocker hết hạn (PRE-007 ACCEPTED 2026-07-19) để lần sau ai đọc spec 03 không tưởng nó vẫn đang chờ. L1 là tầng NGƯỜI viết (§5 CLAUDE.md) nên bước thêm work item `Drafter` phải do Wyatt duyệt nội dung, không phải máy sinh.
@@ -278,7 +278,8 @@ GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && bash .claude/to
 RETRY: 0/3
 RISK: low (ĐỀ XUẤT — Wyatt ký. ALLOWED_FILES toàn docs, KHÔNG giao RISK_PATHS ⇒ floor rule không kích hoạt. Diff docs-only máy verify được.)
 BLOCKED_BY: S1 DONE, S2 DONE
-SMOKE:
+SMOKE: N/A diff docs-only — không đổi dòng code nào, không có mặt runtime để quan sát. Bằng chứng duy nhất là L3 sinh lại (`GD0-SHOPS` không còn map `03:1`), và đó chính là GATE, máy verify được.
+REVIEW: PASS ref=docs/reviews/11-S3-auto-verdict.json
 <!-- /ADP -->
 
 1. `03:1` → `CANCELLED` + lý do + trỏ spec 11.
