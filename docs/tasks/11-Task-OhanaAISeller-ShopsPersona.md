@@ -208,7 +208,8 @@ REVIEW: PASS ref=docs/reviews/11-S0-auto-verdict.json
 ### Phase S1 — Onboard shop thật → JWT mang `shop_id` đã verify
 
 <!-- ADP:PHASE S1 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=ceddc70, gate_exit=0, duration=20s, review=PASS(judge=APPROVE,model=claude-haiku-4-5-20251001,bound=2d8a11241831,tier=high), smoke=PASS(bound=2d8a11241831), ran=2026-07-20T23:23
 ROADMAP: GD0-SHOPS
 GOAL: `POST /admin/shops` tạo shop thật (admin-only); JWT phát ra mang `shop_id` của một row `shops` TỒN TẠI; JWT khai `shop_id` không có trong `shops` bị TỪ CHỐI; test cross-shop: JWT shop A không đọc được data shop B.
 APPROACH: Onboard endpoint vào `api/admin.py` (đã có `require_admin`). Điểm cốt lõi: `auth/identity.py` thôi tin `shop_id` chỉ vì nó có chữ ký hợp lệ — phải đối chiếu với `shops`. Đây là đổi hành vi của ranh giới tenant, không phải thêm endpoint. `api/mock_auth.py` GIỮ LẠI cho dev nhưng thôi là nguồn `shop_id` duy nhất; fixture shop của nó phải được seed vào `shops` khi `OHANA_ENV=dev`, nếu không dev env vỡ im lặng.
