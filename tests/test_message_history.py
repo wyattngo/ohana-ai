@@ -238,7 +238,9 @@ class _FakeDrafter:
     intent: str = "product_info"
     confidence: float = 0.95
 
-    async def draft(self, *, shop_id: str, customer_id: str, message: str) -> _FakeDraft:
+    async def draft(
+        self, *, shop_id: str, customer_id: str, message: str, history: list[Message]
+    ) -> _FakeDraft:
         return _FakeDraft(text=self.text, intent=self.intent, confidence=self.confidence)
 
 
@@ -459,7 +461,9 @@ async def test_inbound_persisted_through_real_webhook_route(fresh_db) -> None:
             raise AssertionError("park path KHÔNG được gọi sender")
 
     class LowConfDrafter:
-        async def draft(self, *, shop_id: str, customer_id: str, message: str) -> _FakeDraft:
+        async def draft(
+            self, *, shop_id: str, customer_id: str, message: str, history: list[Message]
+        ) -> _FakeDraft:
             return _FakeDraft(text="draft ...", intent="general_qa", confidence=0.2)
 
     app = FastAPI()
@@ -484,3 +488,256 @@ async def test_inbound_persisted_through_real_webhook_route(fresh_db) -> None:
     assert await _messages(engine, "shop_a", conv.id) == [("user", "còn size M không")], (
         "tin khách phải được ghi khi đi qua webhook, gắn ĐÚNG conversation vừa resolve"
     )
+
+
+# =====================================================================================
+# H2 — read path: last-N vào `Drafter` + cap kép. Viết TRƯỚC khi `Drafter` nhận `history`
+# ⇒ expected RED.
+#
+# **Các test này KHÔNG đo chất lượng trả lời của LLM.** Chúng đo đúng một điều: history
+# ĐẾN được drafter, đúng nội dung, đúng thứ tự, đúng conversation, đã cắt theo cap. Việc
+# "AI phân giải được đại từ" cần `-m live` + eval; một test phụ thuộc chất lượng LLM là
+# test sẽ đỏ ngẫu nhiên và rồi bị ai đó tắt đi.
+# =====================================================================================
+
+
+from agent.orchestrator import (  # noqa: E402
+    HISTORY_MAX_CHARS,
+    HISTORY_MAX_MESSAGES,
+    receive_and_draft,
+)
+from db.models import Message  # noqa: E402
+from db.repos import MessageRepo  # noqa: E402
+
+
+@dataclass
+class _RecordingSender:
+    """Sender im lặng — H2 không đo đường gửi, chỉ đo history tới drafter."""
+
+    sent: list[str] | None = None
+
+    async def send(self, *, shop_id: str, customer_id: str, text: str) -> None:
+        if self.sent is None:
+            self.sent = []
+        self.sent.append(text)
+
+
+@dataclass
+class _HistoryCapturingDrafter:
+    """Ghi lại ĐÚNG cái nó nhận. Đây là toàn bộ cơ chế đo của H2.
+
+    Không assert bên trong drafter — bắt được gì thì trả ra ngoài cho test assert, để khi
+    đỏ thì thông báo nói rõ nhận được gì thay vì chỉ "False is not True".
+    """
+
+    seen: list[tuple[str, str]] | None = None
+    text: str = "dạ áo đó còn size M ạ"
+
+    async def draft(
+        self,
+        *,
+        shop_id: str,
+        customer_id: str,
+        message: str,
+        history: list[Message],
+    ) -> _FakeDraft:
+        if self.seen is None:
+            self.seen = []
+        self.seen.extend((m.role, m.content) for m in history)
+        return _FakeDraft(text=self.text, intent="product_info", confidence=0.95)
+
+
+@pytest.mark.asyncio
+async def test_second_turn_drafter_receives_first_turn_history(fresh_db) -> None:
+    """(a) Lượt 2 — drafter thấy lượt 1, thứ tự CŨ→MỚI.
+
+    Đây là ca biện minh cho cả spec 10. Khách nhắn "cái áo đó còn size M không" ở lượt 2;
+    không có history thì "cái áo đó" không phân giải được và AI không trả lời nổi. Test
+    khẳng định nguyên liệu ĐÃ tới tay drafter — phần dùng nó là việc của LLM.
+
+    Thứ tự phải tăng dần: `last_n` lấy `DESC LIMIT n` rồi đảo. Quên đảo thì LLM đọc hội
+    thoại ngược, không crash, chỉ trả lời lệch — đúng họ hỏng-âm-thầm.
+    """
+    engine, sf = await fresh_db()
+    shop = "shop_a"
+    async with engine.begin() as c:
+        cus, conv = await _seed_shop(c, shop)
+
+    async with sf() as s:
+        repo = MessageRepo(s, shop_scope=shop)
+        await repo.append(
+            conversation_id=conv, customer_id=cus, role="user", content="áo thun trắng bao nhiêu"
+        )
+        await repo.append(
+            conversation_id=conv, customer_id=cus, role="assistant", content="dạ 250k ạ"
+        )
+
+    drafter = _HistoryCapturingDrafter()
+    await receive_and_draft(
+        shop_id=shop,
+        customer_id=cus,
+        conversation_id=conv,
+        message="cái áo đó còn size M không",
+        drafter=drafter,
+        sender=_RecordingSender(),
+        session_factory=sf,
+        shop_auto_enabled_intents=frozenset(),
+    )
+
+    assert drafter.seen == [
+        ("user", "áo thun trắng bao nhiêu"),
+        ("assistant", "dạ 250k ạ"),
+    ], f"drafter phải nhận history lượt 1 theo thứ tự cũ→mới, nhận được: {drafter.seen}"
+
+
+@pytest.mark.asyncio
+async def test_history_of_other_conversation_does_not_leak(fresh_db) -> None:
+    """(b) Conversation KHÁC không lẫn vào — kể cả cùng shop, cùng khách.
+
+    `last_n` lọc theo `conversation_id`; thiếu vế đó thì mọi hội thoại của shop trộn làm
+    một và AI trả lời khách này bằng ngữ cảnh của khách kia. Không sai type, không crash.
+    """
+    engine, sf = await fresh_db()
+    shop = "shop_a"
+    async with engine.begin() as c:
+        cus_1, conv_1 = await _seed_shop(c, shop)
+        cus_2, conv_2 = await _seed_shop(c, shop)
+
+    async with sf() as s:
+        repo = MessageRepo(s, shop_scope=shop)
+        await repo.append(
+            conversation_id=conv_1, customer_id=cus_1, role="user", content="KHÁCH MỘT"
+        )
+        await repo.append(
+            conversation_id=conv_2, customer_id=cus_2, role="user", content="KHÁCH HAI"
+        )
+
+    drafter = _HistoryCapturingDrafter()
+    await receive_and_draft(
+        shop_id=shop,
+        customer_id=cus_2,
+        conversation_id=conv_2,
+        message="tiếp",
+        drafter=drafter,
+        sender=_RecordingSender(),
+        session_factory=sf,
+        shop_auto_enabled_intents=frozenset(),
+    )
+
+    assert drafter.seen == [("user", "KHÁCH HAI")], (
+        f"history của conversation khác LỌT vào: {drafter.seen}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_history_capped_by_message_count_keeps_newest(fresh_db) -> None:
+    """(c) Vượt cap SỐ LƯỢNG ⇒ giữ N mới nhất, cắt TỪ ĐẦU.
+
+    Cắt nhầm đầu-đuôi là lỗi vô hình: vẫn đúng số lượng, vẫn không crash, chỉ là AI đọc
+    phần hội thoại đã cũ và bỏ mất tin đang cần trả lời. Nên test khẳng định cả hai đầu —
+    tin cũ nhất PHẢI biến mất, tin mới nhất PHẢI còn.
+    """
+    engine, sf = await fresh_db()
+    shop = "shop_a"
+    async with engine.begin() as c:
+        cus, conv = await _seed_shop(c, shop)
+
+    async with sf() as s:
+        repo = MessageRepo(s, shop_scope=shop)
+        for i in range(HISTORY_MAX_MESSAGES + 5):
+            await repo.append(
+                conversation_id=conv, customer_id=cus, role="user", content=f"tin-{i:03d}"
+            )
+
+    drafter = _HistoryCapturingDrafter()
+    await receive_and_draft(
+        shop_id=shop,
+        customer_id=cus,
+        conversation_id=conv,
+        message="tiếp",
+        drafter=drafter,
+        sender=_RecordingSender(),
+        session_factory=sf,
+        shop_auto_enabled_intents=frozenset(),
+    )
+
+    seen = drafter.seen or []
+    assert len(seen) == HISTORY_MAX_MESSAGES, (
+        f"phải cắt còn {HISTORY_MAX_MESSAGES}, nhận {len(seen)}"
+    )
+    newest = f"tin-{HISTORY_MAX_MESSAGES + 4:03d}"
+    assert seen[-1] == ("user", newest), f"tin MỚI NHẤT phải còn, cuối danh sách là {seen[-1]}"
+    assert ("user", "tin-000") not in seen, "tin CŨ NHẤT phải bị cắt — đang cắt nhầm đầu"
+
+
+@pytest.mark.asyncio
+async def test_history_capped_by_chars_keeps_newest(fresh_db) -> None:
+    """(d) Vượt cap KÝ TỰ ⇒ cắt thêm, tin mới nhất luôn còn.
+
+    Vì sao cần cap thứ hai: cap số lượng một mình không chặn được 20 tin mỗi tin 3000 ký
+    tự — vẫn "đúng 20 tin" mà ngân sách token đã vỡ. Ở đây mỗi tin 1000 ký tự nên cap
+    ký tự phải cắn TRƯỚC cap số lượng.
+    """
+    engine, sf = await fresh_db()
+    shop = "shop_a"
+    async with engine.begin() as c:
+        cus, conv = await _seed_shop(c, shop)
+
+    big = 1000
+    async with sf() as s:
+        repo = MessageRepo(s, shop_scope=shop)
+        for i in range(10):
+            await repo.append(
+                conversation_id=conv,
+                customer_id=cus,
+                role="user",
+                content=f"{i:03d}" + "x" * (big - 3),
+            )
+
+    drafter = _HistoryCapturingDrafter()
+    await receive_and_draft(
+        shop_id=shop,
+        customer_id=cus,
+        conversation_id=conv,
+        message="tiếp",
+        drafter=drafter,
+        sender=_RecordingSender(),
+        session_factory=sf,
+        shop_auto_enabled_intents=frozenset(),
+    )
+
+    seen = drafter.seen or []
+    total = sum(len(c) for _, c in seen)
+    assert total <= HISTORY_MAX_CHARS, f"tổng {total} ký tự vượt cap {HISTORY_MAX_CHARS}"
+    assert len(seen) < 10, "cap ký tự phải cắn trước cap số lượng ở ca này"
+    assert seen[-1][1].startswith("009"), (
+        f"tin mới nhất phải còn sau khi cắt theo ký tự, cuối là {seen[-1][1][:3]}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_new_conversation_has_empty_history(fresh_db) -> None:
+    """(e) Conversation mới ⇒ history rỗng, KHÔNG nổ.
+
+    Lượt đầu tiên của mọi khách đều đi qua đường này. Nếu nó raise thì tin nhắn đầu tiên
+    của mỗi khách mới sẽ chết — ca phổ biến nhất, không phải ca biên.
+    """
+    engine, sf = await fresh_db()
+    shop = "shop_a"
+    async with engine.begin() as c:
+        cus, conv = await _seed_shop(c, shop)
+
+    drafter = _HistoryCapturingDrafter()
+    outcome = await receive_and_draft(
+        shop_id=shop,
+        customer_id=cus,
+        conversation_id=conv,
+        message="alo shop ơi",
+        drafter=drafter,
+        sender=_RecordingSender(),
+        session_factory=sf,
+        shop_auto_enabled_intents=frozenset(),
+    )
+
+    assert outcome.action == "park"
+    assert drafter.seen == [], f"conversation mới phải có history rỗng, nhận {drafter.seen}"

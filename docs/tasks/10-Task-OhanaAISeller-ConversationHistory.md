@@ -202,17 +202,18 @@ REVIEW: PASS ref=docs/reviews/10-H1-auto-verdict.json
 ### Phase H2 — Read path: last-N vào `Drafter` + cap
 
 <!-- ADP:PHASE H2 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 ROADMAP: GD0-HISTORY
 GOAL: `Drafter.draft()` nhận `history: list[Message]` của ĐÚNG conversation đó, thứ tự cũ→mới, cắt theo cap PRE-1003; test lượt-2 dùng đại từ chứng minh history tới được drafter; vượt cap thì cắt TỪ ĐẦU (giữ tin mới nhất) và số lượng cắt đo được.
 APPROACH: Mở rộng Protocol `Drafter` thêm tham số `history` — đây là breaking change của Protocol, nhưng hiện **zero implementation** (audit #4) nên chi phí bằng 0; làm bây giờ rẻ hơn làm sau khi có impl thật. Cắt từ ĐẦU chứ không từ cuối: tin mới nhất là tin đang cần trả lời, tin cũ nhất mới là thứ bỏ được. Cap kép (số lượng + ký tự) vì một mình số lượng không chặn được 20 tin mỗi tin 3000 ký tự. Test lượt-2 assert **history tới được drafter với nội dung đúng** qua fake drafter — KHÔNG assert LLM trả lời đúng: cái đó cần `-m live` + eval, và một test phụ thuộc chất lượng LLM là test sẽ đỏ ngẫu nhiên.
-ALLOWED_FILES: agent/orchestrator.py, db/repos.py, tests/test_message_history.py, docs/tasks/10-Task-OhanaAISeller-ConversationHistory.md, docs/memory/KNOWN_ISSUES.md, docs/reviews/, docs/smokes/
+ALLOWED_FILES: agent/orchestrator.py, db/repos.py, tests/test_message_history.py, tests/test_orchestrator.py, tests/test_channel_abstraction.py, docs/tasks/10-Task-OhanaAISeller-ConversationHistory.md, docs/memory/KNOWN_ISSUES.md, docs/reviews/, docs/smokes/
 GATE: .venv/bin/python -m pytest tests/test_message_history.py -x -q
 GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && .venv/bin/mypy app agent retrieval parsing storage db bridge tools && .venv/bin/ruff check . --no-cache && .venv/bin/ruff format --check . --no-cache
 RETRY: 0/3
 RISK: medium (KÝ: Wyatt 2026-07-20. Floor rule: giao RISK_PATHS ở `agent/orchestrator.py`. Đổi signature Protocol, không đổi hành vi gửi.)
 BLOCKED_BY: H1 DONE (PRE-1003 ✅ đã ký)
-SMOKE:
+SMOKE: PASS ref=docs/smokes/10-H2.md
+REVIEW: PASS ref=docs/reviews/10-H2-auto-verdict.json
 <!-- /ADP -->
 
 1. Test (**RED trước**): (a) lượt 2 — fake drafter nhận đúng history của lượt 1, thứ tự cũ→mới; (b) history của conversation KHÁC không lẫn vào; (c) vượt cap số lượng ⇒ giữ N mới nhất; (d) vượt cap ký tự ⇒ cắt thêm, tin mới nhất luôn còn; (e) conversation mới ⇒ history rỗng, không nổ.

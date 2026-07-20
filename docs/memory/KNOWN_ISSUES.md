@@ -357,3 +357,36 @@ _Empty. Log ở đây khi Wyatt approve `RISK_WAIVER` để hạ tier dưới fl
 ## Resolved (chưa có)
 
 _Empty. Khi issue chuyển RESOLVED, di chuyển vào đây kèm commit SHA + resolved-in-phase._
+
+## ISSUE-023 — cap history 20 message / 4000 ký tự CHƯA ĐO (spec 10 H2)
+
+**Trạng thái:** OPEN · **Mở:** 2026-07-20 · **Cùng họ:** ISSUE-022 (cap persona 2000 ký tự)
+
+`agent/orchestrator.HISTORY_MAX_MESSAGES = 20` và `HISTORY_MAX_CHARS = 4000` (PRE-1003, Wyatt
+ký 2026-07-20) suy từ ước lượng ký tự→token tiếng Việt ≈ 3.3 — **chưa chạy tokenizer
+Llama-3.3 thật lần nào**. 4000 ký tự ≈ 1800 token là con số giấy tờ, không phải số đo.
+
+Đặt số để có ràng buộc cứng từ đầu còn hơn để trôi. Nhưng đừng trích nó như đã đo: nếu tỉ lệ
+thật lệch đáng kể thì hoặc ngân sách token vỡ (cap quá rộng), hoặc AI mất ngữ cảnh sớm hơn
+cần thiết (cap quá hẹp) — cả hai đều không có triệu chứng rõ, chỉ làm chất lượng trả lời tệ đi.
+
+**Đóng khi:** chạy tokenizer thật trên ≥50 hội thoại Zalo thật, đo phân phối token/message,
+chốt lại hai số. Cùng lúc với ISSUE-022 (cả hai chia chung một ngân sách prompt).
+
+---
+
+## ISSUE-024 — `api/webhook.py` khai Protocol `_Drafter` đã lệch với `agent.orchestrator.Drafter`
+
+**Trạng thái:** OPEN · **Mở:** 2026-07-20 (spec 10 H2) · **Rủi ro:** trung bình, chưa chảy máu
+
+`agent/orchestrator.Drafter.draft()` nhận thêm `history` từ H2. Bản sao `_Drafter` tại
+`api/webhook.py:33` vẫn khai 3 tham số. **mypy không bắt được** vì dòng đó mang
+`# type: ignore[no-untyped-def]` (return type untyped ⇒ bỏ qua so khớp).
+
+Hệ quả: ai viết `Drafter` thật dựa theo Protocol của webhook sẽ qua type-check rồi nổ
+`TypeError` lúc chạy khi orchestrator gọi kèm `history=`. Chưa chảy máu vì webhook chưa mount
+và chưa có `Drafter` implementation nào.
+
+Không vá trong H2 vì `api/webhook.py` ngoài `ALLOWED_FILES`. **Nguyên nhân gốc là sự TRÙNG
+LẶP** — hai bản khai của cùng một khái niệm, sửa một dòng chỉ đồng bộ được tới lần đổi sau.
+Cách đóng đúng: webhook import thẳng `Drafter` từ `agent.orchestrator`, xoá bản sao.

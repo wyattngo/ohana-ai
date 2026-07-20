@@ -34,6 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from agent.policy_gate import DraftContext, decide
 from bridge.zalo_sender import ZaloSender
+from db.models import Message
 from db.repos import MessageRepo, PendingReplyRepo
 
 
@@ -43,8 +44,42 @@ class _Draft(Protocol):
     confidence: float
 
 
+# Cap KÉP cho history nạp vào draft (spec 10 H2, PRE-1003 — Wyatt ký 2026-07-20).
+#
+# Vì sao hai cap chứ không một: cap số lượng một mình không chặn được 20 tin mỗi tin 3000
+# ký tự — vẫn "đúng 20 tin" trong khi ngân sách token đã vỡ. Cap ký tự một mình thì một
+# hội thoại toàn tin ngắn sẽ nạp hàng trăm lượt, tốn round-trip vô ích.
+#
+# ⚠️ HAI SỐ NÀY CHƯA ĐO — suy từ ước lượng ký tự→token tiếng Việt ≈ 3.3, chưa chạy tokenizer
+# Llama-3.3 thật. Cùng họ ISSUE-022 (cap persona 2000). Đặt số để có ràng buộc cứng từ đầu,
+# KHÔNG phải vì tin nó đúng. Đo lại khi có hội thoại thật.
+HISTORY_MAX_MESSAGES = 20
+HISTORY_MAX_CHARS = 4000
+
+
+def _trim_history(rows: list[Message]) -> list[Message]:
+    """Cắt history về trong cap, luôn giữ tin MỚI NHẤT.
+
+    Cắt từ ĐẦU (tin cũ nhất) chứ không từ cuối: tin mới nhất là tin đang cần trả lời, tin
+    cũ nhất mới là thứ bỏ được. Cắt nhầm đầu-đuôi không crash và không sai type — vẫn đúng
+    số lượng, chỉ là AI đọc phần hội thoại đã cũ và bỏ mất câu đang hỏi.
+
+    Luôn trả về ít nhất 1 row khi `rows` không rỗng, kể cả khi row đó một mình đã vượt
+    `HISTORY_MAX_CHARS`: trả rỗng sẽ biến "tin quá dài" thành "không có ngữ cảnh gì", tức
+    một tin dài bất thường lại làm AI mất trí nhớ hoàn toàn — im lặng và khó lần ra.
+    """
+    kept = rows[-HISTORY_MAX_MESSAGES:]
+    total = sum(len(r.content) for r in kept)
+    while len(kept) > 1 and total > HISTORY_MAX_CHARS:
+        total -= len(kept[0].content)
+        kept = kept[1:]
+    return kept
+
+
 class Drafter(Protocol):
-    async def draft(self, *, shop_id: str, customer_id: str, message: str) -> _Draft: ...
+    async def draft(
+        self, *, shop_id: str, customer_id: str, message: str, history: list[Message]
+    ) -> _Draft: ...
 
 
 @dataclass(frozen=True)
@@ -74,7 +109,27 @@ async def receive_and_draft(
     `shop_auto_enabled_intents` is the shop-level opt-in set for auto-send. If the intent
     the drafter emits isn't in this set, the gate parks even at high confidence.
     """
-    draft = await drafter.draft(shop_id=shop_id, customer_id=customer_id, message=message)
+    # History load TRƯỚC khi draft. Repo scope theo `shop_id` ⇒ conversation của shop khác
+    # trả rỗng chứ không raise (xem `MessageRepo.last_n`), nên một `conversation_id` sai
+    # cho ra "không có ngữ cảnh", không cho ra ngữ cảnh của người khác.
+    #
+    # ⚠️ History NÀY ĐÃ CHỨA tin nhắn hiện tại. `api/webhook.py` (H1) cố ý ghi inbound
+    # TRƯỚC khi gọi hàm này — để tin khách không mất nếu LLM nổ — nên `last_n` thấy luôn
+    # nó ở cuối. Hệ quả: `message` và `history[-1].content` trùng nhau khi đi qua webhook.
+    # Giữ cả hai là có chủ ý: `message` là "câu cần trả lời", `history` là "hội thoại tới
+    # giờ", và implementation của `Drafter` cần phân biệt được hai vai đó. Đừng "sửa" bằng
+    # cách bỏ phần tử cuối — gọi trực tiếp (không qua webhook) thì phần tử cuối KHÔNG phải
+    # tin hiện tại, và cắt mù sẽ ăn mất một lượt thật.
+    async with session_factory() as session:
+        history = _trim_history(
+            await MessageRepo(session, shop_scope=shop_id).last_n(
+                conversation_id, limit=HISTORY_MAX_MESSAGES
+            )
+        )
+
+    draft = await drafter.draft(
+        shop_id=shop_id, customer_id=customer_id, message=message, history=history
+    )
 
     decision = decide(
         DraftContext(

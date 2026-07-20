@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import os
 import uuid
+from typing import Any
 
 import pytest
 
@@ -161,7 +162,9 @@ async def test_brand_new_channel_routes_end_to_end_without_touching_core(fresh_d
         confidence: float
 
     class LowConfDrafter:
-        async def draft(self, *, shop_id: str, customer_id: str, message: str) -> _D:
+        async def draft(
+            self, *, shop_id: str, customer_id: str, message: str, history: list[Any]
+        ) -> _D:
             return _D(text="draft ...", intent="general_qa", confidence=0.2)  # -> park
 
     ch = FakeChannel()

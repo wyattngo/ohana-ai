@@ -1,0 +1,25 @@
+{
+  "verdict": "APPROVE",
+  "model": "claude-haiku-4-5-20251001",
+  "summary": "Phase H2 read path correct: history trimmed from oldest (newest preserved), dual cap enforced, never empty on non-empty input, MessageRepo.last_n scopes shop_id at SQL level and returns [] cross-shop, tests prove old-to-new order deterministically with no LLM dependency, send path untouched, files within (expanded) ALLOWED_FILES.",
+  "findings": [
+    {
+      "severity": "medium",
+      "file": "api/webhook.py",
+      "issue": "Duplicate Protocol _Drafter at line 33 lacks `history`; masked from mypy by `# type: ignore[no-untyped-def]`. Outside H2 ALLOWED_FILES; documented as ISSUE-024. Non-blocking today: webhook unmounted, zero Drafter implementations."
+    }
+  ],
+  "checks": {
+    "trim_from_oldest": "pass",
+    "dual_cap": "pass",
+    "never_empty": "pass",
+    "repo_shop_scope": "pass",
+    "order_proven": "pass",
+    "no_llm_dependent_test": "pass",
+    "no_send_path_change": "pass",
+    "allowed_files": "pass",
+    "webhook_protocol_drift": "acceptable"
+  },
+  "diff_sha256": "5ea5bc2f8ba9061b80523b005e5123dacdfe26edcd43f556f8abe10670be4c58",
+  "stamped_at": "2026-07-20T20:24"
+}

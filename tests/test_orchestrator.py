@@ -44,7 +44,9 @@ class _FakeDrafter:
         self._responses = responses
         self.calls: list[dict[str, Any]] = []
 
-    async def draft(self, *, shop_id: str, customer_id: str, message: str) -> _FakeDraft:
+    async def draft(
+        self, *, shop_id: str, customer_id: str, message: str, history: list[Any]
+    ) -> _FakeDraft:
         self.calls.append({"shop_id": shop_id, "customer_id": customer_id, "message": message})
         for key, val in self._responses.items():
             if key.lower() in message.lower():
