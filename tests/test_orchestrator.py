@@ -168,10 +168,13 @@ async def test_safe_high_confidence_auto_enabled_sends() -> None:
     )
     sender = _FakeSender()
 
-    # No `_seed_parents` here, unlike the park tests: the auto_send path writes NO row, so
-    # nothing references these ids and no foreign key is exercised. `conversation_id` is
-    # still required (spec 06 F1 removed the `or customer_id` shim) — the caller always
-    # knows it, whether or not this particular branch persists anything.
+    # `_seed_parents` LÀ bắt buộc kể từ spec 10 H1. Comment cũ ở đây nói auto_send "writes
+    # NO row" nên không đụng FK nào — điều đó đúng cho tới H1, khi nhánh auto_send bắt đầu
+    # ghi `messages` (role=assistant) sau khi gửi thành công. Composite FK của H0 lập tức
+    # từ chối id giả `conv1`/`cust1`, và đó là FK làm đúng việc của nó.
+    await _seed_parents(
+        session_factory, shop_id="shop_a", customer_id="cust1", conversation_id="conv1"
+    )
     outcome = await receive_and_draft(
         shop_id="shop_a",
         customer_id="cust1",

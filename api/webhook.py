@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from agent.orchestrator import ReceiveOutcome, receive_and_draft
 from channels.base import InboundChannel, OutboundChannel
 from channels.identity import resolve_conversation
+from db.repos import MessageRepo
 
 
 class _Drafter(Protocol):
@@ -93,6 +94,20 @@ def build_router(
                 channel=channel,
                 external_user_id=msg.external_user_id,
                 external_thread_id=msg.external_thread_id,
+            )
+
+            # Ghi tin khách NGAY tại đây — trước `receive_and_draft` (spec 10 H1).
+            # Thứ tự là có chủ ý: drafter/LLM nổ thì tin khách vẫn nằm trong log. Mất tin
+            # khách không phục hồi được (Zalo không cho đọc lại lịch sử); mất draft thì
+            # retry được. `shop_id` không truyền vào repo — nó baked từ `shop_scope`, nên
+            # kể cả `endpoint_to_shop` map sai cũng không ghi lệch sang shop khác được.
+            # ⚠️ KHÔNG idempotent: Zalo retry cùng payload ⇒ 2 row. Đã biết và đã chấp nhận
+            # (H1 GOAL-AMEND) — dedup là `webhook_event_log`, spec 03 Phase 2, BLOCKED.
+            await MessageRepo(session, shop_scope=shop_id).append(
+                conversation_id=conversation_id,
+                customer_id=customer_id,
+                role="user",
+                content=msg.text,
             )
 
         outcome: ReceiveOutcome = await receive_and_draft(

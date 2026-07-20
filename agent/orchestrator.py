@@ -34,7 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from agent.policy_gate import DraftContext, decide
 from bridge.zalo_sender import ZaloSender
-from db.repos import PendingReplyRepo
+from db.repos import MessageRepo, PendingReplyRepo
 
 
 class _Draft(Protocol):
@@ -86,9 +86,25 @@ async def receive_and_draft(
 
     if decision.action == "auto_send":
         await sender.send(shop_id=shop_id, customer_id=customer_id, text=draft.text)
+        # Ghi SAU khi gửi thành công, không phải trước (spec 10 H1). `send()` nổ ⇒ ngoại lệ
+        # bay lên và KHÔNG có row nào — lịch sử không bao giờ khai một điều chưa xảy ra.
+        # Ghi trước sẽ làm AI lượt sau tưởng nó đã trả lời khách rồi, và im lặng.
+        async with session_factory() as session:
+            await MessageRepo(session, shop_scope=shop_id).append(
+                conversation_id=conversation_id,
+                customer_id=customer_id,
+                role="assistant",
+                content=draft.text,
+            )
         return ReceiveOutcome(action="auto_send", reason=decision.reason, reply_id=None)
 
     # Park path — new PendingReply row, shop_id BAKED from repo scope (not caller args).
+    #
+    # CỐ Ý KHÔNG ghi `messages` ở đây (PRE-1004, Wyatt ký 2026-07-20). `PendingReply` đã là
+    # bản ghi của nhánh này, và chưa có worker nào thực sự gửi (`api/inbox.py` approve chỉ
+    # flip status). Ghi lúc park hay lúc approve đều là khai "đã gửi" trong khi không ai gửi.
+    # Hệ quả đã chấp nhận: reply seller duyệt không vào history cho tới khi worker gửi land.
+    # Gate: tests/test_message_history.py::test_park_writes_no_assistant_message.
     reply_id = uuid.uuid4().hex
     async with session_factory() as session:
         repo = PendingReplyRepo(session, shop_scope=shop_id)

@@ -6,11 +6,14 @@ build a repo without picking a shop, and one repo instance can only ever surface
 rows for that shop. Ad-hoc `session.execute(select(PendingReply)…)` outside these repos is
 a S4 breach.
 
-Currently only `PendingReplyRepo` lives here. Message / Embedding stay in-place at the
-retrieval and orchestrator boundaries because those paths already lock shop scope in a
-different layer (retrieval/pgvector.py's `PgvectorRetriever(shop_scope=…)` for embeddings,
-orchestrator direct-insert with a verified shop_id for messages). If Message ever grows a
-read-by-shop use case, its repo lives here too.
+`ConversationRepo`, `PendingReplyRepo` and `MessageRepo` live here. `Embedding` stays
+in-place at the retrieval boundary because that path locks shop scope in a different layer
+(`PgvectorRetriever(shop_scope=…)`).
+
+`MessageRepo` landed in spec 10 H1 — the old note here said messages could stay as an
+"orchestrator direct-insert with a verified shop_id", which was the wrong seam: it puts
+`shop_id` back in the caller's hands at exactly the point where a bug becomes a cross-tenant
+write. Baking the scope into the repo removes the parameter a caller could get wrong.
 """
 
 from __future__ import annotations
@@ -23,7 +26,11 @@ from sqlalchemy import select, update
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.models import Conversation, PendingReply
+from db.models import Conversation, Message, PendingReply
+
+# Khai tường minh thay vì nhận string tuỳ ý: `role` sai chính tả (vd "Assistant") sẽ làm
+# `last_n` trả đúng row nhưng LLM đọc sai vai — hỏng âm thầm, không exception nào.
+_MESSAGE_ROLES = frozenset({"user", "assistant", "seller", "system"})
 
 
 class ConversationRepo:
@@ -141,3 +148,78 @@ class PendingReplyRepo:
         result = cast("CursorResult[Any]", await self._session.execute(stmt))
         await self._session.commit()
         return int(result.rowcount or 0)
+
+
+class MessageRepo:
+    """Shop-scoped access to `messages` (spec 10 Phase H1).
+
+    **Append-only log, KHÔNG phải hàng đợi gửi.** Một row ở đây nghĩa là "việc này ĐÃ xảy
+    ra", không phải "hãy gửi cái này". Đường duy nhất tới khách hàng đi qua
+    `agent/policy_gate.py`; drain bảng này để gửi là bypass gate — nếu bạn đang định viết
+    một worker đọc từ đây rồi gọi sender, dừng lại và đọc `agent/orchestrator.py` trước.
+
+    **Idempotency KHÔNG có ở tầng này** (spec 10 H1 GOAL-AMEND, Wyatt ký 2026-07-20).
+    `messages` không có khoá dedup, nên gọi `append()` hai lần với cùng nội dung tạo HAI
+    row. Đó là hành vi đã biết và đã chấp nhận, không phải thiếu sót: cơ chế chống trùng là
+    `webhook_event_log` (`event_id` PRIMARY KEY) thuộc spec 03 Phase 2, đang BLOCKED chờ
+    PRE-004. 🚫 Đừng "vá tạm" bằng select-then-insert ở đây — đó đúng là ISSUE-017 mà spec
+    09 vừa đóng: hai webhook đồng thời vẫn lọt cả hai, test đơn luồng vẫn xanh, và nó chỉ
+    TRÔNG như đã vá. Dedup phải ở tầng DB hoặc không làm.
+    """
+
+    def __init__(self, session: AsyncSession, *, shop_scope: str) -> None:
+        if not shop_scope:
+            raise ValueError("shop_scope is required — no default, no cross-tenant surface")
+        self._session = session
+        self._shop_scope = shop_scope
+
+    async def append(
+        self,
+        *,
+        conversation_id: str,
+        customer_id: str,
+        role: str,
+        content: str,
+    ) -> Message:
+        """Ghi một message. `shop_id` BAKED từ scope repo — caller KHÔNG truyền.
+
+        Không có tham số `shop_id` nghĩa là không có tham số nào để bẻ: một caller bị lỗi
+        hoặc bị chiếm quyền vẫn không ghi được row sang shop khác. Composite FK của H0 là
+        lớp thứ hai — Postgres từ chối nếu `(shop_id, conversation_id)` không khớp.
+        """
+        if role not in _MESSAGE_ROLES:
+            raise ValueError(f"invalid role: {role!r} (hợp lệ: {sorted(_MESSAGE_ROLES)})")
+        row = Message(
+            shop_id=self._shop_scope,
+            conversation_id=conversation_id,
+            customer_id=customer_id,
+            role=role,
+            content=content,
+        )
+        self._session.add(row)
+        await self._session.commit()
+        return row
+
+    async def last_n(self, conversation_id: str, *, limit: int = 20) -> list[Message]:
+        """N message GẦN NHẤT của conversation này, trả theo thứ tự thời gian TĂNG dần.
+
+        Conversation của shop khác trả **rỗng**, KHÔNG raise — raise sẽ phân biệt được
+        "không tồn tại" với "tồn tại nhưng của shop khác", tức rò rỉ chính sự TỒN TẠI của
+        dữ liệu shop khác. Cùng hình dạng với `PendingReplyRepo.get` trả None.
+
+        Lấy `DESC LIMIT n` rồi đảo lại trong Python: cần n cái MỚI nhất, nhưng LLM cần đọc
+        chúng theo thứ tự hội thoại. `ASC LIMIT n` sẽ lấy nhầm n cái CŨ nhất — sai âm thầm,
+        và càng dài hội thoại càng sai.
+        """
+        if limit <= 0:
+            raise ValueError(f"limit phải > 0, nhận {limit}")
+        stmt = (
+            select(Message)
+            .where(Message.shop_id == self._shop_scope)
+            .where(Message.conversation_id == conversation_id)
+            .order_by(Message.created_at.desc(), Message.id.desc())
+            .limit(limit)
+        )
+        rows = list((await self._session.execute(stmt)).scalars().all())
+        rows.reverse()
+        return rows

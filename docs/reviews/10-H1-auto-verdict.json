@@ -1,0 +1,21 @@
+{
+  "verdict": "APPROVE",
+  "model": "claude-haiku-4-5-20251001",
+  "summary": "H1 write path fully implemented with no cross-tenant gaps. MessageRepo bakes shop_id, SQL-level scoping on reads, composite FK enforced by Postgres, inbound-before-draft ordering correct, outbound-after-send timing correct, park path does not write assistant, no sneaky dedup. Smoke PASS on real DB.",
+  "findings": [],
+  "checks": {
+    "shop_id_baked": "pass",
+    "sql_level_scope": "pass",
+    "cross_tenant_read_empty": "pass",
+    "last_n_ordering": "pass",
+    "write_after_send": "pass",
+    "inbound_before_draft": "pass",
+    "park_no_write": "pass",
+    "no_gate_bypass": "pass",
+    "allowed_files": "pass",
+    "no_weakened_tests": "pass",
+    "no_sneaky_dedup": "pass"
+  },
+  "diff_sha256": "4fba514be60e7a0ad9bb1abbe08fc61cb990f1dffd3d6a7c4e1e51a8bce78cf7",
+  "stamped_at": "2026-07-20T13:43"
+}

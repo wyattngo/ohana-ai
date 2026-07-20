@@ -172,17 +172,22 @@ REVIEW: PASS ref=docs/reviews/10-H0-auto-verdict.json
 ### Phase H1 — Write path: ghi inbound + outbound
 
 <!-- ADP:PHASE H1 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 ROADMAP: GD0-HISTORY
-GOAL: Một tin nhắn khách đi qua webhook để lại ĐÚNG 1 row `role='user'` gắn đúng `conversation_id`; nhánh `auto_send` để lại thêm ĐÚNG 1 row `role='assistant'`; `MessageRepo` từ chối ghi/đọc ngoài `shop_scope`; ghi 2 lần cùng payload không nhân đôi row (idempotency theo quyết định PRE-1004).
+GOAL: Một tin nhắn khách đi qua webhook để lại ĐÚNG 1 row `role='user'` gắn đúng `conversation_id`; nhánh `auto_send` để lại thêm ĐÚNG 1 row `role='assistant'`; nhánh `park` KHÔNG để lại row assistant; `MessageRepo` từ chối ghi/đọc ngoài `shop_scope`.
+GOAL-AMEND (Wyatt ký 2026-07-20, trước khi H1 bắt đầu): vế "ghi 2 lần cùng payload không nhân đôi row (idempotency theo quyết định PRE-1004)" **ĐÃ GỠ**. Ba lý do: (1) trích dẫn sai — PRE-1004 nói về nhánh `park`, không nói gì về idempotency; (2) sau H0 `messages` KHÔNG có khoá dedup nào (`external_message_id`/unique), nên không có gì để nhận ra payload trùng; (3) cơ chế dedup là `webhook_event_log` (`event_id` PRIMARY KEY) thuộc **spec 03 Phase 2**, class `external`, BLOCKED chờ Tân (PRE-004).
+  ⚠️ Hệ quả CHẤP NHẬN tường minh: Zalo retry webhook sẽ nhân đôi tin khách trong `messages`. Chưa chảy máu vì `api/webhook.py` chưa mount + `enabled=False`; ngày hết hạn = ngày mount.
+  🚫 KHÔNG vá bằng select-then-insert ở tầng code: đó đúng là ISSUE-017 mà spec 09 vừa đóng — hai webhook đồng thời vẫn lọt cả hai, test đơn luồng vẫn xanh, và nó chỉ TRÔNG như đã vá. Dedup phải ở tầng DB hoặc không làm.
 APPROACH: `MessageRepo(session, *, shop_scope)` đối xứng với `PendingReplyRepo` — `shop_id` BAKED từ scope repo, không nhận từ tham số, nên caller sai cũng không ghi lệch shop được. Ghi inbound ở `api/webhook.py` NGAY SAU `resolve_conversation()` và TRƯỚC `receive_and_draft`: nếu drafter/LLM nổ thì tin khách vẫn nằm trong log — mất tin khách là loại mất mát không phục hồi được, mất draft thì retry được. Ghi outbound chỉ ở nhánh `auto_send`, ngay SAU `sender.send()` thành công — ghi trước khi gửi sẽ tạo lịch sử khai điều chưa xảy ra. Nhánh `park` CỐ Ý chưa ghi: `PendingReply` đã là bản ghi của nó, và chưa có worker nào thực sự gửi (audit #7) — ghi lúc approve sẽ khai "đã gửi" trong khi không ai gửi. Docstring `MessageRepo` phải nói rõ: **append-only log, KHÔNG phải hàng đợi gửi** — để lần sau không ai drain nó mà bypass `policy_gate`.
-ALLOWED_FILES: db/repos.py, api/webhook.py, agent/orchestrator.py, tests/test_message_history.py, docs/tasks/10-Task-OhanaAISeller-ConversationHistory.md, docs/reviews/, docs/smokes/
+ALLOWED_FILES: db/repos.py, api/webhook.py, agent/orchestrator.py, tests/test_message_history.py, tests/test_orchestrator.py, docs/tasks/10-Task-OhanaAISeller-ConversationHistory.md, docs/reviews/, docs/smokes/
+ALLOWED_FILES-AMEND: `tests/test_orchestrator.py` thêm giữa phase. Lý do: `test_safe_high_confidence_auto_enabled_sends` dùng id giả `conv1`/`cust1` không có parent — trước H1 nhánh auto_send không ghi gì nên không đụng FK; H1 làm nó ghi `messages` ⇒ composite FK của H0 từ chối. Sửa = thêm 1 lời gọi `_seed_parents` đã có sẵn trong file. KHÔNG nới lỏng assertion nào.
 GATE: .venv/bin/python -m pytest tests/test_message_history.py -x -q
 GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && .venv/bin/mypy app agent retrieval parsing storage db bridge tools && .venv/bin/ruff check . --no-cache && .venv/bin/ruff format --check . --no-cache
 RETRY: 0/3
 RISK: medium (KÝ: Wyatt 2026-07-20 — giữ medium, KHÔNG nâng high. Floor rule: giao RISK_PATHS ở `agent/orchestrator.py` + `api/webhook.py`. Đây là phase đáng cân nhắc nhất trong spec: nó đổi hành vi của orchestrator — luồng duy nhất đứng giữa AI và khách hàng. Không đổi tiền, nhưng đổi cái quyết định gửi gì cho ai.)
 BLOCKED_BY: H0 DONE (PRE-1004 ✅ đã ký)
-SMOKE:
+SMOKE: PASS ref=docs/smokes/10-H1.md
+REVIEW: PASS ref=docs/reviews/10-H1-auto-verdict.json
 <!-- /ADP -->
 
 1. Test (**RED trước**): (a) inbound → 1 row `user` đúng conversation; (b) `auto_send` → thêm 1 row `assistant`; (c) `park` → KHÔNG có row assistant (khẳng định quyết định, để lần sau đổi ý thì test đỏ chứ không trôi âm thầm); (d) `MessageRepo(shop_scope='A').last_n(conv_của_B)` trả **rỗng**, không raise — không leak sự tồn tại; (e) `sender.send` raise ⇒ KHÔNG có row assistant.
