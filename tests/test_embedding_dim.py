@@ -43,6 +43,14 @@ DATABASE_URL = os.environ.get(
 EXPECTED_DIM = 1024
 
 
+# `downgrade -1` KHÔNG dùng được ở đây. Nó nghĩa là "lùi MỘT bước từ head", nên nó chỉ trỏ
+# đúng vào `0004` chừng nào `0004` CÒN là head — và điều đó hết đúng ngay khi spec 09 thêm
+# `0005`. Test này nói về migration `0004`, nên nó phải GỌI TÊN `0004`, không phải mô tả vị
+# trí tương đối của nó. (Lỗi thật: thêm `0005` làm 2 test ở file này đỏ mà không dòng nào của
+# spec 08 sai.)
+_DOWN_TARGET = "0003"  # ngay TRƯỚC 0004 — cố định, không trôi theo head
+
+
 def _alembic(*args: str) -> subprocess.CompletedProcess[str]:
     """Chạy alembic trong tiến trình con.
 
@@ -171,7 +179,7 @@ async def test_migration_up_down_up_is_clean() -> None:
     assert r.returncode == 0, f"upgrade head lỗi:\n{r.stderr}"
     assert await _column_dim(DATABASE_URL) == EXPECTED_DIM
 
-    r = _alembic("downgrade", "-1")
+    r = _alembic("downgrade", _DOWN_TARGET)
     assert r.returncode == 0, f"downgrade -1 lỗi:\n{r.stderr}"
     assert await _column_dim(DATABASE_URL) == 1536, "down phải trả cột về 1536"
 
@@ -211,7 +219,7 @@ async def test_migration_refuses_when_rows_exceed_safe_threshold() -> None:
                     {"c": f"chunk {i}", "v": "[" + ",".join(["0.1"] * EXPECTED_DIM) + "]"},
                 )
 
-        r = _alembic("downgrade", "-1")
+        r = _alembic("downgrade", _DOWN_TARGET)
         assert r.returncode != 0, (
             "migration PHẢI từ chối khi vượt ngưỡng — nó đã chạy và xoá dữ liệu:\n" + r.stdout
         )
@@ -228,7 +236,7 @@ async def test_migration_refuses_when_rows_exceed_safe_threshold() -> None:
         # gỡ nó ra thay vì dùng đúng — kết cục tệ hơn không có guard.
         env = {**os.environ, "OHANA_MIGRATION_ALLOW_EMBEDDING_DATA_LOSS": "1"}
         r = subprocess.run(  # noqa: S603
-            [sys.executable, "-m", "alembic", "downgrade", "-1"],
+            [sys.executable, "-m", "alembic", "downgrade", _DOWN_TARGET],
             capture_output=True,
             text=True,
             cwd=str(_REPO_ROOT),

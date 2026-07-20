@@ -154,6 +154,28 @@ class Conversation(Base):
 
     __table_args__ = (
         UniqueConstraint("shop_id", "id", name="uq_conversations_shop_id"),
+        # ISSUE-017 (spec 09 C0). Trước constraint này, `resolve_conversation()` là
+        # select-then-insert không có gì đỡ lưng: hai tin nhắn đến đồng thời từ cùng một
+        # khách ⇒ 2 conversation ⇒ lịch sử tách đôi, AI mất ngữ cảnh, KHÔNG có exception nào.
+        #
+        # `postgresql_nulls_not_distinct=True` là phần bắt buộc, không phải tuỳ chọn: mặc
+        # định của SQL coi NULL là DISTINCT, nên một UNIQUE thường sẽ cho qua hai row
+        # `(shop, cus, chan, NULL)`. Mà `external_thread_id=NULL` chính là ca phổ biến nhất
+        # hôm nay (`channels/zalo` đọc `payload.get("thread_id")`, Zalo không phải lúc nào
+        # cũng gửi). Thiếu cờ ⇒ constraint trông như đã vá mà thực tế không vá gì.
+        #
+        # Vì sao có `external_thread_id` trong khoá (phương án B, Wyatt ký 2026-07-20):
+        # câu "Zalo có xoay thread_id giữa cùng một mạch không?" nằm trong PRE-004 đang
+        # BLOCKED. Khi phải đoán, chọn cái mà đoán sai còn sửa được — B sai ⇒ phân mảnh,
+        # gộp lại được; A sai ⇒ gộp nhầm hai mạch, và đã gộp thì không tách lại được.
+        UniqueConstraint(
+            "shop_id",
+            "customer_id",
+            "channel",
+            "external_thread_id",
+            name="uq_conversations_shop_cus_chan_thread",
+            postgresql_nulls_not_distinct=True,
+        ),
         ForeignKeyConstraint(
             ["shop_id", "customer_id"],
             ["customers.shop_id", "customers.id"],

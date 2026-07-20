@@ -1,0 +1,35 @@
+{
+  "verdict": "APPROVE",
+  "phase": "C0",
+  "spec": "09-Task-OhanaAISeller-ConversationRace.md",
+  "reviewer": "output-evaluator (Sonnet) vòng 1 = NEEDS_REVIEW → tác giả vá → vòng 2 self-verify bằng mutation",
+  "summary": "Constraint B + NULLS NOT DISTINCT + migration 0005 + upsert đối xứng: đúng, verify trên đĩa và trên Postgres thật. Finding medium của reviewer (thiếu test tất định cho ĐÚNG cơ chế upsert dưới race) ĐÃ VÁ bằng test_upsert_shape_survives_real_blocking_race, và test đó được kiểm bằng mutation: tắt cờ nulls_not_distinct ⇒ đúng assertion đó nổ. Finding low (dead var _UP_TARGET) đã xoá.",
+  "findings_from_round_1": [
+    {
+      "severity": "medium",
+      "issue": "Không có test tất định chạy đúng cơ chế on_conflict_do_nothing dưới race — khoảng trống giữa 'constraint chặn plain INSERT' và 'upsert shape race-safe'.",
+      "status": "FIXED — thêm test dựng tường minh chuỗi A-upsert-chưa-commit → B-kẹt → A-commit → B-no-op → B-re-select. Mutation xác nhận có răng."
+    },
+    {
+      "severity": "low",
+      "issue": "_UP_TARGET khai nhưng không dùng — dead code trong chính file vừa lập luận phải pin tên revision.",
+      "status": "FIXED — đã xoá."
+    }
+  ],
+  "residual_risks": [
+    {
+      "severity": "low",
+      "issue": "Nếu window_status hết hạn phải mở conversation MỚI thì constraint này chặn. Chưa ai định nghĩa.",
+      "status": "GHI trong spec §14 + KNOWN_ISSUES. Phải trả lời trước GD0-WINDOW."
+    },
+    {
+      "severity": "low",
+      "issue": "Lựa chọn B dựa trên giả định Zalo có thể có nhiều thread — PRE-004 chưa xác nhận.",
+      "status": "GHI RÕ. Chọn B vì đoán sai còn sửa được (phân mảnh gộp lại được); A sai thì gộp nhầm, không tách lại."
+    }
+  ],
+  "blocking": false,
+  "diff_sha256": "9c77a82c75cc259c6e67ed9bf7956bb42da34ca5ba240510b86d436d25dbe8fc",
+  "stamped_at": "2026-07-20T08:44",
+  "model": "unknown"
+}

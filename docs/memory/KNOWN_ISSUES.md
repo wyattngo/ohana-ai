@@ -203,7 +203,17 @@ Cùng source, cùng binary. Xoá `.ruff_cache` rồi chạy lại lệnh CŨ ⇒
 **KHÔNG sửa 19 phase cũ.** Chúng DONE hợp lệ theo tiêu chuẩn lúc đó; viết lại lịch sử không mua được gì. Giá trị nằm ở chỗ từ nay gate không tự lừa nữa.
 - **Ghi chú cho lần sau:** lỗi lộ ra vì `GATE_FULL` chạy `ruff check .` (toàn repo). Trong session này tôi từng báo "ruff sạch" sau khi chỉ chạy `ruff check app/config.py` — scoped. Gate scoped trả lời câu hỏi hẹp hơn câu mình đang khẳng định; đó chính là hình dạng của ISSUE-018. Khi báo trạng thái gate, chạy đúng lệnh mà gate khai.
 
-### ISSUE-017 — `channels/identity.py`: thiếu unique constraint → race có thể tạo 2 Conversation cho 1 khách
+### ISSUE-017 — ✅ RESOLVED 2026-07-20 (spec 09 C0) — unique constraint + upsert đối xứng
+
+- **Đóng bằng gì:** `uq_conversations_shop_cus_chan_thread` UNIQUE **NULLS NOT DISTINCT** trên `(shop_id, customer_id, channel, external_thread_id)` (migration `0005`) + `resolve_conversation()` đổi sang `on_conflict_do_nothing` + re-select, đối xứng với nhánh `Customer`. Bằng chứng: `docs/smokes/09-C0.md`.
+- **Chọn hình dạng B, Wyatt ký:** thêm `external_thread_id` vào khoá thay vì `(shop,cus,chan)` như đề xuất gốc của issue. Lý do: câu "Zalo có xoay `thread_id` giữa cùng một mạch không?" nằm trong PRE-004 đang BLOCKED; khi phải đoán thì chọn cái **đoán sai còn sửa được** — B sai ⇒ phân mảnh, gộp lại được; A sai ⇒ gộp nhầm hai mạch, không tách lại được. Hôm nay B hành xử y hệt A vì `thread_id` luôn NULL.
+- **`NULLS NOT DISTINCT` là phần bắt buộc, không phải trang trí:** mặc định SQL coi NULL là distinct ⇒ UNIQUE thường sẽ cho qua hai row `(shop,cus,chan,NULL)`, mà đó là ca phổ biến nhất hôm nay. Thiếu cờ ⇒ constraint trông như đã vá mà không vá gì.
+- **Bài học khi viết test:** bản đầu tái hiện race bằng `asyncio.gather` và **XANH TRƯỚC KHI CÓ CONSTRAINT** — hai transaction không đan xen. Đã thay bằng test tất định viết thẳng thứ tự SELECT-A → SELECT-B → INSERT-A → INSERT-B. Test `gather` giữ lại nhưng hạ vai trò, docstring ghi rõ KHÔNG được đọc như bằng chứng race.
+- **CÒN LẠI:** nếu `window_status` hết hạn phải mở conversation MỚI thì constraint này sẽ chặn — chưa ai định nghĩa. Phải trả lời trước khi làm `GD0-WINDOW`. Và khi PRE-004 về, rà lại lựa chọn B.
+
+<details><summary>Mô tả gốc (giữ nguyên)</summary>
+
+### ISSUE-017 (gốc) — `channels/identity.py`: thiếu unique constraint → race có thể tạo 2 Conversation cho 1 khách
 - **Origin:** spec 06 F1 (khai KNOWN UNCOVERED ngay trong code + review artifact `docs/reviews/06-F1-auto-verdict.json`)
 - **Discovered:** 2026-07-18 · session spec-06-F1
 - **Severity:** medium (chưa chạm được, nhưng chạm được ngay khi webhook mount)
@@ -211,6 +221,8 @@ Cùng source, cùng binary. Xoá `.ruff_cache` rồi chạy lại lệnh CŨ ⇒
 - **Detail:** `resolve_conversation()` upsert `Customer` bằng `ON CONFLICT DO NOTHING` trên `uq_customers_shop_chan_ext` (race-safe), NHƯNG phần `Conversation` là **select-then-insert** và bảng `conversations` KHÔNG có unique trên `(shop_id, customer_id, channel)`. Hai tin nhắn đến đồng thời từ cùng một khách → 2 Conversation.
 - **Why not blocking now:** `api/webhook.py` **chưa mount** trong `app/main.py` (thiếu concrete `Drafter`), nên không luồng nào gọi hàm này đồng thời. Đây là lỗi TIỀM ẨN, không phải đang chảy máu.
 - **Action:** Thêm Alembic migration `UNIQUE (shop_id, customer_id, channel)` trên `conversations` + đổi phần Conversation sang cùng shape upsert như Customer. **BẮT BUỘC làm TRƯỚC khi Spec 03c mount webhook** — đừng dựa vào "chưa xảy ra bao giờ".
+
+</details>
 
 ### ISSUE-018 — `_blank_env_means_unset` KHÔNG phủ complex field; docstring khai "áp cho MỌI field" là SAI
 - **Origin:** spec 07 G0 (`app/config.py`) — phát hiện khi so sánh 2 bản CLAUDE.md, 2026-07-19

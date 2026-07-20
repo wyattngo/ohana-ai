@@ -85,7 +85,7 @@ Spec 01 shipped 5/5 phase với **mock** — tenant-first foundation + policy-ga
 - `shops` table + real onboard flow + JWT extension include `shop_id` từ verified auth (không stub).
 - Real `ZaloSender` wire Zalo Send API + webhook signature verify + `webhook_event_log` idempotency.
 - Zalo 48h reactive window scheduler + seller notification trước hết window.
-- Files: `db/models.py` (add `Shop`, `WebhookEventLog`), `db/migrations/versions/` (dự kiến 0005/0006), `auth/identity.py`, `bridge/zalo_sender.py`, `api/webhook.py`, `api/admin.py`, `agent/scheduler.py` (new).
+- Files: `db/models.py` (add `Shop`, `WebhookEventLog`), `db/migrations/versions/` (dự kiến 0006/0007), `auth/identity.py`, `bridge/zalo_sender.py`, `api/webhook.py`, `api/admin.py`, `agent/scheduler.py` (new).
 
 ### Sub-task B — Data completeness (Phase 3, 4)
 - Real Wiki corpus batch ingest + delta ingest + admin UI upload (multipart).
@@ -96,7 +96,7 @@ Spec 01 shipped 5/5 phase với **mock** — tenant-first foundation + policy-ga
 - `credit_ledger` table tenant-scope + middleware trừ credit per-lượt (KHÔNG token-based per Roadmap §3.2).
 - Per-shop rate-limit (kéo về GĐ0 per Roadmap §3.2 — không đợi GĐ3).
 - Bypass test (call API trực tiếp với body giả, verify không được).
-- Files: `db/models.py` (add `CreditLedger`), `db/migrations/versions/` (dự kiến 0007), `agent/metering.py` (new), `api/middleware.py` (new).
+- Files: `db/models.py` (add `CreditLedger`), `db/migrations/versions/` (dự kiến 0008), `agent/metering.py` (new), `api/middleware.py` (new).
 
 ### Sub-task D — AI-layer hardening (Phase 6, 7, 8, 9)
 - **Eval harness** (Phase 6): golden fixtures + multi-dim assertion (structural/grounding/action-correctness/tone/safety) + rule-based + LLM-as-Judge + Manual Override Rate baseline + regression gate CI. Coverage matrix ≥ N golden case per intent family (Roadmap §2).
@@ -161,8 +161,10 @@ Ohana priority order: **safety → user trust → stability → growth**. Filter
 - `api/inbox.py` — Phase 8 UI hint để seller thấy "cần bạn tự trả lời" khi escalate.
 - `auth/identity.py` — Phase 1 mở rộng claim source từ real onboard flow (không stub).
 - `db/models.py` — Phase 1 (Shop, WebhookEventLog), Phase 5 (CreditLedger).
-- `db/migrations/versions/` — dự kiến **Phase 1 = 0005 · Phase 2 = 0006 · Phase 5 = 0007**.
-  *(Lịch sử: bản gốc ghi 0004/0005/0006; spec 08 EmbedderSwap chạy trước và lấy **0004** —
+- `db/migrations/versions/` — dự kiến **Phase 1 = 0006 · Phase 2 = 0007 · Phase 5 = 0008**.
+  *(Lịch sử: bản gốc ghi 0004/0005/0006 → dịch +1 khi spec 08 lấy **0004** → dịch thêm +1 khi
+  spec 09 ConversationRace lấy **0005**. Hai lần va chạm, cùng một nguyên nhân: spec 03 BLOCKED
+  chờ Tân nên mọi spec internal đều land trước nó —
   dịch +1 ngày 2026-07-19.)*
   **Luật:** số migration cấp theo THỨ TỰ LAND, không theo thứ tự lập kế hoạch — Alembic nối
   chuỗi bằng `down_revision`, không bằng số trong tên file. Chạy lại `ls db/migrations/versions/`
@@ -256,7 +258,7 @@ PRE-007/008/009 = NEW cho Spec 03.
 STATUS: TODO
 ROADMAP: GD0-SHOPS
 GOAL: `shops` table tồn tại; onboard flow tạo real shop → JWT include `shop_id` từ verified DB record; test: JWT của shop A không đọc được data shop B (cross-shop rejection).
-APPROACH: Add `Shop` model + Alembic 0005 (xác nhận số lúc execute); extend `auth/identity.py` load `shop_id` từ DB thay stub; onboard endpoint `POST /api/admin/shops` (admin auth); JWT issuance include `shop_id` claim; adversarial test cross-shop.
+APPROACH: Add `Shop` model + Alembic 0006 (xác nhận số lúc execute); extend `auth/identity.py` load `shop_id` từ DB thay stub; onboard endpoint `POST /api/admin/shops` (admin auth); JWT issuance include `shop_id` claim; adversarial test cross-shop.
 ALLOWED_FILES: db/models.py, db/migrations/versions/, auth/identity.py, api/admin.py, tests/test_shops_onboard.py, tests/conftest.py, docs/reviews/, docs/tasks/03-Task-GD0-AcceptanceBackfill.md
 GATE: .venv/bin/python -m pytest tests/test_shops_onboard.py -x -q
 GATE_FULL: .venv/bin/python -m pytest tests/test_shops_onboard.py tests/test_tenant_isolation.py -x -q
@@ -266,7 +268,7 @@ BLOCKED_BY: PRE-007 (hosting region ADR phải ACCEPTED trước)
 <!-- /ADP -->
 
 1. `test_shops_onboard.py` (RED): (a) POST /api/admin/shops tạo Shop record; (b) JWT include `shop_id` từ DB; (c) cross-shop rejection (shop A token không list shop B messages).
-2. Add `Shop` model + Alembic 0005 (columns: id, name, zalo_oa_id UNIQUE, plan_tier, created_at, is_active).
+2. Add `Shop` model + Alembic 0006 (columns: id, name, zalo_oa_id UNIQUE, plan_tier, created_at, is_active).
 3. Extend `auth/identity.py`: load shop_id từ `shops` table thay stub, verify is_active.
 4. Add `POST /api/admin/shops` endpoint (admin-only auth).
 5. STOP+WAIT (per-step confirm — RISK high).
@@ -288,7 +290,7 @@ BLOCKED_BY: PRE-004 (Zalo creds + signature spec + rate-limit)
 6. `test_zalo_sender.py` (RED, MockTransport): (a) send message trả success shape; (b) retry on 5xx; (c) rate-limit 429 back-off.
 7. `test_webhook_idempotency.py` (RED): (a) valid signature accepted; (b) invalid signature rejected 401; (c) duplicate event_id rejected 200 (idempotent no-op).
 8. `RealZaloSender` implement (httpx + retry + timeout).
-9. `WebhookEventLog` model + Alembic 0006.
+9. `WebhookEventLog` model + Alembic 0007.
 10. Signature verify middleware + dedup wrapper trong `api/webhook.py`.
 11. STOP+WAIT (per-step confirm — RISK high, user-facing production).
 

@@ -28,5 +28,11 @@
     "red_exit": "1",
     "red_ts": "2026-07-19T22:44:55+0700",
     "files": "db/models.py,db/migrations/versions/,api/admin.py,app/config.py"
+  },
+  "09-C0-conversation-race": {
+    "acc_sha": "4e97f86e27e303ee961dfee0d72b9cf8ae7d7472544b406ce3d1d147a76ae918",
+    "red_exit": "1",
+    "red_ts": "2026-07-20T08:29:58+0700",
+    "files": "db/models.py,db/migrations/versions/,channels/identity.py"
   }
 }

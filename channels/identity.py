@@ -42,12 +42,18 @@ async def resolve_conversation(
     `uq_customers_shop_chan_ext` constraint, then re-selects — so two concurrent inbound
     messages cannot produce duplicate customers.
 
-    KNOWN UNCOVERED (spec 06 F1): the conversation lookup is select-then-insert with no
-    unique constraint behind it, so a genuine race could create two conversations for one
-    customer. Harmless today because the webhook is not mounted and nothing calls this
-    concurrently. Before Spec 03c mounts the webhook, add a unique constraint on
-    `(shop_id, customer_id, channel)` and switch this to the same upsert shape as the
-    customer above. Do not rely on "it hasn't happened yet".
+    The conversation insert uses the same shape against
+    `uq_conversations_shop_cus_chan_thread` (spec 09 C0, closes ISSUE-017) — so neither half
+    of this function depends on request timing any more.
+
+    That constraint carries `NULLS NOT DISTINCT`, which is what makes it bite in the common
+    case: `external_thread_id` is usually NULL (Zalo does not always send `thread_id`), and
+    plain SQL treats NULLs as distinct — a normal UNIQUE would wave both rows through.
+
+    Idempotency key is `(shop_id, customer_id, channel, external_thread_id)`, so two distinct
+    threads from one customer stay two conversations. Whether Zalo actually rotates
+    `thread_id` mid-conversation is unknown (PRE-004, blocked) — see spec 09 §14 for why the
+    recoverable-if-wrong option was chosen.
     """
     if not shop_id:
         raise ValueError("shop_id is required — must come from verified auth, never a payload")
@@ -75,28 +81,44 @@ async def resolve_conversation(
         )
     ).scalar_one()
 
+    # Đối xứng HOÀN TOÀN với nhánh Customer ở trên: insert-on-conflict-do-nothing rồi
+    # re-select. Bản trước là select-then-insert — hai tin nhắn đồng thời cùng thấy "chưa
+    # có" rồi cùng insert ⇒ 2 conversation (ISSUE-017). Giờ Postgres là trọng tài, không
+    # phải thứ tự may rủi của hai request.
+    #
+    # `order_by(created_at.desc()).limit(1)` của bản cũ đã bỏ: nó tồn tại để CHỌN giữa nhiều
+    # conversation trùng, mà giờ trùng là điều constraint cấm. Giữ lại sẽ là dấu vết của một
+    # mô hình không còn đúng, và che mất việc `scalar_one()` bây giờ phải luôn tìm thấy đúng
+    # một row — nếu không thì có gì đó sai, và ta muốn biết chứ không muốn im lặng lấy cái mới nhất.
+    await session.execute(
+        pg_insert(Conversation)
+        .values(
+            id=f"cnv_{uuid.uuid4().hex[:16]}",
+            shop_id=shop_id,
+            customer_id=customer_id,
+            channel=channel,
+            external_thread_id=external_thread_id,
+        )
+        .on_conflict_do_nothing(constraint="uq_conversations_shop_cus_chan_thread")
+    )
+    await session.flush()
+
     conversation_id = (
         await session.execute(
             select(Conversation.id)
             .where(Conversation.shop_id == shop_id)
             .where(Conversation.customer_id == customer_id)
             .where(Conversation.channel == channel)
-            .order_by(Conversation.created_at.desc())
-            .limit(1)
-        )
-    ).scalar_one_or_none()
-
-    if conversation_id is None:
-        conversation_id = f"cnv_{uuid.uuid4().hex[:16]}"
-        session.add(
-            Conversation(
-                id=conversation_id,
-                shop_id=shop_id,
-                customer_id=customer_id,
-                channel=channel,
-                external_thread_id=external_thread_id,
+            # `is_(None)` chứ không `== None`: phải khớp ĐÚNG hàng mà upsert vừa nhắm tới.
+            # Lọc thiếu cột này thì khách có thread_B sẽ nhận về conversation của thread_A —
+            # tức gộp nhầm hai mạch, đúng thứ phương án B sinh ra để tránh.
+            .where(
+                Conversation.external_thread_id.is_(None)
+                if external_thread_id is None
+                else Conversation.external_thread_id == external_thread_id
             )
         )
+    ).scalar_one()
 
     await session.commit()
     return customer_id, conversation_id
