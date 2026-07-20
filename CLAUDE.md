@@ -57,7 +57,7 @@ app/          FastAPI entrypoint. main.py = NƠI DUY NHẤT wire concrete deps v
               factory (build_*_router(...)). config.py = Settings(BaseSettings) + get_settings() lru_cache.
 agent/        orchestrator · llm_client · embedder · policy_gate
   providers/  openai_client · together_client (subclass 17 dòng) · openai_embedder · together_embedder (e5)
-channels/     base (Protocol) · identity (resolve_conversation) · zalo/ adapter
+channels/     base (Protocol) · identity (resolve_conversation — upsert, race-safe) · zalo/ adapter
 retrieval/    pgvector.py — PgvectorRetriever(shop_scope=) hard filter SQL-level
 parsing/      chunk · ingest · extract (Wiki doc)
 storage/      base · local
@@ -65,7 +65,7 @@ bridge/       ohana_client (REST platform API, verify=True) · zalo_sender (Mock
 auth/         identity.py — HS256 JWT (user_id, shop_id, role) · require_admin · CSRF
 tools/        registry · wiki (search_wiki) · ohana_read (order_status)
 api/          admin (require_admin) · inbox · mock_auth (dev-only) · chat (mounted) · webhook (CHƯA mount)
-db/           models.py (tenant-first) · repos · session · migrations/ (Alembic 0001–0004)
+db/           models.py (tenant-first) · repos · session · migrations/ (Alembic 0001–0005)
 web/          Vite+React+TS. State-based routing (KHÔNG react-router). dist/ committed.
 tests/        pytest; conftest.py cung cấp fixture fresh_db (drop+create schema, dispose kể cả khi raise)
 .claude/      ADP v2.3 — hooks/ (guardrail.py) + tools/ (adp-*.sh)
@@ -106,6 +106,14 @@ Bất biến bảo mật. `.claude/hooks/guardrail.py` chặn cơ học **một 
   - `get_jwt_secret()` — fallback literal công khai nuôi CẢ path verify ⇒ attacker forge cookie với `shop_id` bất kỳ = cross-tenant bypass. Mint fail-closed + verify fail-open KHÔNG phải cặp an toàn.
   - `_DeterministicDevEmbedder` — vector giả ⇒ ingest báo `success: true` nhưng `search_wiki` trả chunk gần-ngẫu-nhiên ⇒ **AI trả lời khách sai, không stack trace**. Silent-wrong tệ hơn crash.
   - Quy tắc: fallback chỉ đúng ở dev thì gate trên cùng tín hiệu dev — **và test cái gate đó**.
+- **Idempotency của inbound phải nằm ở tầng DB, không ở code:** `resolve_conversation()` upsert
+  `Customer` (`uq_customers_shop_chan_ext`) và `Conversation`
+  (`uq_conversations_shop_cus_chan_thread`, **NULLS NOT DISTINCT**) — cả hai
+  `on_conflict_do_nothing` + re-select. Select-then-insert là ISSUE-017: hai tin nhắn đồng thời
+  ⇒ 2 conversation ⇒ lịch sử tách đôi, KHÔNG có exception nào.
+  ⚠️ `NULLS NOT DISTINCT` là bắt buộc chứ không phải tinh chỉnh: mặc định SQL coi NULL là
+  distinct, mà `external_thread_id` thường NULL (Zalo không phải lúc nào cũng gửi `thread_id`)
+  ⇒ UNIQUE thường sẽ cho qua cả hai row và constraint chỉ *trông như* đã vá.
 - **TDD cho phase RISK:high:** test ĐỎ trước khi impl.
 
 ---
@@ -148,8 +156,8 @@ CHECKPOINT_PREFIX: adp
 - **SMOKE gate:** test đo môi trường TEST; smoke đo môi trường THẬT — không cái nào thay được cái nào. Có mặt runtime → `SMOKE: PASS ref=docs/smokes/<spec>-<phase>.md` (điền OBSERVED bằng output THẬT, không viết "OK"). Không có mặt runtime → `SMOKE: N/A <lý do ≥12 ký tự>`. **Ghi dòng SMOKE TRƯỚC khi stamp** — stamp trước rồi ghi sau ⇒ hash lệch ⇒ REFUSE (đã dính đúng bẫy này với `REVIEW:` ở spec 06 F1). Xem `.claude/tools/adp-smoke.sh`.
   Vì sao có gate: spec 07 ship 3 lỗi mà 107 test xanh + mypy 0 + 3 vòng review không thấy → `docs/memory/SHIPPED-SURFACE.md`.
 - **Roadmap 3 tầng, 3 chủ:** L1 `docs/ROADMAP.md` (**người** viết) · L2 `docs/tasks/*.md` (spec, frozen) · L3 `docs/ROADMAP-STATUS.md` (**máy** sinh — không sửa tay). ⚠️ L1 nằm **NGOÀI** spec-lock có chủ ý: kéo vào vùng diff-bound = mỗi lần re-plan giữa sprint bị REFUSE vì DRIFT, tức máy cấm đổi ý. **Đừng "sửa" điều này.**
-- ⚠️ **Đọc số phase DONE cho đúng (WAIVER-001, DEC-OHANA-04):** CI chưa từng xanh cho tới `01c2479` (2026-07-19). **22/24 phase DONE được ký trong lúc CI đỏ** — và vì ruff chết ở step 7 nên `mypy`/`alembic`/`pytest` **chưa từng chạy trên CI** giai đoạn đó. Với 22 phase ấy, "DONE" = *"gate local pass, CI chưa xác nhận"*. Chỉ spec 08 (E0/E1/E2) ký trong thời kỳ CI xanh. Code hiện tại KHÔNG bị nghi ngờ — HEAD qua đủ 11 step CI.
-- **Hai bộ đếm, hai câu hỏi:** `adp-status.sh` = *phase đã ký* (24/34) · `adp-roadmap.sh` = *work item thật* (internal 9/25). Mục tiêu 100% = mẫu số `internal`, không gộp `external` chờ bên thứ ba. Số roadmap thấp hơn vì mẫu số ĐÚNG hơn — không phải tiến độ xấu đi (DEC-OHANA-03).
+- ⚠️ **Đọc số phase DONE cho đúng (WAIVER-001, DEC-OHANA-04):** CI chưa từng xanh cho tới `01c2479` (2026-07-19). **22/25 phase DONE được ký trong lúc CI đỏ** — và vì ruff chết ở step 7 nên `mypy`/`alembic`/`pytest` **chưa từng chạy trên CI** giai đoạn đó. Với 22 phase ấy, "DONE" = *"gate local pass, CI chưa xác nhận"*. Chỉ spec 08 (E0/E1/E2) + spec 09 (C0) ký trong thời kỳ CI xanh. Code hiện tại KHÔNG bị nghi ngờ — HEAD qua đủ 11 step CI.
+- **Hai bộ đếm, hai câu hỏi:** `adp-status.sh` = *phase đã ký* (25/35) · `adp-roadmap.sh` = *work item thật* (internal 9/25). Mục tiêu 100% = mẫu số `internal`, không gộp `external` chờ bên thứ ba. Số roadmap thấp hơn vì mẫu số ĐÚNG hơn — không phải tiến độ xấu đi (DEC-OHANA-03).
 - **Isolation:** ADP v2.3 riêng, KHÔNG dùng workspace v1.3 của Onfa/DrNick. Sandbox an toàn để calibrate decision-gate (SHADOW → hard-block sau ≥5 real decision). Contract: `docs/adr/hook-contract.md`.
 
 ---
@@ -173,12 +181,13 @@ CHECKPOINT_PREFIX: adp
 
 *(tóm tắt — nguồn thật ở `docs/tasks/` + `ROADMAP-STATUS.md`)*
 
-- ✅ **DONE:** Spec 01 (GĐ0 backend) · 02 (bootstrap) · 04 (GĐ0.5 UI) · 05 (config/embedder) · 06 (foundation) · 07 (General Chat — chạy THẬT end-to-end) · **08 (embedder swap → Together e5 1024-dim, 3/3)**.
-- ⏳ Spec 03 (acceptance backfill, 0/10, 4 BLOCKED chờ Tân) — migration đã dịch sang `0005`/`0006`/`0007` vì spec 08 lấy `0004`.
-- **Gate hiện tại:** pytest xanh (`-m 'not live'`, **129 test**, 6 live deselected) · ruff sạch (`--no-cache`) · mypy 0 lỗi / 39 file.
+- ✅ **DONE:** Spec 01 (GĐ0 backend) · 02 (bootstrap) · 04 (GĐ0.5 UI) · 05 (config/embedder) · 06 (foundation) · 07 (General Chat — chạy THẬT end-to-end) · 08 (embedder swap → Together e5 1024-dim, 3/3) · **09 (unique constraint chặn race Conversation, 1/1 — đóng ISSUE-017)**.
+- ⏳ Spec 03 (acceptance backfill, 0/10, 4 BLOCKED chờ Tân) — migration đã dịch **hai lần** sang `0006`/`0007`/`0008` (spec 08 lấy `0004`, spec 09 lấy `0005`). Số cấp theo thứ tự LAND, không theo thứ tự lập kế hoạch.
+- **Gate hiện tại:** pytest xanh (`-m 'not live'`, **137 test**, 6 live deselected) · ruff sạch (`--no-cache`) · mypy 0 lỗi / 40 file.
 - **Live (chạy tay, ngoài CI):** `test_together_live.py` 2 · `test_wiki_rag_live.py` 4 — cả 6 PASS 2026-07-19 với key thật.
-- `main` == `origin/main` (`github.com:wyattngo/ohana-ai`). STATE_HASH `546faeb6dd6a` @ spec 08 E2.
-- **OPEN:** ISSUE-010 (alerting) · ISSUE-019 action 6 (runtime deps chưa pin) · ISSUE-017 (`channels/identity.py` thiếu unique `(shop_id, customer_id, channel)` — PHẢI thêm trước khi Spec 03c mount webhook) · ISSUE-018 (blank-env không phủ complex field).
+- `main` == `origin/main` (`github.com:wyattngo/ohana-ai`). STATE_HASH `f36b9cd5fd89` @ spec 09 C0. **CI xanh** (`08c030a`, đủ 11 step).
+- **OPEN:** ISSUE-010 (alerting — `app/alert_service.py` chưa port, 429 không được đếm ở đâu) · ISSUE-018 (blank-env không phủ complex field).
+- **Chưa ai nhận:** rule thật của các run CI đỏ 17–18/07 (log chưa đào được) · `window_status` hết hạn có mở conversation MỚI không (constraint spec 09 sẽ chặn — phải trả lời trước `GD0-WINDOW`) · chưa có index vector (ivfflat/hnsw) cho corpus thật.
 - **Blocked backfill** (chờ Tân — không chặn gate, chặn real-content): PRE-002 platform REST API spec · PRE-003 real wiki corpus · PRE-004 Zalo OA creds + webhook signature.
 
 | Cần gì | Đọc đâu |

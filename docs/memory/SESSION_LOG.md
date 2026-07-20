@@ -284,3 +284,36 @@ Spec 03c mount webhook · legal TIA/consent chưa có chủ.
   2. ISSUE-019 action 6: pin runtime deps.
   3. ISSUE-017 trước khi Spec 03c mount webhook.
   4. Spec 03 còn 10 phase (4 BLOCKED chờ Tân).
+
+---
+
+## 2026-07-20 — ISSUE-019 đóng bằng bằng chứng CI · WAIVER-001 · spec 09 đóng ISSUE-017
+
+- **Owner:** Wyatt Ngo (main loop) + Claude (Opus 4.8)
+- **Duration:** tiếp nối phiên spec 08 cùng ngày
+- **Context:** Vào phiên với một việc treo duy nhất: "chưa ai xác nhận CI thật xanh".
+
+- **Done:**
+  - **Mở tab Actions** (qua `gh`, sau khi GitHub hết partial-outage). Kết quả lớn hơn câu hỏi: **23 run = toàn bộ lịch sử repo, 19 đỏ, 4 xanh — cả 4 đều sau commit vá ruff hôm qua.** CI **chưa từng xanh** cho tới `01c2479`. Lấy mẫu 2 run đỏ: cùng chết ở step `Ruff lint`, và vì nó là step 7 nên **`mypy`/`alembic`/`pytest` bị SKIP — chưa từng chạy trên CI**.
+  - **WAIVER-001 / DEC-OHANA-04** (`77534b9`) — Wyatt ký chấp nhận 22 EVIDENCE cũ, không re-stamp. Cơ sở: HEAD qua đủ 11 step trên container sạch. Waiver ghi rõ 4 thứ KHÔNG được waive, quan trọng nhất là nghĩa vụ nói thật về chữ "DONE" giai đoạn đó.
+  - **ISSUE-019 action 6** (`edb3ecf`) — pin 16 runtime dep. Đo trước khi pin: 4 đã qua đổi MAJOR (`openai` 1.30→2.45 là SDK của cả `TogetherClient` lẫn `TogetherEmbedder`, `pypdf` 4→6, `redis` 5→8, `sse-starlette` 2.1→3.4). CI xanh xác nhận resolve được trên runner sạch ⇒ **ISSUE-019 đóng trọn vẹn**.
+  - **Spec 09 C0** (`08c030a`, `20299d9`) — đóng **ISSUE-017**. `uq_conversations_shop_cus_chan_thread` UNIQUE **NULLS NOT DISTINCT** + `resolve_conversation()` sang upsert đối xứng. CI xanh.
+
+- **Decisions:**
+  - **WAIVER-001** — chấp nhận EVIDENCE 22 phase trước `01c2479`, không re-stamp (DEC-OHANA-04).
+  - **ISSUE-017 hình dạng constraint = B** (thêm `external_thread_id` vào khoá) thay vì A như issue viết. Lý do: câu quyết định nằm trong PRE-004 BLOCKED; khi phải đoán thì chọn cái **đoán sai còn sửa được** — B sai ⇒ phân mảnh, gộp lại được; A sai ⇒ gộp nhầm hai mạch, không tách lại.
+  - **Spec 09 đi qua ADP spine** thay vì commit thẳng, dù chỉ 1 phase — vì nó chạm `db/migrations`, và hai chuẩn cho cùng một loại rủi ro là chỗ spine bắt đầu mục ruỗng.
+
+- **Issues touched:** ISSUE-016 ✅ (phiên trước) · **ISSUE-017 ✅ RESOLVED** · **ISSUE-019 ✅ RESOLVED trọn vẹn** (6/6 action) · ISSUE-018 còn mở
+
+- **Bài học tự thân:**
+  - **Lần thứ tư trong sprint tôi tự tạo một phép đo xanh-mà-rỗng.** Test race đầu tiên dùng `asyncio.gather` và **XANH TRƯỚC KHI CÓ CONSTRAINT** — hai transaction không đan xen. Thay bằng test viết thẳng thứ tự, rồi kiểm chính nó bằng **mutation** (tắt cờ `nulls_not_distinct` ⇒ đúng assertion đó nổ). Mutation là thứ duy nhất phân biệt được "test có răng" với "test trông có vẻ".
+  - **Reviewer bắt đúng lần thứ hai liên tiếp.** Vòng 1 NEEDS_REVIEW: tôi chứng minh constraint chặn *plain INSERT* trong khi code thật dùng *upsert* — khoảng trống thật, và tôi đã lấp bằng đo chứ không bằng lập luận.
+  - **Ước lượng local nhẹ hơn thực tế.** Tôi từng nói "19/22 phase không tái lập được `ruff check`" (suy từ `git stash`). CI cho biết: chưa từng xanh lần nào. Suy luận cho ra con số gần đúng nhưng kết luận sai.
+  - **`downgrade -1` là bug chờ nổ.** Thêm `0005` làm đỏ 2 test spec 08 mà không dòng nào của spec 08 sai — chúng mô tả migration bằng *vị trí tương đối* thay vì *tên*. Đã sửa; bẫy này sẽ nổ với bất kỳ migration nào thêm sau.
+
+- **Next:**
+  1. `window_status` hết hạn có mở conversation MỚI không — constraint spec 09 sẽ chặn. Phải trả lời trước `GD0-WINDOW`.
+  2. Đào log run CI đỏ 17–18/07 tìm rule thật.
+  3. ISSUE-018 (blank-env complex field).
+  4. Spec 03 còn 10 phase, 4 BLOCKED chờ Tân.

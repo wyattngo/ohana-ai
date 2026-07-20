@@ -2,7 +2,7 @@
 
 > Nơi log deferred bugs / assumption breaks / waivers / open PRE checks. Update mỗi sub-phase (ghi mới, KHÔNG xoá cũ — chỉ đổi STATUS + gắn resolved commit SHA).
 >
-> Last updated: 2026-07-19 · Status: Spec 01/02/04/05/06/07/08 DONE (**ADP 24/34**, internal 9/25). Gate: 129 test xanh · ruff sạch (`--no-cache`, pin) · mypy 0 lỗi/39 file. Live 6/6 PASS tay với key thật.
+> Last updated: 2026-07-20 · Status: Spec 01/02/04/05/06/07/08/09 DONE (**ADP 25/35**, internal 9/25). Gate: 137 test xanh · ruff sạch (`--no-cache`, pin) · mypy 0 lỗi/40 file. Live 6/6 PASS tay. **CI XANH** (`08c030a`, đủ 11 step trên container sạch).
 > · ✅ ĐÓNG session này: ISSUE-016 (F1 wiki-RAG chạy thật trên e5).
 > · ⚠️ MỞ session này: ISSUE-018 (blank-env không phủ complex field) · ISSUE-019 (gate ADP từng cho kết quả sai vì cache+version trôi — **19/22 phase DONE cũ không tái lập được `ruff check`**).
 > · Chưa ai nhận: trạng thái CI THẬT chưa ai mở tab Actions xác nhận · runtime deps chưa pin · PRE-002/003/004 chờ Tân.
