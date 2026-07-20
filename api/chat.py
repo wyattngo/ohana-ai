@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -85,7 +85,8 @@ def get_llm_client() -> LLMClient:
 
 
 def build_router(
-    identity_dep: Callable[..., Identity],
+    # Sync hoặc async (spec 11 S1 làm nó async — tra `shops`). FastAPI nhận cả hai.
+    identity_dep: Callable[..., Identity | Awaitable[Identity]],
     llm_dep: Callable[..., LLMClient] = get_llm_client,
 ) -> APIRouter:
     router = APIRouter(tags=["chat"])

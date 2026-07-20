@@ -1,0 +1,22 @@
+{
+  "verdict": "APPROVE",
+  "model": "claude-haiku-4-5-20251001",
+  "summary": "Phase S1 đóng lỗ shop_id tự khai. shop_id do server sinh (uuid4), body client bị extra=ignore bỏ qua. build_active_shop_dep kiểm CẢ tồn tại LẪN status='active', trả 401 cùng detail cho hai ca nên không lộ shop_id nào là thật. build_admin_dep kiểm shop TRƯỚC role. Đủ 3 cửa inbox/chat/admin. verify_token giữ sync/thuần. ShopRepo tách sang db/shop_repo.py chỉ import Shop — đóng gate import-graph spec 07. Seed fixture shop nằm sau _is_dev_env() và idempotent. Test vượt CSRF trước khi đo tầng shop, và có đối chứng shop-active-phải-qua.",
+  "findings": [],
+  "checks": {
+    "server_generated_id": "pass",
+    "onboard_admin_only": "pass",
+    "checks_existence_and_status": "pass",
+    "no_oracle_leak": "pass",
+    "shop_before_role": "pass",
+    "all_three_doors": "pass",
+    "verify_token_still_pure": "pass",
+    "shop_repo_narrow": "pass",
+    "dev_seed_gated": "pass",
+    "test_passes_csrf_first": "pass",
+    "has_positive_control": "pass",
+    "allowed_files": "pass"
+  },
+  "diff_sha256": "2d8a1124183104bba2912d44404730e2bb97cb5e4d447b0af72e22f8a653ece1",
+  "stamped_at": "2026-07-20T23:22"
+}

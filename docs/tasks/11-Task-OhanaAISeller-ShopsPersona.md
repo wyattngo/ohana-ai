@@ -208,17 +208,26 @@ REVIEW: PASS ref=docs/reviews/11-S0-auto-verdict.json
 ### Phase S1 — Onboard shop thật → JWT mang `shop_id` đã verify
 
 <!-- ADP:PHASE S1 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 ROADMAP: GD0-SHOPS
 GOAL: `POST /admin/shops` tạo shop thật (admin-only); JWT phát ra mang `shop_id` của một row `shops` TỒN TẠI; JWT khai `shop_id` không có trong `shops` bị TỪ CHỐI; test cross-shop: JWT shop A không đọc được data shop B.
 APPROACH: Onboard endpoint vào `api/admin.py` (đã có `require_admin`). Điểm cốt lõi: `auth/identity.py` thôi tin `shop_id` chỉ vì nó có chữ ký hợp lệ — phải đối chiếu với `shops`. Đây là đổi hành vi của ranh giới tenant, không phải thêm endpoint. `api/mock_auth.py` GIỮ LẠI cho dev nhưng thôi là nguồn `shop_id` duy nhất; fixture shop của nó phải được seed vào `shops` khi `OHANA_ENV=dev`, nếu không dev env vỡ im lặng.
-ALLOWED_FILES: api/admin.py, auth/identity.py, api/mock_auth.py, db/repos.py, tests/test_shops_persona.py, tests/test_tenant_isolation.py, docs/tasks/11-Task-OhanaAISeller-ShopsPersona.md, docs/reviews/, docs/smokes/
+ALLOWED_FILES: api/admin.py, auth/identity.py, api/mock_auth.py, db/repos.py, db/shop_repo.py, app/main.py, api/inbox.py, api/chat.py, tests/test_shops_persona.py, tests/test_tenant_isolation.py, docs/tasks/11-Task-OhanaAISeller-ShopsPersona.md, docs/reviews/, docs/smokes/
+ALLOWED_FILES_AMEND: Wyatt duyệt 2026-07-20 — 3 file thêm, cả ba BỊ ÉP CƠ HỌC, không phải mở scope tuỳ ý.
+  · `db/shop_repo.py` (mới): gate ranh giới spec 07 (`test_chat_module_cannot_reach_the_customer_send_path`)
+    ĐỎ khi `ShopRepo` nằm trong `db/repos.py` — bao đóng thành `api.chat → auth.identity → db.repos →
+    db.models.PendingReply`, tức đường chat nội bộ nối tới module sở hữu hàng đợi gửi khách. Gate đúng;
+    tách module làm phụ thuộc hẹp lại đúng bằng thứ auth thật sự cần (`Shop`).
+  · `api/inbox.py` + `api/chat.py`: dependency thành async ⇒ annotation phải là
+    `Callable[..., Identity | Awaitable[Identity]]`. mypy chặn ở call site, không có đường vòng.
+  · `app/main.py`: 3 call site — chính là nơi wire, không thể không đụng.
 GATE: .venv/bin/python -m pytest tests/test_shops_persona.py -x -q
 GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && .venv/bin/mypy app agent retrieval parsing storage db bridge tools api auth && .venv/bin/ruff check . --no-cache && .venv/bin/ruff format --check . --no-cache
 RETRY: 0/3
 RISK: high (✅ WYATT KÝ 2026-07-20. Floor cho `auth/` là medium, nhưng ký **high**: phase này ĐỔI HÀNH VI của ranh giới tenant — thứ mà CLAUDE.md §3 gọi là "bất biến cốt lõi". Sai ở đây không hỏng một tính năng, nó hỏng sự cách ly giữa mọi shop. high ⇒ per-step confirm + Wyatt đọc diff sync + human review artifact.)
 BLOCKED_BY: S0 DONE
-SMOKE:
+SMOKE: PASS ref=docs/smokes/11-S1.md
+REVIEW: PASS ref=docs/reviews/11-S1-auto-verdict.json human=docs/reviews/11-S1-human.md
 <!-- /ADP -->
 
 1. Test (**RED trước**): (a) onboard tạo row + trả shop_id; (b) non-admin → 403; (c) JWT với `shop_id` không có trong `shops` → từ chối; (d) cross-shop đọc → rỗng; (e) `OHANA_ENV=dev` seed fixture shop, ngoài dev thì KHÔNG.

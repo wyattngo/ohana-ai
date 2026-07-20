@@ -37,12 +37,15 @@ read did on every call.
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 import jwt
 from fastapi import Depends, HTTPException, Request
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.config import Settings
+from db.shop_repo import ShopRepo
 
 _ALLOWED_ALGOS = ["HS256"]
 
@@ -120,6 +123,58 @@ def identity_from_cookie(request: Request) -> Identity:
         return verify_token(token, secret=get_jwt_secret())
     except (jwt.InvalidTokenError, ValueError) as exc:
         raise HTTPException(status_code=401, detail="invalid_session_cookie") from exc
+
+
+def build_active_shop_dep(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> Callable[..., Awaitable[Identity]]:
+    """Dependency factory (spec 11 S1) — `identity_from_cookie` + đối chiếu `shops`.
+
+    **Vì sao lớp này tồn tại.** `verify_token` chỉ chứng minh token được ký bằng secret của
+    ta và có đủ claim. Nó KHÔNG chứng minh `shop_id` trong claim trỏ tới một shop có thật:
+    trước S1, một token ký đúng mang `shop_id` là chuỗi bất kỳ đi thẳng vào mọi tầng dưới,
+    và bảng `shops` (S0) không ai hỏi tới. Ca cụ thể nhất không phải kẻ tấn công mà là token
+    dev fixture (`fixture-shop-001`) lọt sang môi trường khác.
+
+    **Vì sao KHÔNG nhét DB vào `verify_token`.** Verify chữ ký là hàm thuần, đồng bộ, test
+    được không cần Postgres — kéo I/O vào đó làm mọi test chữ ký phải dựng DB, và trộn hai
+    câu hỏi khác nhau ("token có thật không" vs "shop còn hoạt động không") vào một chỗ.
+    Tách ra thì mỗi tầng hỏng theo cách riêng và đọc log biết ngay tầng nào.
+
+    **Chưa cache** (Wyatt ký 2026-07-20): mỗi request thêm một PK lookup. Cache sai key là
+    cross-tenant leak KHÔNG đi qua SQL nên FK không cứu được (R2, spec §4). Chưa có shop
+    thật để đo tải ⇒ đo trước, cache sau — và khi thêm thì phải kèm test 2 shop song song.
+    """
+
+    async def _dep(identity: Identity = Depends(identity_from_cookie)) -> Identity:
+        async with session_factory() as session:
+            shop = await ShopRepo(session).get_active(identity.shop_id)
+        if shop is None:
+            # 401 (không phải 403) và CÙNG một detail cho cả "không tồn tại" lẫn "bị treo":
+            # phân biệt hai ca đó cho kẻ tấn công biết `shop_id` nào là thật. Cùng hình dạng
+            # với `identity_from_cookie` — cookie thiếu và cookie hỏng cũng không phân biệt.
+            raise HTTPException(status_code=401, detail="invalid_session_cookie")
+        return identity
+
+    return _dep
+
+
+def build_admin_dep(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> Callable[..., Awaitable[Identity]]:
+    """`build_active_shop_dep` + role check — bản có kiểm shop của `require_admin`.
+
+    Phải bọc lên dependency MỚI chứ không phải `identity_from_cookie`: nếu quên, đường admin
+    thành cửa DUY NHẤT không kiểm shop, và nó lại đúng là cửa quyền cao nhất.
+    """
+    active_shop_dep = build_active_shop_dep(session_factory)
+
+    async def _dep(identity: Identity = Depends(active_shop_dep)) -> Identity:
+        if identity.role != "admin":
+            raise HTTPException(status_code=403, detail="admin_role_required")
+        return identity
+
+    return _dep
 
 
 def require_admin(identity: Identity = Depends(identity_from_cookie)) -> Identity:

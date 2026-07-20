@@ -49,6 +49,29 @@ def _is_dev_env() -> bool:
     return os.environ.get("OHANA_ENV") == "dev"
 
 
+async def _ensure_fixture_shop() -> None:
+    """Tạo row `shops` cho fixture shop nếu chưa có. CHỈ gọi từ nhánh đã qua `_is_dev_env()`.
+
+    Dùng session riêng thay vì nhận `session_factory` qua `build_router`: giữ chữ ký
+    `build_router()` không đổi (nó được gọi ở `app/main.py` và trong test), và đây là đường
+    dev-only nên không đáng đánh đổi API của router production.
+    """
+    from sqlalchemy import text
+
+    from db.session import make_session_factory
+
+    session_factory = make_session_factory()
+    async with session_factory() as session:
+        await session.execute(
+            text(
+                "insert into shops (id, name, status) values (:i, :n, 'active') "
+                "on conflict (id) do nothing"
+            ),
+            {"i": _FIXTURE_SHOP_ID, "n": "Dev Fixture Shop"},
+        )
+        await session.commit()
+
+
 def build_router() -> APIRouter:
     router = APIRouter(prefix="/mock", tags=["mock-auth-dev-only"])
 
@@ -58,6 +81,17 @@ def build_router() -> APIRouter:
             raise HTTPException(status_code=404)
         if role not in _ALLOWED_ROLES:
             raise HTTPException(status_code=422, detail="invalid_role")
+
+        # Spec 11 S1 — seed fixture shop vào `shops`, CHỈ ở dev.
+        #
+        # Từ S1, mọi route đối chiếu `shop_id` với bảng `shops`. Không seed thì luồng dev vỡ
+        # theo kiểu tệ nhất: `mock/authorize` vẫn trả 200 (nó chỉ mint token), rồi MỌI route
+        # sau đó 401 vì `fixture-shop-001` không có trong bảng. Tầng mint nói OK, tầng dùng
+        # nói không — người debug sẽ đi soi JWT chứ không nghĩ tới bảng shops.
+        #
+        # Idempotent (`on conflict do nothing`) và nằm SAU `_is_dev_env()`: ngoài dev route
+        # này đã 404 từ dòng trên, nên không có đường nào seed vào production.
+        await _ensure_fixture_shop()
 
         token = jwt.encode(
             {"sub": _FIXTURE_USER_ID, "shop_id": _FIXTURE_SHOP_ID, "role": role},

@@ -40,8 +40,8 @@ from api.mock_auth import build_router as build_mock_auth_router
 from auth.identity import (
     CSRF_COOKIE_NAME,
     CSRF_HEADER_NAME,
-    identity_from_cookie,
-    require_admin,
+    build_active_shop_dep,
+    build_admin_dep,
 )
 from db.session import make_session_factory
 
@@ -67,13 +67,22 @@ app = FastAPI(title="Ohana AI Seller", version="0.1.0")
 
 _session_factory = make_session_factory()
 
+# Spec 11 S1 — MỌI cửa đều đi qua dependency có đối chiếu `shops`, không cửa nào dùng
+# `identity_from_cookie` trần nữa. `identity_from_cookie` chỉ chứng minh token được ký đúng;
+# nó KHÔNG chứng minh `shop_id` trỏ tới một shop có thật và còn hoạt động.
+#
+# ⚠️ Sót MỘT call site = còn một cửa không kiểm shop, và nó sẽ không đỏ test nào trừ khi test
+# probe đúng cửa đó. Vì vậy `tests/test_shops_persona.py` probe CẢ BA (inbox / chat / admin).
+_identity_dep = build_active_shop_dep(_session_factory)
+_admin_dep = build_admin_dep(_session_factory)
+
 app.include_router(
-    build_inbox_router(_session_factory, identity_from_cookie),
+    build_inbox_router(_session_factory, _identity_dep),
     prefix="/api",
 )
 app.include_router(build_mock_auth_router(), prefix="/api")
 app.include_router(
-    build_admin_router(default_embedder(), _session_factory, require_admin),
+    build_admin_router(default_embedder(), _session_factory, _admin_dep),
     prefix="/api",
 )
 # General Chat (spec 07 G1). No session factory and no embedder: this endpoint deliberately
@@ -81,7 +90,7 @@ app.include_router(
 # for why that isolation is the point, not an omission. The Together client is built lazily
 # inside the router's dependency, so a missing TOGETHER_API_KEY breaks /api/chat only rather
 # than preventing this module from importing at all.
-app.include_router(build_chat_router(identity_from_cookie), prefix="/api")
+app.include_router(build_chat_router(_identity_dep), prefix="/api")
 
 
 @app.get("/health")

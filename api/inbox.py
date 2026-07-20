@@ -15,7 +15,7 @@ API idempotent and cheap; make the actual outbound send an isolated retryable st
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -41,7 +41,9 @@ def build_router(
     # `Depends(identity_dep)` an arg-type error and forced four `type: ignore` comments —
     # and those carried the WRONG code (`valid-type`), so they suppressed nothing while
     # themselves being flagged as unused. One accurate annotation removes all of it.
-    identity_dep: Callable[..., Identity],  # FastAPI dependency → Identity (wired by app.main)
+    # FastAPI dependency → Identity (wired by app.main). Sync HOẶC async: spec 11 S1 làm nó
+    # async vì phải tra `shops`. FastAPI nhận cả hai — annotation phải nói đúng điều đó.
+    identity_dep: Callable[..., Identity | Awaitable[Identity]],
 ) -> APIRouter:
     router = APIRouter(prefix="/inbox", tags=["inbox"])
 

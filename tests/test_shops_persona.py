@@ -271,3 +271,222 @@ async def test_published_at_defaults_null(fresh_db) -> None:
         await ShopProfileRepo(s, shop_scope=shop).upsert(persona_md="draft", knowledge={})
         got = await ShopProfileRepo(s, shop_scope=shop).get()
     assert got is not None and got.published_at is None
+
+
+# =====================================================================================
+# S1 — onboard shop thật → JWT mang `shop_id` ĐÃ ĐỐI CHIẾU `shops`.
+# Viết TRƯỚC endpoint + đối chiếu DB ⇒ expected RED. RISK:high (Wyatt ký 2026-07-20).
+#
+# **Lỗ đang đóng.** S0 dựng bảng cha, nhưng `auth/identity.py` vẫn tin `shop_id` chỉ vì
+# chữ ký JWT hợp lệ. Nghĩa là một token ký đúng mang `shop_id` là chuỗi BẤT KỲ vẫn đi
+# thẳng vào mọi tầng dưới — bảng `shops` có tồn tại cũng không ai hỏi tới nó.
+#
+# **Hai quyết định Wyatt chốt trong phiên (2026-07-20), test đóng băng cả hai:**
+#   - `status != 'active'` ⇒ TỪ CHỐI (fail-closed). Suspend một shop phải cắt được truy cập
+#     NGAY, không chờ token hết hạn 24h. Nếu chỉ kiểm tồn tại thì `status` là cột trang trí —
+#     loại dễ bị đọc nhầm là có tác dụng.
+#   - CHƯA cache. Mỗi request thêm một PK lookup. Cache sai key là cross-tenant leak KHÔNG đi
+#     qua SQL nên FK không cứu được (R2, §4). Chưa có shop thật để đo tải ⇒ đo trước, cache sau.
+# =====================================================================================
+
+import jwt as _pyjwt  # noqa: E402
+import pytest as _pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+from auth.identity import SESSION_COOKIE_NAME, get_jwt_secret  # noqa: E402
+
+
+@_pytest.fixture
+def dev_client(monkeypatch: _pytest.MonkeyPatch) -> TestClient:
+    monkeypatch.setenv("OHANA_ENV", "dev")
+    from app.main import app
+
+    return TestClient(app)
+
+
+def _mint(shop_id: str, *, role: str = "seller") -> str:
+    """Token ký ĐÚNG, chỉ khác `shop_id`. Đây là mô hình mối đe doạ thật của phase này:
+    không phải chữ ký giả, mà là một `shop_id` chưa từng tồn tại (hoặc đã bị treo) đi kèm
+    chữ ký hợp lệ — token dev fixture lọt sang prod là ca cụ thể nhất."""
+    return _pyjwt.encode(
+        {"sub": "u_test", "shop_id": shop_id, "role": role},
+        get_jwt_secret(),
+        algorithm="HS256",
+    )
+
+
+async def _seed_shop_row(shop_id: str, *, status: str) -> None:
+    from sqlalchemy import text as _text
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    from db.session import make_engine
+
+    engine = make_engine()
+    try:
+        async with async_sessionmaker(engine, expire_on_commit=False)() as s:
+            await s.execute(
+                _text(
+                    "insert into shops (id, name, status) values (:i, :n, :st) "
+                    "on conflict (id) do update set status = excluded.status"
+                ),
+                {"i": shop_id, "n": f"Shop {shop_id}", "st": status},
+            )
+            await s.commit()
+    finally:
+        await engine.dispose()
+
+
+# --- onboard endpoint ----------------------------------------------------------------
+
+
+def test_onboard_requires_admin(dev_client: TestClient) -> None:
+    """Seller cookie hợp lệ vẫn KHÔNG tạo được shop — 403.
+
+    `POST /admin/shops` là đường SINH RA tenant. Nếu seller gọi được, một tenant tự tạo
+    được tenant khác và toàn bộ mô hình cách ly mất nghĩa ngay từ gốc.
+    """
+    resp = dev_client.post("/api/mock/authorize?role=seller")
+    assert resp.status_code == 200
+    csrf = dev_client.cookies.get("ohana_csrf")
+    r = dev_client.post(
+        "/api/admin/shops",
+        json={"name": "Shop lén"},
+        headers={"X-CSRF-Token": csrf or ""},
+    )
+    assert r.status_code == 403, f"seller tạo được shop — {r.status_code} {r.text}"
+
+
+def test_onboard_creates_real_shop(dev_client: TestClient) -> None:
+    """Admin onboard ⇒ row `shops` THẬT, `id` do server sinh.
+
+    `id` KHÔNG được nhận từ client: cho client chọn `shop_id` nghĩa là cho họ chọn danh
+    tính tenant, tức mở lại đúng lỗ mà phase này đóng.
+    """
+    resp = dev_client.post("/api/mock/authorize?role=admin")
+    assert resp.status_code == 200
+    csrf = dev_client.cookies.get("ohana_csrf")
+    r = dev_client.post(
+        "/api/admin/shops",
+        json={"name": "Shop Áo Thun 24h"},
+        headers={"X-CSRF-Token": csrf or ""},
+    )
+    assert r.status_code in (200, 201), r.text
+    body = r.json()
+    assert body.get("shop_id"), f"onboard phải trả shop_id, nhận {body}"
+    assert body["shop_id"] != "Shop Áo Thun 24h"
+
+
+def test_onboard_ignores_client_supplied_id(dev_client: TestClient) -> None:
+    """Client khai `id`/`shop_id` trong body ⇒ BỊ BỎ QUA, không được dùng.
+
+    Cùng bất biến với `ChatIn(extra="ignore")` của spec 07: thân request không bao giờ
+    quyết định tenancy.
+    """
+    dev_client.post("/api/mock/authorize?role=admin")
+    csrf = dev_client.cookies.get("ohana_csrf")
+    r = dev_client.post(
+        "/api/admin/shops",
+        json={"name": "Shop X", "id": "shop_tu_khai", "shop_id": "shop_tu_khai"},
+        headers={"X-CSRF-Token": csrf or ""},
+    )
+    assert r.status_code in (200, 201, 422), r.text
+    if r.status_code != 422:
+        assert r.json()["shop_id"] != "shop_tu_khai", "client tự chọn được shop_id — lỗ tenancy"
+
+
+# --- đối chiếu shops ở đường VERIFY ---------------------------------------------------
+
+
+def test_jwt_with_unknown_shop_is_rejected(dev_client: TestClient) -> None:
+    """Token ký ĐÚNG nhưng `shop_id` không có trong `shops` ⇒ 401.
+
+    Đây là mệnh đề trung tâm của S1. Trước phase này, token như vậy đi lọt hoàn toàn.
+    """
+    dev_client.cookies.set(SESSION_COOKIE_NAME, _mint("shop_khong_bao_gio_ton_tai"))
+    r = dev_client.get("/api/inbox")
+    assert r.status_code == 401, f"shop không tồn tại vẫn qua — {r.status_code} {r.text}"
+
+
+@_pytest.mark.asyncio
+async def test_jwt_with_inactive_shop_is_rejected(dev_client: TestClient) -> None:
+    """Shop TỒN TẠI nhưng `status='suspended'` ⇒ 401 (Wyatt ký fail-closed).
+
+    Không có test này thì `status` là cột trang trí: suspend một shop sẽ không có hiệu lực
+    nào cho tới khi token hết hạn 24h, trong khi người bấm nút suspend tin rằng nó đã cắt.
+    """
+    await _seed_shop_row("shop_bi_treo", status="suspended")
+    dev_client.cookies.set(SESSION_COOKIE_NAME, _mint("shop_bi_treo"))
+    r = dev_client.get("/api/inbox")
+    assert r.status_code == 401, f"shop suspended vẫn qua — {r.status_code} {r.text}"
+
+
+@_pytest.mark.asyncio
+async def test_jwt_with_active_shop_passes(dev_client: TestClient) -> None:
+    """(đối chứng) Shop active thì PHẢI qua.
+
+    Thiếu test này thì một implementation từ chối MỌI thứ vẫn làm hai test trên xanh —
+    và "khoá sạch" cũng là một cách hỏng.
+    """
+    await _seed_shop_row("shop_dang_hoat_dong", status="active")
+    dev_client.cookies.set(SESSION_COOKIE_NAME, _mint("shop_dang_hoat_dong"))
+    r = dev_client.get("/api/inbox")
+    assert r.status_code == 200, f"shop active bị chặn — {r.status_code} {r.text}"
+
+
+def test_dev_fixture_shop_exists_so_mock_flow_still_works(dev_client: TestClient) -> None:
+    """`OHANA_ENV=dev` ⇒ fixture shop của `mock_auth` phải TỒN TẠI trong `shops`.
+
+    Nếu không seed, S1 sẽ làm vỡ toàn bộ luồng dev một cách im lặng: `mock/authorize` vẫn
+    trả 200 (nó chỉ mint token), rồi mọi route sau đó 401 vì `fixture-shop-001` không có
+    trong bảng. Đó là kiểu hỏng tệ nhất — tầng mint nói OK, tầng dùng nói không.
+    """
+    resp = dev_client.post("/api/mock/authorize?role=seller")
+    assert resp.status_code == 200
+    r = dev_client.get("/api/inbox")
+    assert r.status_code == 200, (
+        f"luồng dev vỡ sau S1 — fixture shop chưa được seed vào `shops`? {r.status_code} {r.text}"
+    )
+
+
+# --- cả BA cửa, không chỉ /api/inbox -------------------------------------------------
+#
+# Wire dependency mới là việc thủ công ở `app/main.py`: sót MỘT call site nghĩa là còn một
+# cửa không kiểm shop, và nó KHÔNG đỏ test nào nếu test chỉ probe cửa khác. Cửa dễ sót nhất
+# lại là `admin` — nó có dependency RIÊNG (`build_admin_dep`), nên đổi `_identity_dep` mà
+# quên `_admin_dep` sẽ để hở đúng cửa quyền cao nhất.
+
+
+@_pytest.mark.parametrize(
+    ("method", "path", "body"),
+    [
+        ("get", "/api/inbox", None),
+        ("post", "/api/chat", {"message": "xin chào"}),
+        ("post", "/api/admin/wiki/ingest", {"text": "x", "source_ref": "r"}),
+    ],
+)
+def test_every_door_rejects_unknown_shop(
+    dev_client: TestClient, method: str, path: str, body: dict[str, str] | None
+) -> None:
+    """Token ký đúng + `shop_id` không tồn tại ⇒ 401 ở MỌI cửa.
+
+    **Phải vượt CSRF TRƯỚC, nếu không test xanh vì lý do sai.** Bản đầu của test này không
+    gửi `X-CSRF-Token`, nên hai route POST bị middleware chặn ở 403 `csrf_check_failed`
+    trước khi chạm tầng kiểm shop — tức nó đo CSRF chứ không đo cái nó tuyên bố. Một biến
+    thể "chấp nhận cả 401 lẫn 403" sẽ càng tệ: nó XANH kể cả khi tầng kiểm shop bị gỡ sạch.
+
+    Nên: authorize để lấy CSRF hợp lệ, rồi ĐÈ cookie phiên bằng token giả mạo. Giờ request
+    đi qua được CSRF và dừng đúng ở tầng ta muốn đo.
+    """
+    # 1. Lấy CSRF thật (đồng thời set cookie phiên hợp lệ — sẽ bị đè ở bước 2).
+    assert dev_client.post("/api/mock/authorize?role=admin").status_code == 200
+    csrf = dev_client.cookies.get("ohana_csrf")
+    assert csrf
+
+    # 2. Đè phiên bằng token ký ĐÚNG nhưng trỏ shop không tồn tại. `role=admin` để cửa admin
+    #    không bị 403 vì role — ta muốn nó dừng ở tầng shop, không ở tầng role.
+    dev_client.cookies.set(SESSION_COOKIE_NAME, _mint("shop_khong_ton_tai", role="admin"))
+
+    resp = dev_client.request(method, path, json=body, headers={"X-CSRF-Token": csrf})
+    assert resp.status_code == 401, (
+        f"{method.upper()} {path} KHÔNG kiểm shop — {resp.status_code} {resp.text}"
+    )
