@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChevronRight, Lock, Loader2, MessageCircle, ShieldCheck } from "lucide-react";
 import { ApiError, mockAuthorize } from "../lib/api";
+import { Logo } from "../components/Logo";
 import "./ChannelPicker.css";
 
 /**
@@ -57,6 +58,10 @@ export function ChannelPicker({ onConnected, onError }: ChannelPickerProps) {
     return (
       <main className="screen channel-picker">
         <header className="screen-header">
+          {/* Lockup chỉ đặt ở màn hình đầu tiên — đây là chỗ duy nhất seller thấy sản phẩm
+              trước khi biết nó là gì. Các màn sau đã có ngữ cảnh, nhét logo vào chỉ tốn
+              chiều cao trên khung 430px. */}
+          <Logo size={36} />
           <h1>Kết nối kênh bán hàng</h1>
           <p>Chọn kênh để Ohana AI bắt đầu soạn sẵn phản hồi cho bạn duyệt.</p>
         </header>

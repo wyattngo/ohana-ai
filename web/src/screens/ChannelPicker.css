@@ -1,3 +1,9 @@
+/* Lockup ở đầu màn hình kết nối. `.screen-header h1` có margin 0 nên khoảng cách phải do
+   logo tự khai, không dựa vào lề mặc định. */
+.channel-picker .ohana-logo {
+  margin-bottom: 20px;
+}
+
 .channel-list {
   list-style: none;
   margin: 0;
