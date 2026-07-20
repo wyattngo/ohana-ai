@@ -172,7 +172,8 @@ REVIEW: PASS ref=docs/reviews/10-H0-auto-verdict.json
 ### Phase H1 — Write path: ghi inbound + outbound
 
 <!-- ADP:PHASE H1 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=e6d7ef8, gate_exit=0, duration=11s, review=PASS(judge=APPROVE,model=claude-haiku-4-5-20251001,bound=4fba514be60e,tier=medium), smoke=PASS(bound=4fba514be60e), ran=2026-07-20T13:44
 ROADMAP: GD0-HISTORY
 GOAL: Một tin nhắn khách đi qua webhook để lại ĐÚNG 1 row `role='user'` gắn đúng `conversation_id`; nhánh `auto_send` để lại thêm ĐÚNG 1 row `role='assistant'`; nhánh `park` KHÔNG để lại row assistant; `MessageRepo` từ chối ghi/đọc ngoài `shop_scope`.
 GOAL-AMEND (Wyatt ký 2026-07-20, trước khi H1 bắt đầu): vế "ghi 2 lần cùng payload không nhân đôi row (idempotency theo quyết định PRE-1004)" **ĐÃ GỠ**. Ba lý do: (1) trích dẫn sai — PRE-1004 nói về nhánh `park`, không nói gì về idempotency; (2) sau H0 `messages` KHÔNG có khoá dedup nào (`external_message_id`/unique), nên không có gì để nhận ra payload trùng; (3) cơ chế dedup là `webhook_event_log` (`event_id` PRIMARY KEY) thuộc **spec 03 Phase 2**, class `external`, BLOCKED chờ Tân (PRE-004).
