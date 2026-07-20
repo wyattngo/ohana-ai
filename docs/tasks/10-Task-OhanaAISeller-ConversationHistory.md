@@ -145,7 +145,8 @@ PRE-1005: `role` khi seller sửa draft rồi gửi — Wyatt chốt.
 ### Phase H0 — Schema: `Message` gắn conversation + composite FK
 
 <!-- ADP:PHASE H0 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=e4971e0, gate_exit=0, duration=17s, review=PASS(judge=APPROVE,model=claude-haiku-4-5-20251001,bound=31d5d34fc39c,tier=medium), smoke=PASS(bound=31d5d34fc39c), ran=2026-07-20T13:23
 ROADMAP: GD0-HISTORY
 GOAL: `messages` có `conversation_id`/`customer_id` NOT NULL + 2 composite FK; Postgres TỪ CHỐI message trỏ conversation của shop khác (test chứng minh bằng `IntegrityError`, không bằng đọc code); index `(shop_id, conversation_id, created_at)` tồn tại; migration up→down→up sạch.
 APPROACH: Đúng shape composite FK mà spec 06 F0 đã áp cho `Conversation`/`OrderDraft`/`PendingReply` — `ForeignKeyConstraint(["shop_id","conversation_id"], ["conversations.shop_id","conversations.id"])`. Lý do phải composite chứ không FK đơn đã viết sẵn trong docstring `PendingReply`: FK đơn chỉ đòi id TỒN TẠI, không đòi cùng shop, nên nó cho phép message của shop A trỏ conversation shop B và Postgres im lặng chấp nhận. Thêm `customer_id` luôn (cùng migration) để đối xứng với `PendingReply` và để truy vấn "mọi message của khách này xuyên conversation" không phải join. Index mới đặt cạnh `idx_msg_shop_created` chứ không thay nó — cái cũ phục vụ truy vấn theo shop, cái mới phục vụ đọc history.

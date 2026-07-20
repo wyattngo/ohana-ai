@@ -1,14 +1,14 @@
 # ROADMAP STATUS — ohana-ai (L3, SINH MÁY)
 
-> **AUTO-GENERATED bởi `.claude/tools/adp-roadmap.sh` @ 2026-07-20T08:44.**
+> **AUTO-GENERATED bởi `.claude/tools/adp-roadmap.sh` @ 2026-07-20T13:23.**
 > Đây là VIEW join từ L1 (`docs/ROADMAP.md`) × L2 (`docs/tasks/*.md`) × git — **KHÔNG phải source of truth**.
 > ĐỪNG sửa tay phía trên `NOTES_HUMAN`. Muốn đổi kế hoạch → sửa L1. Muốn đổi trạng thái → chạy `adp-checkpoint.sh`.
 
 ## Mục tiêu 100%
 
-**Internal: 9/25 work item hoàn tất (36%)** ← đây là mẫu số của "100% Roadmap"
-External: 0/10 (0%) — chờ bên thứ ba, **không tính vào 100%**
-Phase gate-passed: 25/35
+**Internal: 9/27 work item hoàn tất (33%)** ← đây là mẫu số của "100% Roadmap"
+External: 0/9 (0%) — chờ bên thứ ba, **không tính vào 100%**
+Phase gate-passed: 26/38
 
 
 
@@ -22,6 +22,7 @@ Phase gate-passed: 25/35
 | `GD0-EMBED` | ✅ DONE | 3/3 | 08:E0 08:E1 08:E2  |
 | `GD0-EVAL` | ⬜ TODO | 0/1 | 03:6  |
 | `GD0-FOUNDATION` | ✅ DONE | 3/3 | 06:F0 06:F2 09:C0  |
+| `GD0-HISTORY` | 🔶 một phần | 1/3 | 10:H0 10:H1 10:H2  |
 | `GD0-INTENT` | ⬜ TODO | 0/1 | 03:8  |
 | `GD0-METER` | ⬜ TODO | 0/1 | 03:5  |
 | `GD0-MULTITENANT` | ✅ DONE | 1/1 | 01:2  |
@@ -31,6 +32,7 @@ Phase gate-passed: 25/35
 | `GD0-ROUTER` | ⬜ TODO | 0/1 | 03:7  |
 | `GD0-SHOPS` | ⬜ TODO | 0/1 | 03:1  |
 | `GD0-UI` | ✅ DONE | 3/3 | 04:P0 04:P1 04:P2  |
+| `GD0-WIKI` | ⛔ BLOCKED | 1/2 | 01:3 03:3  |
 | `GD1-STATE` | ⚪ chưa có spec | 0/0 | — |
 | `GD2-ANALYTICS` | ⚪ chưa có spec | 0/0 | — |
 | `GD2-CARRIER` | ⚪ chưa có spec | 0/0 | — |
@@ -47,7 +49,6 @@ Phase gate-passed: 25/35
 | Roadmap ID | Trạng thái | Phase done | Phase trỏ tới |
 |---|---|---|---|
 | `GD0-TOOLS` | ⛔ BLOCKED | 1/2 | 01:4 03:4  |
-| `GD0-WIKI` | ⛔ BLOCKED | 1/2 | 01:3 03:3  |
 | `GD0-WINDOW` | ⛔ BLOCKED | 0/1 | 03:10  |
 | `GD0-ZALO` | ⛔ BLOCKED | 0/1 | 03:2  |
 | `GD1-COD` | ⚪ chưa có spec | 0/0 | — |
@@ -87,5 +88,6 @@ _(không có — mọi phase đều có khoá nối hợp lệ)_
 ## Lịch sử mẫu số internal
 
 - 2026-07-19T12:38 25 internal_denominator
+- 2026-07-20T13:23 27 internal_denominator
 
 <!-- NOTES_HUMAN — phần dưới đây generator KHÔNG ghi đè -->
