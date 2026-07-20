@@ -317,3 +317,46 @@ Spec 03c mount webhook · legal TIA/consent chưa có chủ.
   2. Đào log run CI đỏ 17–18/07 tìm rule thật.
   3. ISSUE-018 (blank-env complex field).
   4. Spec 03 còn 10 phase, 4 BLOCKED chờ Tân.
+
+## 2026-07-20 — Audit kickoff persona → L1 patch → spec 10 ConversationHistory (3/3) → meta-sync
+
+**Vào:** brief kickoff persona (Downloads) + một bản review brief đó, cả hai chưa audit on-disk.
+
+**Audit HEAD `e8a5952`:** 8/9 finding PASS. Ba sai:
+- Bản review khẳng định "mỗi tin nhắn khách hôm nay đã đi qua Together US" ⇒ **SAI**. `api/webhook.py`
+  chưa mount, `Drafter` zero impl, `Message` chưa ai ghi ⇒ đường seller **zero traffic**. Kết luận
+  "vấn đề pháp lý OPEN ngay lúc này" sụp theo; D6 hoãn Bước 1 vẫn đứng vững.
+- Brief §0 + review: migration "mới tới 0004" ⇒ trên đĩa đã `0005`.
+- Phase 24/34 ⇒ thật là 25/35.
+
+**L1 (`4169567`):** GD0-WIKI external→internal (gỡ PRE-003/Tân) · intent 4/5/6/7/8 → GD0-SHOPS ·
+GD0-SHOPKB gộp vào GD0-SHOPS · gỡ `shipping_info` khỏi GD0-TOOLS · thêm `GD0-HISTORY`.
+Mở ISSUE-021 (L1↔spec 03 lệch), ISSUE-022 (cap persona chưa đo).
+
+**Spec 10 — 3 phase, tất cả RISK medium Wyatt ký, tất cả qua `adp-checkpoint.sh` + CI xanh:**
+- H0 `e4971e0` — `messages` += conversation_id/customer_id + 2 composite FK + index; Alembic `0006`.
+- H1 `e6d7ef8` — `MessageRepo`; ghi inbound ở webhook TRƯỚC draft, ghi outbound SAU `send()` thành công.
+- H2 `84aac7f` — `Drafter` += `history`; cap kép 20 msg/4000 ký tự, cắt từ ĐẦU.
+
+**Bài học đắt nhất phiên:**
+1. **pytest xanh trong khi thiếu import.** `from __future__ import annotations` làm annotation lazy ⇒
+   `agent/orchestrator.py` mất `from db.models import Message` mà 154 test vẫn xanh; chỉ mypy bắt.
+   Gate nhiều bước không phải nghi thức.
+2. **pytest làm bẩn schema alembic.** `fresh_db` drop/create từ `Base.metadata` trên CÙNG DB alembic
+   quản lý nhưng không đụng `alembic_version` ⇒ `alembic upgrade head` chết bằng `DuplicateColumn`
+   trên chính cột vừa thêm. KHÔNG phải lỗi migration.
+3. **`drop schema public cascade` xoá luôn extension `vector`**, user `ohana` không superuser nên
+   không tạo lại được. Superuser container là **`drnick`**, KHÔNG phải `postgres`.
+4. NOT NULL của H0 làm vỡ `test_tenant_isolation.py` (dựng `Message` trần) — regression thật, đã sửa
+   để seed parent, assertion gốc không bị nới lỏng.
+
+**Nợ đã ký, không phải bỏ sót:** ISSUE-023 (cap 20/4000 chưa đo tokenizer) · ISSUE-024
+(`api/webhook.py` khai Protocol `_Drafter` đã lệch, mypy mù vì `type: ignore` — gốc là TRÙNG LẶP
+khai báo) · PRE-1004 (nhánh `park` chưa ghi history ⇒ thiếu gần hết phía shop, vì `park` là đường
+mặc định) · không idempotent (chờ `webhook_event_log` spec 03, BLOCKED).
+
+**Trạng thái:** `main` == `origin/main` @ `31b6716`, CI xanh đủ 11 step. STATE_HASH `87e21549f981`.
+`GD0-HISTORY` đóng ⇒ internal 9/27 → **10/27**. Nhưng **chưa ai gọi history** — mount webhook còn
+chờ PRE-004 (Zalo creds + signature, Tân).
+
+**CLAUDE.md update needed:** no (meta-sync chạy cuối phiên này).
