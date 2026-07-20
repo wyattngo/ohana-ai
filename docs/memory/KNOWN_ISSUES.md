@@ -144,6 +144,26 @@ _Empty. Log ở đây khi port drnickv4 phát hiện bug nhưng defer fix per sp
 - **Discovered:** 2026-07-19 · session spec-08-E0
 - **Severity:** medium (CI đỏ, không phải bug runtime)
 - **Status:** ✅ RESOLVED 2026-07-19 — commit "fix(ci): pin ruff…" (action 1+2+3). Action 4 (rà phase DONE cũ) vẫn OPEN, xem cuối entry.
+
+- **🔴 BẰNG CHỨNG CI THẬT (2026-07-20, sau khi GitHub Actions hồi phục) — action 4 ĐÓNG, và kết quả tệ hơn ước lượng local:**
+
+  Trước đây tôi chỉ suy luận từ `git stash` trên máy local ("19/22 phase DONE không tái lập được `ruff check`"). Giờ đã hỏi thẳng GitHub:
+
+  ```
+  23 run  = TOÀN BỘ lịch sử repo (cũ nhất 2026-07-17T15:53, b93b8ed "Merge GĐ0.5 Inbox UI")
+  ✅  4 xanh — CẢ BỐN đều sau commit vá ruff 01c2479 (2026-07-19T15:36)
+  ❌ 19 đỏ
+  ```
+
+  **CI CHƯA TỪNG XANH MỘT LẦN NÀO** cho tới `01c2479` hôm nay. Spec 04, 05, 06, 07 — mọi phase — đều được `adp-checkpoint.sh` stamp DONE trong lúc CI đỏ. Bao gồm `5fa5b04` (spec 07 G2 checkpoint evidence) và `50e4862` (meta-sync sau spec 06).
+
+  **Lấy mẫu 2 run đỏ, cả hai chết ở CÙNG step:** `Ruff lint (incl S / bandit)` — run `29643425884` (50e4862, 18/07) và `29671576305` (5fa5b04, 19/07).
+
+  ⚠️ **Chưa verify:** rule cụ thể của các run đỏ CŨ. S603 chỉ land cùng spec 07 (19/07), nên run đỏ từ 17–18/07 phải do rule khác. Log không lấy được (Actions API còn partial-outage lúc điều tra). **Đừng đọc thành "tất cả đều do S603"** — mới chỉ chứng minh được *cùng một step*, chưa phải *cùng một nguyên nhân*.
+
+  **Ý nghĩa với ADP spine:** `GATE_FULL` chạy local với `.ruff_cache` nhiễm độc trả xanh, CI chạy sạch trả đỏ — và EVIDENCE stamp vào spec ghi lại cái xanh giả. Đây không phải "CI hơi lệch local"; đây là **spine đã ký DONE cho thứ chưa từng qua gate thật**. Việc pin + `--no-cache` vá nguyên nhân từ nay về sau, KHÔNG hồi tố các EVIDENCE cũ.
+
+  **Action còn lại (chưa ai nhận):** quyết xem EVIDENCE của 22 phase DONE trước `01c2479` có cần re-stamp không, hay chấp nhận và ghi waiver. Đây là câu hỏi cho Wyatt, không phải việc máy quyết.
 - **Detail:** `ruff check .` tại HEAD trả **1 error** — `S603` (`subprocess` call: check for execution of untrusted input) ở `tests/test_chat_endpoint.py:313`. Verify bằng `git stash -u` (cây sạch, không có thay đổi E0) ⇒ lỗi có sẵn, land cùng `3a41bfe` (spec 07). CI `.github/workflows/ci.yml:64` chạy đúng lệnh này ⇒ **CI đang đỏ ở bước ruff**.
   Bản thân S603 ở đây là **báo nhầm**: lệnh chạy là `[sys.executable, "-c", probe]` với `probe` là literal viết trong file test, không có input ngoài. Đó là subprocess CỐ Ý — probe đo thứ chỉ quan sát được ở tiến trình sạch (thứ tự `dictConfig` vs `import app.main`), in-process không đo được.
 - **Nguyên nhân gốc — quan trọng hơn cái lỗi:** `pyproject.toml:27` khai `ruff>=0.4`, không pin. Local đang **0.15.22**. Một bản ruff mới bật thêm rule là CI đỏ mà **không ai đổi một dòng code nào**. Nghĩa là gate của repo phụ thuộc ngày cài đặt — chạy hôm nay xanh, chạy tuần sau đỏ. Hệ quả thứ hai: một phase từng checkpoint DONE với `GATE_FULL` chứa `ruff check .` giờ không tái lập được kết quả đó, tức EVIDENCE cũ mất tính kiểm chứng.
