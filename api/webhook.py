@@ -23,14 +23,22 @@ from typing import Any, Protocol
 from fastapi import APIRouter, Body, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from agent.orchestrator import ReceiveOutcome, receive_and_draft
+from agent.orchestrator import Drafter, ReceiveOutcome, receive_and_draft
 from channels.base import InboundChannel, OutboundChannel
 from channels.identity import resolve_conversation
 from db.repos import MessageRepo
 
-
-class _Drafter(Protocol):
-    async def draft(self, *, shop_id: str, customer_id: str, message: str): ...  # type: ignore[no-untyped-def]  # returns _Draft
+# `Drafter` import THẲNG từ `agent.orchestrator` — KHÔNG khai lại ở đây (ISSUE-024).
+#
+# Module này từng giữ một bản sao `class _Drafter(Protocol)` riêng. Khi spec 10 H2 thêm
+# tham số `history` vào `Drafter` thật, bản sao không đổi theo và mypy KHÔNG bắt được: dòng
+# đó mang `# type: ignore[no-untyped-def]` (return type untyped ⇒ bỏ qua so khớp). Kết quả
+# là một Protocol nói dối — ai viết `Drafter` thật dựa theo nó sẽ qua type-check rồi nổ
+# `TypeError` lúc chạy, vì orchestrator gọi kèm `history=`.
+#
+# Bài học không phải "quên sửa một dòng" mà là: hai bản khai của cùng một khái niệm chỉ
+# đồng bộ tới lần đổi kế tiếp. Nguồn sự thật là bên ĐỊNH NGHĨA hành vi (orchestrator gọi
+# `draft()`), nên nó giữ Protocol; các module khác import.
 
 
 class _Channel(InboundChannel, OutboundChannel, Protocol):
@@ -38,7 +46,7 @@ class _Channel(InboundChannel, OutboundChannel, Protocol):
 
 
 def build_router(
-    drafter: _Drafter,
+    drafter: Drafter,
     session_factory: async_sessionmaker[AsyncSession],
     *,
     channels: dict[str, _Channel],
