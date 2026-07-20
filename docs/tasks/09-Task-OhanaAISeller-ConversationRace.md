@@ -103,7 +103,8 @@ PRE-904: Hình dạng constraint — Wyatt chốt.
 
 ### Phase C0 — Unique constraint + upsert đối xứng
 <!-- ADP:PHASE C0 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=20299d9, gate_exit=0, duration=9s, review=PASS(judge=APPROVE,model=unknown,bound=9c77a82c75cc,tier=medium), smoke=PASS(bound=9c77a82c75cc), ran=2026-07-20T08:44
 ROADMAP: GD0-FOUNDATION
 GOAL: `conversations` có `uq_conversations_shop_cus_chan_thread` với `NULLS NOT DISTINCT`; hai lời gọi `resolve_conversation()` ĐỒNG THỜI cho cùng một khách trả về CÙNG `conversation_id` và để lại ĐÚNG 1 row; `external_thread_id` khác nhau vẫn tạo được conversation riêng; migration up→down→up sạch.
 APPROACH: `UniqueConstraint(..., postgresql_nulls_not_distinct=True)` — bắt buộc, vì mặc định SQL coi NULL là distinct nên không có nó thì ca `thread_id=NULL` (ca phổ biến nhất hôm nay) KHÔNG được chặn. `channels/identity.py` đổi sang `pg_insert(Conversation).on_conflict_do_nothing(constraint=...)` rồi re-select — đối xứng hoàn toàn với nhánh `Customer` ngay trên nó, để người đọc sau không phải hỏi "sao hai nhánh khác nhau". Bỏ `order_by(created_at.desc()).limit(1)`: nó tồn tại để chọn giữa nhiều conversation, mà giờ nhiều conversation là điều schema cấm — giữ lại là để dấu vết của một mô hình không còn đúng.
