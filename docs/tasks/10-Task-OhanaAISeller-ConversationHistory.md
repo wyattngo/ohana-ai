@@ -202,7 +202,8 @@ REVIEW: PASS ref=docs/reviews/10-H1-auto-verdict.json
 ### Phase H2 — Read path: last-N vào `Drafter` + cap
 
 <!-- ADP:PHASE H2 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=84aac7f, gate_exit=0, duration=13s, review=PASS(judge=APPROVE,model=claude-haiku-4-5-20251001,bound=5ea5bc2f8ba9,tier=medium), smoke=PASS(bound=5ea5bc2f8ba9), ran=2026-07-20T20:25
 ROADMAP: GD0-HISTORY
 GOAL: `Drafter.draft()` nhận `history: list[Message]` của ĐÚNG conversation đó, thứ tự cũ→mới, cắt theo cap PRE-1003; test lượt-2 dùng đại từ chứng minh history tới được drafter; vượt cap thì cắt TỪ ĐẦU (giữ tin mới nhất) và số lượng cắt đo được.
 APPROACH: Mở rộng Protocol `Drafter` thêm tham số `history` — đây là breaking change của Protocol, nhưng hiện **zero implementation** (audit #4) nên chi phí bằng 0; làm bây giờ rẻ hơn làm sau khi có impl thật. Cắt từ ĐẦU chứ không từ cuối: tin mới nhất là tin đang cần trả lời, tin cũ nhất mới là thứ bỏ được. Cap kép (số lượng + ký tự) vì một mình số lượng không chặn được 20 tin mỗi tin 3000 ký tự. Test lượt-2 assert **history tới được drafter với nội dung đúng** qua fake drafter — KHÔNG assert LLM trả lời đúng: cái đó cần `-m live` + eval, và một test phụ thuộc chất lượng LLM là test sẽ đỏ ngẫu nhiên.
