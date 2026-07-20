@@ -490,3 +490,201 @@ def test_every_door_rejects_unknown_shop(
     assert resp.status_code == 401, (
         f"{method.upper()} {path} KHÔNG kiểm shop — {resp.status_code} {resp.text}"
     )
+
+
+# =====================================================================================
+# S2 — hai hàm tra cứu TẤT ĐỊNH + ráp persona vào prompt. Viết TRƯỚC `tools/shop_kb.py`
+# ⇒ expected RED.
+#
+# **Vì sao size chart KHÔNG đi RAG** (D9, đã ký): (a) `parsing/chunk.py` cắt ở 800 ký tự sẽ
+# cắt GIỮA bảng, chunk mất cột; (b) cosine similarity giữa "1m6 50kg" và một chunk toàn số
+# gần như vô nghĩa; (c) quan trọng nhất — **RAG không bao giờ nói "không biết"**, nó luôn trả
+# k chunk gần nhất. Hàm tất định trả `not_found` dứt khoát, và chính tín hiệu đó là thứ
+# confidence-gated escalation cần. Vì vậy `not_found` ở đây là YÊU CẦU an toàn, không phải
+# chi tiết API.
+# =====================================================================================
+
+from agent.persona import build_persona_prompt  # noqa: E402
+
+
+def _knowledge() -> dict[str, object]:
+    return {
+        "size_chart": [
+            {
+                "size": "S",
+                "height_min_cm": 145,
+                "height_max_cm": 154,
+                "weight_min_kg": 35,
+                "weight_max_kg": 44,
+            },
+            {
+                "size": "M",
+                "height_min_cm": 155,
+                "height_max_cm": 165,
+                "weight_min_kg": 45,
+                "weight_max_kg": 55,
+            },
+            {
+                "size": "L",
+                "height_min_cm": 166,
+                "height_max_cm": 175,
+                "weight_min_kg": 56,
+                "weight_max_kg": 68,
+            },
+        ],
+        "shipping_zones": [
+            {"zone": "Q7", "fee_vnd": 25000, "eta_days": 2},
+            {"zone": "Hà Nội", "fee_vnd": 35000, "eta_days": 4},
+        ],
+    }
+
+
+async def _shop_with_knowledge(engine, sf, shop: str) -> str:
+    async with engine.begin() as c:
+        await _seed_shop(c, shop)
+    async with sf() as s:
+        await ShopProfileRepo(s, shop_scope=shop).upsert(
+            persona_md="Shop áo thun nữ, xưng 'shop'.", knowledge=_knowledge()
+        )
+    return shop
+
+
+@pytest.mark.asyncio
+async def test_lookup_size_exact_case_from_spec(fresh_db) -> None:
+    """(a) `lookup_size(160, 50) == "M"` — assert TẤT ĐỊNH, không cần LLM-as-judge.
+
+    Đây là acceptance viết nguyên văn trong L1 cho `GD0-SHOPS`. Một hàm thuần thì kiểm được
+    bằng đúng một dòng như thế; một đường RAG thì phải chấm bằng model, và chấm bằng model
+    nghĩa là gate của bạn có phương sai.
+    """
+    from tools.shop_kb import lookup_size
+
+    engine, sf = await fresh_db()
+    shop = await _shop_with_knowledge(engine, sf, _uid("shop"))
+
+    async with sf() as s:
+        out = await lookup_size(s, shop_id=shop, height_cm=160, weight_kg=50)
+    assert out["result"] == "M", out
+
+
+@pytest.mark.asyncio
+async def test_lookup_size_out_of_range_is_explicit_not_found(fresh_db) -> None:
+    """(b) Ngoài bảng ⇒ `not_found` TƯỜNG MINH, và `success` vẫn True.
+
+    Thiếu data KHÔNG phải lỗi hệ thống — nó là một câu trả lời hợp lệ ("shop chưa khai").
+    Trả `success: False` sẽ trộn nó với lỗi hạ tầng, và tầng escalation sẽ không phân biệt
+    được "chưa biết" với "hỏng".
+    """
+    from tools.shop_kb import lookup_size
+
+    engine, sf = await fresh_db()
+    shop = await _shop_with_knowledge(engine, sf, _uid("shop"))
+
+    async with sf() as s:
+        out = await lookup_size(s, shop_id=shop, height_cm=200, weight_kg=120)
+    assert out["result"] == "not_found", out
+    assert out["success"] is True, "thiếu data không phải lỗi hệ thống"
+
+
+@pytest.mark.asyncio
+async def test_lookup_on_shop_without_knowledge_does_not_explode(fresh_db) -> None:
+    """(c) Shop chưa khai gì ⇒ `not_found`, KHÔNG nổ.
+
+    Mọi shop mới onboard đều ở trạng thái này. Nếu nó raise thì shop đầu tiên nhắn tin sau
+    khi onboard sẽ gặp lỗi 500 — ca phổ biến nhất, không phải ca biên.
+    """
+    from tools.shop_kb import lookup_shipping, lookup_size
+
+    engine, sf = await fresh_db()
+    shop = _uid("shop_trong")
+    async with engine.begin() as c:
+        await _seed_shop(c, shop)
+
+    async with sf() as s:
+        assert (await lookup_size(s, shop_id=shop, height_cm=160, weight_kg=50))[
+            "result"
+        ] == "not_found"
+        assert (await lookup_shipping(s, shop_id=shop, zone="Q7"))["result"] == "not_found"
+
+
+@pytest.mark.asyncio
+async def test_lookup_shipping_returns_fee_and_eta(fresh_db) -> None:
+    """(a-bis) `lookup_shipping` trả phí + thời gian giao, cùng hình dạng tất định."""
+    from tools.shop_kb import lookup_shipping
+
+    engine, sf = await fresh_db()
+    shop = await _shop_with_knowledge(engine, sf, _uid("shop"))
+
+    async with sf() as s:
+        out = await lookup_shipping(s, shop_id=shop, zone="Q7")
+    assert out["result"] == "found", out
+    assert out["fee_vnd"] == 25000 and out["eta_days"] == 2, out
+
+
+@pytest.mark.asyncio
+async def test_lookup_is_scoped_to_shop(fresh_db) -> None:
+    """(e) Tool của shop A KHÔNG đọc được knowledge shop B.
+
+    `shop_id` tới từ tham số HÀM (do orchestrator truyền từ Identity đã verify), không từ
+    `parameters` mà LLM điền — xem test (d).
+    """
+    from tools.shop_kb import lookup_size
+
+    engine, sf = await fresh_db()
+    shop_a, shop_b = _uid("shopA"), _uid("shopB")
+    async with engine.begin() as c:
+        await _seed_shop(c, shop_a)
+    await _shop_with_knowledge(engine, sf, shop_b)
+
+    async with sf() as s:
+        out = await lookup_size(s, shop_id=shop_a, height_cm=160, weight_kg=50)
+    assert out["result"] == "not_found", f"shop A đọc được bảng size của shop B: {out}"
+
+
+def test_shop_id_is_not_an_llm_parameter() -> None:
+    """(d) `shop_id` KHÔNG xuất hiện trong `Tool.parameters` của cả hai tool.
+
+    Đọc thẳng `Tool.parameters`, không tin docstring. Đây là bất biến của `tools/registry`:
+    handler nhận `(user_id, shop_id, args)` từ orchestrator; nếu `shop_id` lọt vào schema mà
+    LLM điền được thì model có thể chĩa tool sang shop khác — và nó sẽ làm vậy một cách vô
+    tình khi khách nhắc tên shop khác trong câu hỏi.
+    """
+    from tools.shop_kb import build_shipping_tool, build_size_tool
+
+    for tool in (build_size_tool(None), build_shipping_tool(None)):  # type: ignore[arg-type]
+        props = tool.parameters.get("properties", {})
+        assert "shop_id" not in props, f"{tool.name}: shop_id lọt vào parameters — {props}"
+        assert tool.parameters.get("additionalProperties") is False, (
+            f"{tool.name}: thiếu additionalProperties=False ⇒ LLM nhét được field lạ"
+        )
+
+
+# --- build_persona_prompt -------------------------------------------------------------
+
+
+def test_persona_prompt_respects_cap() -> None:
+    """(f) Persona vượt cap ⇒ raise, KHÔNG cắt âm thầm.
+
+    Cắt lúc build sẽ làm mất phần nội dung seller tưởng đã lưu, và không ai thấy. Chặn ở
+    tầng ghi (S0) là đúng chỗ; ở đây chỉ là chốt chặn cuối.
+    """
+    with pytest.raises(ValueError):
+        build_persona_prompt("x" * (PERSONA_MAX_CHARS + 1), shop_display_name="Shop")
+
+
+def test_persona_prompt_template_never_names_the_platform() -> None:
+    """(g) Phần TEMPLATE của ta không bao giờ nhắc "Ohana".
+
+    ⚠️ Đây KHÔNG phải "prompt không bao giờ chứa chữ Ohana": nếu shop tên là "Ohana Boutique"
+    thì tên đó PHẢI vào prompt — kiểm duyệt chữ của chính shop là sai. Bất biến đúng là: văn
+    bản DO TA sinh ra không mang tên nền tảng sang đường nói với khách.
+
+    Và kể cả thế, đây vẫn chỉ là phần tất định. AI có tuân chỉ dẫn hay không là câu hỏi hành
+    vi, đo bằng `-m live` + eval trên output THẬT (`GD0-DRAFTER`). Đừng đọc test này rộng hơn.
+    """
+    out = build_persona_prompt("Shop bán áo thun.", shop_display_name="Shop Áo Thun")
+    assert "Ohana" not in out, f"template của ta nhắc tên nền tảng: {out}"
+
+    # Đối chứng: tên shop có chữ Ohana thì PHẢI được giữ nguyên.
+    out2 = build_persona_prompt("Shop bán áo.", shop_display_name="Ohana Boutique")
+    assert "Ohana Boutique" in out2, "tên riêng của shop bị kiểm duyệt — sai"

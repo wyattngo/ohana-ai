@@ -240,17 +240,23 @@ REVIEW: PASS ref=docs/reviews/11-S1-auto-verdict.json human=docs/reviews/11-S1-h
 ### Phase S2 — `lookup_size` / `lookup_shipping` + `build_persona_prompt`
 
 <!-- ADP:PHASE S2 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 ROADMAP: GD0-SHOPS
 GOAL: `lookup_size(160,50)=="M"` assert được không cần LLM; thiếu data ⇒ `not_found` TƯỜNG MINH (không rỗng, không None); cả hai tool scope `shop_id` từ handler-arg, KHÔNG từ `parameters`; `build_persona_prompt` cap cứng và không bao giờ nhả chuỗi "Ohana".
 APPROACH: `tools/shop_kb.py` theo shape `tools/wiki.build_tool`. `ToolHandler` nhận `(user_id, shop_id, args)` và `shop_id` KHÔNG được có trong `parameters` — đó là lý do LLM không chĩa tool sang shop khác được; giữ nguyên bất biến đó. `not_found` là giá trị trả về TƯỜNG MINH (`{"success": True, "result": "not_found"}` chứ không phải `success: False`) — thiếu data là câu trả lời hợp lệ, không phải lỗi hệ thống; nhầm hai cái này làm confidence gate đọc sai tín hiệu. `build_persona_prompt` là hàm THUẦN (profile → str), không chạm DB, không chạm LLM — để test được bằng assertion tất định.
-ALLOWED_FILES: tools/shop_kb.py, tools/registry.py, agent/persona.py, app/main.py, tests/test_shops_persona.py, docs/tasks/11-Task-OhanaAISeller-ShopsPersona.md, docs/reviews/, docs/smokes/
+ALLOWED_FILES: tools/shop_kb.py, tools/registry.py, agent/persona.py, tests/test_shops_persona.py, docs/tasks/11-Task-OhanaAISeller-ShopsPersona.md, docs/reviews/, docs/smokes/
 GATE: .venv/bin/python -m pytest tests/test_shops_persona.py -x -q
 GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && .venv/bin/mypy app agent retrieval parsing storage db bridge tools api auth && .venv/bin/ruff check . --no-cache && .venv/bin/ruff format --check . --no-cache
 RETRY: 0/3
 RISK: medium (ĐỀ XUẤT — Wyatt ký. Floor: `tools/registry.py`. Không high: không đổi hành vi gửi khách, không chạm tiền.)
 BLOCKED_BY: S0 DONE
-SMOKE:
+SMOKE: PASS ref=docs/smokes/11-S2.md
+REVIEW: PASS ref=docs/reviews/11-S2-auto-verdict.json
+APPROACH_DEVIATION: KHÔNG register tool trong `app/main.py` (spec bước 2 có ghi). `register()`
+  chưa từng được gọi ở đâu trong repo — `TOOLS` luôn rỗng, `wiki.py`/`ohana_read.py` cũng chỉ
+  có factory. Register riêng `shop_kb` = tool DUY NHẤT trong registry, bất đối xứng vô cớ. Người
+  tiêu thụ registry là `Drafter` (`GD0-DRAFTER`, chưa tồn tại) ⇒ đăng ký cả BA tool cùng lúc ở
+  spec đó, khi đã có người đọc. Xem `docs/smokes/11-S2.md` §6.
 <!-- /ADP -->
 
 1. Test (**RED trước**): (a) `lookup_size(160,50)=="M"` trên fixture; (b) ngoài bảng ⇒ `not_found` tường minh; (c) shop chưa có `size_chart` ⇒ `not_found`, KHÔNG nổ; (d) `shop_id` không xuất hiện trong `parameters` của cả 2 tool (đọc `Tool.parameters`, đừng tin docstring); (e) tool scope shop A không đọc data shop B; (f) `build_persona_prompt` cap đúng; (g) persona chứa chữ "Ohana" ⇒ prompt KHÔNG mang nó sang.

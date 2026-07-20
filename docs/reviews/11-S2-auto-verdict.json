@@ -1,0 +1,28 @@
+{
+  "verdict": "APPROVE",
+  "model": "claude-haiku-4-5-20251001",
+  "scores": {
+    "correctness": 9,
+    "completeness": 9,
+    "safety": 10,
+    "financial_integrity": 10
+  },
+  "overall_score": 9.5,
+  "issues": [],
+  "summary": "Phase S2: lookup_size/lookup_shipping + build_persona_prompt. Lookup tất định trả not_found TƯỜNG MINH kèm success:True (không phải lỗi hệ thống). shop_id vắng mặt hoàn toàn khỏi Tool.parameters, additionalProperties:False chặn LLM nhét field; scope đi qua handler-arg → ShopProfileRepo(shop_scope=) → WHERE ở tầng SQL, không post-filter (R1.22 OK). build_persona_prompt thuần, cap cứng raise khi tràn, template không nhả chuỗi 'Ohana'. Test đọc Tool.parameters trực tiếp chứ không tin docstring, và test cross-shop khẳng định shop A không thấy data shop B. Mọi file trong ALLOWED_FILES. APPROACH_DEVIATION (không register trong app/main.py) có ghi lý do ở smoke §6 — hoãn tới GD0-DRAFTER khi có consumer.",
+  "checks": {
+    "shop_id_not_in_parameters": "pass",
+    "additionalProperties_false": "pass",
+    "not_found_success_true": "pass",
+    "db_scope_at_sql_level": "pass",
+    "build_persona_prompt_pure": "pass",
+    "persona_cap_enforced": "pass",
+    "template_no_ohana": "pass",
+    "tests_assert_claims": "pass",
+    "no_post_filter": "pass",
+    "allowed_files": "pass",
+    "no_secrets": "pass"
+  },
+  "diff_sha256": "cad3452061c063eb48f23f1d32d982a12eb08d303584115984061a81d1aeaa2e",
+  "stamped_at": "2026-07-21T00:05"
+}
