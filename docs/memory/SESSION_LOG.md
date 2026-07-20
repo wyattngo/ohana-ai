@@ -237,3 +237,50 @@ Bắt buộc KHAI BÁO, không bắt buộc CHẠY — bắt smoke chỗ không 
 **Next.** Spec 03 (0/10, 4 BLOCKED chờ Tân) · ISSUE-016 giờ là 4 việc thật (TogetherEmbedder +
 migration 1536→1024 + re-embed + live trên e5), chưa spec nào nhận · ISSUE-017 phải đóng TRƯỚC
 Spec 03c mount webhook · legal TIA/consent chưa có chủ.
+
+---
+
+## 2026-07-19 — Spec 08 embedder swap (3/3) + ISSUE-019 (gate nói dối) + CLAUDE.md hợp nhất
+
+- **Owner:** Wyatt Ngo (main loop) + Claude (Opus 4.8)
+- **Duration:** ~1 phiên dài
+- **Context:** Bắt đầu từ một việc nhỏ — dashboard mất section roadmap. Kết thúc ở chỗ khác hẳn: phát hiện gate của chính ADP từng cho kết quả sai, rồi ship spec 08 trọn vẹn.
+
+- **Done:**
+  - **Dashboard** (`198a4dd`): port section roadmap L1×L2×L3 từ prototype vào generator. Prototype không phải nguồn — chạy lại generator là mất.
+  - **CLAUDE.md hợp nhất** (`be28e20`, `e5f1116`): 279 → 191 dòng. So hai bản, giữ phần mạnh của mỗi bản. Bản kia thắng ở §Safety (5 bullet có ví dụ đã cháy) + phát hiện `REASONING_MODELS=` rỗng làm `Settings()` RAISE; bản tôi thắng ở cấu trúc + giữ ADP markers. Tách `docs/memory/SHIPPED-SURFACE.md`.
+  - **ISSUE-018** — docstring `_blank_env_means_unset` khai sai phạm vi (`4531805`). Sửa docstring TRƯỚC vì câu sai đó đang nhân bản ra CLAUDE.md mỗi lần meta-sync.
+  - **ISSUE-019 — gate ADP từng cho kết quả sai** (`7fcd310`, `bf24e46`): `.ruff_cache` do bản ruff cũ ghi không bị vô hiệu khi ruff nâng cấp ⇒ `ruff check .` xanh trong khi `--no-cache` đỏ **trên cùng source**. Rà 22 phase DONE dưới ruff pin: **19/22 không tái lập được**. Pin cả 4 dev tool; `mypy` 1.10→2.3, `pytest` 8.0→9.1, `pytest-asyncio` 0.23→1.4 đều đã trôi qua major mà không ai biết.
+  - **Spec 03** (`f30158b`): dịch migration `0004/0005` → `0006/0007`, bỏ hard-code tên file khỏi ALLOWED_FILES.
+  - **Spec 08 — 3/3 phase DONE:**
+    - **E0** (medium): `TogetherEmbedder` + `Embedder` ABC thêm `embed_query`/`embed_documents` **concrete** (abstract sẽ phá mọi impl cũ). Prefix `query:`/`passage:` ở tầng adapter. 12 test gồm **gate bất đối xứng**.
+    - **E1** (high): migration `0004` 1536→1024 destructive có chủ ý + `default_embedder()` ưu tiên Together. `EMBED_DIM` thành nguồn sự thật duy nhất; 3 chỗ hardcode `1536` thành alias import.
+    - **E2** (low): live acceptance trên e5 thật — **3/3 truy vấn tiếng Việt kéo đúng chunk lên #0**, mỗi câu một chunk khác. **ISSUE-016 RESOLVED** sau 3 ngày OPEN.
+
+- **Decisions:**
+  - **PRE-E04** — Wyatt ký **XOÁ** 2 vector cũ khi migrate (test fixture; 1536 không chiếu được sang 1024). Re-verify sống trước khi ký.
+  - **RISK tier spec 08** — Wyatt ký theo đề xuất: E0 medium · E1 **high** · E2 low.
+  - **E1 human review** — Wyatt APPROVE **trên tóm tắt, không đọc từng dòng diff**. Ghi đúng như vậy trong artifact để người sau biết chữ ký nặng đến đâu.
+
+- **Issues touched:** ISSUE-016 ✅ RESOLVED · ISSUE-018 mở (action 1 xong) · ISSUE-019 mở (action 1-5 xong, **action 6 runtime deps CHƯA**)
+
+- **Files changed:** `agent/embedder.py` · `agent/providers/together_embedder.py` (mới) · `app/config.py` · `api/admin.py` · `db/models.py` · `db/migrations/versions/0004_embedding_dim_1024.py` (mới) · `parsing/ingest.py` · `tools/wiki.py` · `pyproject.toml` · 6 file test · `CLAUDE.md` · `docs/memory/{KNOWN_ISSUES,SHIPPED-SURFACE}.md` · `.claude/tools/adp-dashboard.sh` · spec 03 + 08
+
+- **Blockers surfaced:**
+  - **Trạng thái CI THẬT chưa ai xác nhận.** Suốt session tôi suy luận CI đỏ/xanh từ chạy local. Chưa ai mở tab Actions. Đây đúng là lớp sai lầm mà ISSUE-019 nói tới.
+  - **Runtime deps chưa pin** — `openai>=1.30` thực cài 2.45, SDK mà cả `TogetherClient` lẫn `TogetherEmbedder` đang dùng.
+  - **E2 không chứng minh chất lượng retrieval ở quy mô thật** — corpus test 3 đoạn tách bạch, bài quá dễ. Phải đo lại khi PRE-003 land.
+  - `tests/test_wiki_rag_live.py` dùng `Base.metadata.drop_all` — không guard, trỏ `DATABASE_URL` nhầm là mất dữ liệu.
+  - Chưa có index vector (ivfflat/hnsw) — với corpus thật sẽ thành vấn đề hiệu năng.
+  - **ISSUE-017** unique `(shop_id, customer_id, channel)` — bắt buộc trước Spec 03c mount webhook.
+
+- **Bài học tự thân (đắt nhất session này):**
+  - **Ba lần tôi tự tạo ra "xanh vì môi trường, không phải vì code"** — cùng hình dạng với `.ruff_cache` mà tôi vừa vạch ra: (1) báo "ruff sạch" từ một lệnh **scoped**; (2) viết test migration gọi `alembic` mà `DATABASE_URL` rỗng ⇒ đọc `.env` khác DB thật, xanh mà không chứng minh gì; (3) test `EMBED_DIM` so `db.models._EMBED_DIM` với `config.EMBED_DIM` sau khi chúng đã là alias ⇒ tautology, xanh kể cả khi cột DB sai. Cả ba đều lộ khi **hỏi thẳng runtime** thay vì tin exit code.
+  - **Reviewer bắt được lỗi thật:** migration của tôi chỉ có docstring cảnh báo, không guard cơ học — đúng hình dạng `_DEV_EMBED_DIM = 1536  # must match` đã thất bại. Đã vá + test cả hai vế.
+  - **Thứ tự stamp:** ghi `SMOKE:`/`REVIEW:` vào spec **TRƯỚC**, stamp SAU. Làm ngược ở E1 ⇒ hash lệch ⇒ phải tạo lại chữ ký người.
+
+- **Next:**
+  1. **Mở tab GitHub Actions** xác nhận CI thật xanh — không suy luận thêm.
+  2. ISSUE-019 action 6: pin runtime deps.
+  3. ISSUE-017 trước khi Spec 03c mount webhook.
+  4. Spec 03 còn 10 phase (4 BLOCKED chờ Tân).

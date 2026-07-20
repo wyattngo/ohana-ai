@@ -2,7 +2,10 @@
 
 > Nơi log deferred bugs / assumption breaks / waivers / open PRE checks. Update mỗi sub-phase (ghi mới, KHÔNG xoá cũ — chỉ đổi STATUS + gắn resolved commit SHA).
 >
-> Last updated: 2026-07-18 · Status: Spec 01/02/04/05/06 DONE (ADP 18/28). mypy 0 lỗi (F2 đưa 12→0 — CI mypy trước đó ĐỎ âm thầm trên main). Contract gates all GREEN via mocks/fixtures; PRE-002/003/004 backfill deferred until source landed. Newly-tracked deferred items from Phase 2–5: HS256+exp/aud/iss upgrade (auth), send-on-approve worker (F3), shops/customers/conversations tables, wider F2 read-tools.
+> Last updated: 2026-07-19 · Status: Spec 01/02/04/05/06/07/08 DONE (**ADP 24/34**, internal 9/25). Gate: 129 test xanh · ruff sạch (`--no-cache`, pin) · mypy 0 lỗi/39 file. Live 6/6 PASS tay với key thật.
+> · ✅ ĐÓNG session này: ISSUE-016 (F1 wiki-RAG chạy thật trên e5).
+> · ⚠️ MỞ session này: ISSUE-018 (blank-env không phủ complex field) · ISSUE-019 (gate ADP từng cho kết quả sai vì cache+version trôi — **19/22 phase DONE cũ không tái lập được `ruff check`**).
+> · Chưa ai nhận: trạng thái CI THẬT chưa ai mở tab Actions xác nhận · runtime deps chưa pin · PRE-002/003/004 chờ Tân.
 
 ---
 

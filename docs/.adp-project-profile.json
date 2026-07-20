@@ -1,0 +1,25 @@
+{
+  "schema": "adp-project-profile/v1",
+  "project": "ohana-ai",
+  "adp_home": "/Users/wyattngo/Sites/localhost/ohana-ai",
+  "gate_runner": ".venv/bin/python -m pytest -q -x",
+  "spec_dir": "docs/tasks",
+  "executor_skill": "drnick-coder",
+  "checkpoint_prefix": "adp",
+  "risk_paths": [
+    "agent/orchestrator.py",
+    "agent/policy_gate.py",
+    "tools/registry.py",
+    "bridge/",
+    "auth/",
+    "db/migrations",
+    "api/webhook.py",
+    "api/inbox.py",
+    "api/admin.py",
+    "api/chat.py"
+  ],
+  "skill_map": {
+    "default": "drnick-coder"
+  },
+  "_generated_from": "CLAUDE.md ADP:MANIFEST (bootstrap; rich fields paths/conventions/stack are hand-added, not manifest-derived)"
+}
