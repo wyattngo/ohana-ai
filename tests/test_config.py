@@ -156,3 +156,25 @@ def test_reasoning_models_supports_membership_test() -> None:
     from app.config import get_settings
 
     assert "gpt-4o" not in get_settings().reasoning_models  # empty by default (P0 doesn't wire)
+
+
+def test_blank_reasoning_models_env_treated_as_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    """ISSUE-018: `REASONING_MODELS=` rỗng phải ⇒ default `frozenset()`, KHÔNG raise.
+
+    `_blank_env_means_unset` hứa "rỗng = chưa set" nhưng chỉ phủ field VÔ HƯỚNG: nó chạy
+    `mode="before"` = *sau* khi `EnvSettingsSource` đã thử JSON-parse. Với field PHỨC
+    (`frozenset[str]`), chuỗi rỗng nổ `SettingsError` ngay tại tầng source, validator không
+    bao giờ thấy. Trước fix, dòng này RAISE — cùng lời hứa, thủng đúng ở field phức.
+    """
+    from app.config import Settings
+
+    monkeypatch.setenv("REASONING_MODELS", "")
+    assert Settings().reasoning_models == frozenset()
+
+
+def test_reasoning_models_env_parsed_as_collection(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Giá trị không rỗng vẫn nạp được thành collection cho membership test."""
+    from app.config import Settings
+
+    monkeypatch.setenv("REASONING_MODELS", "gpt-5, o3 ,gpt-4o")
+    assert Settings().reasoning_models == frozenset({"gpt-5", "o3", "gpt-4o"})

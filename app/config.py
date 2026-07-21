@@ -18,10 +18,10 @@ raising, not represent a real deployment choice.
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator, model_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 # Model Together mặc định — Wyatt ký lại PRE-G02 ngày 2026-07-19. Hằng số CÓ TÊN chứ không
 # phải literal rải rác, vì `agent/providers/together_client.py` cần đúng giá trị này làm chốt
@@ -89,19 +89,19 @@ class Settings(BaseSettings):
         cũng ra `None` như cũ — không đổi hành vi; với `str` có default thì đây chính là
         phần vá.
 
-        ⚠️ KHÔNG phủ field kiểu PHỨC (`frozenset[str]`, list, dict) — ISSUE-018. Validator
-        này chạy `mode="before"`, nhưng "before" ở đây là *sau* khi `EnvSettingsSource` đã
-        parse giá trị env thành JSON. Với field phức, chuỗi rỗng nổ ngay tại tầng source và
-        validator không bao giờ nhìn thấy nó:
+        ⚠️ Hàm này CHỈ phủ field VÔ HƯỚNG. Với field kiểu PHỨC (`frozenset[str]`, list, dict)
+        nó chạy `mode="before"` = *sau* khi `EnvSettingsSource` đã thử JSON-parse env, nên
+        chuỗi rỗng nổ tại tầng source trước khi validator thấy — từng là ISSUE-018:
 
             REASONING_MODELS=  ⇒  SettingsError: error parsing value for field
                                   "reasoning_models" from source "EnvSettingsSource"
 
-        Nên đừng đọc hàm này như một hàng rào toàn diện. Field phức muốn "rỗng = chưa set"
-        thì phải BỎ HẲN dòng env, hoặc dùng `NoDecode` + validator riêng cho field đó.
-        Hôm nay chỉ có ĐÚNG MỘT field phức (`reasoning_models`) và nó không nằm trong
-        `.env.example`, nên lỗ này fail-loud lúc khởi động chứ không silent-wrong — thêm
-        field phức thứ hai thì đọc lại ISSUE-018 trước.
+        Cách đóng (2026-07-21): field phức nào cần "rỗng = chưa set" phải mang `NoDecode` để
+        tắt parse ở tầng source (giá trị tới đây dưới dạng chuỗi thô) + một `field_validator`
+        riêng biến chuỗi thành collection. `reasoning_models` — field phức DUY NHẤT hiện có —
+        đã làm vậy ngay dưới đây, nên chuỗi thô "" lọt tới dict và bị chính hàm này coi là
+        chưa set. Thêm field phức thứ hai: lặp lại đúng cặp `NoDecode` + validator, đừng
+        trông vào hàm này một mình.
 
         Đã kiểm tay trên path bảo mật (`get_jwt_secret`), fail-closed giữ nguyên: unset /
         rỗng / production đều RAISE, secret thật vẫn OK, dev vẫn fallback. Có ĐÚNG MỘT thay
@@ -138,7 +138,25 @@ class Settings(BaseSettings):
     # (membership test) — frozenset gives that O(1) with immutable-by-default semantics. Empty
     # by default: no model is in "reasoning mode" until a future phase wires the client and
     # deliberately opts models in.
-    reasoning_models: frozenset[str] = frozenset()
+    #
+    # `NoDecode` tắt JSON-parse của EnvSettingsSource cho field này (ISSUE-018): env tới dưới
+    # dạng chuỗi thô, nên `REASONING_MODELS=` rỗng không còn nổ `SettingsError` ở tầng source
+    # — nó lọt tới `_blank_env_means_unset` và được coi như chưa set. `_parse_reasoning_models`
+    # dưới đây nhận chuỗi thô khi env được set và tách theo dấu phẩy thành frozenset.
+    reasoning_models: Annotated[frozenset[str], NoDecode] = frozenset()
+
+    @field_validator("reasoning_models", mode="before")
+    @classmethod
+    def _parse_reasoning_models(cls, v: Any) -> Any:
+        """Chuỗi env thô (do `NoDecode`) → `frozenset`; rỗng/khoảng trắng → `frozenset()`.
+
+        Chỉ chạy khi env ĐƯỢC set (field validator không chạy trên default), nên giá trị vào
+        là `str`. Khi env không set, default `frozenset()` dùng thẳng. Comma-separated cho
+        khớp cách admin sẽ khai; phần tử rỗng bị loại để `"a,,b"` không sinh chuỗi rỗng.
+        """
+        if isinstance(v, str):
+            return frozenset(part.strip() for part in v.split(",") if part.strip())
+        return v
 
     # ---- G0 (spec 07 §7 Phase G0) — Together AI, provider cho General Chat.
     #
