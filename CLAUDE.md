@@ -167,7 +167,7 @@ RISK_PATHS: agent/orchestrator.py, agent/policy_gate.py, tools/registry.py, brid
 SPEC_DIR: docs/tasks
 ROADMAP_L1: docs/ROADMAP.md
 ROADMAP_L3: docs/ROADMAP-STATUS.md
-EXECUTOR_SKILL: drnick-coder
+EXECUTOR_SKILL: AI-coder
 CHECKPOINT_PREFIX: adp
 <!-- /ADP -->
 
@@ -224,6 +224,6 @@ CHECKPOINT_PREFIX: adp
 
 Trigger signals: `Ohana`, `Ohana AI`, `ohana-ai`, `Zalo OA`, `seller copilot`, `Wiki RAG`, `policy_gate`, `pending_reply`, `shop_id`, `multi-tenant`, `platform_wiki`, `GĐ0 MVP`, `Tân`.
 
-Skill: `drnick-coder` (Plan-Patch-Verify Python/FastAPI) · `onfa-spec-generator` (thêm spec phase) · `onfa-brief-formatter` (intake brief).
+Skill: `AI-coder` (executor — Plan-Patch-Verify Python/FastAPI + AI-agent invariants; đọc `.ai-coder.conf`) · `adp-spec` (author + lint phase block v2.3, đọc manifest) · `onfa-brief-formatter` (intake brief). *(`onfa-spec-generator` KHÔNG hợp v2.3: thiếu ROADMAP/SMOKE/REVIEW/GATE_FULL, mang Survival Framework — xem đối chiếu 2026-07-21.)*
 
 *Router level 1. Workspace router `../CLAUDE.md` (§4.7 mô tả ADP v1.3 của Onfa/DrNick). Convention thư mục `../FOLDER-CONVENTION.md`.*
