@@ -165,7 +165,8 @@ REVIEW: PASS ref=docs/reviews/14-A0-auto-verdict.json
 ### Phase B0 — `webhook_event_log` + `WebhookEventRepo.record_event`
 
 <!-- ADP:PHASE B0 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=3d7bf62, gate_exit=0, duration=14s, review=PASS(judge=APPROVE,model=claude-haiku-4-5-20251001,bound=976094c6bbff,tier=medium), smoke=N/A(migration schema — verify bằng alembic up→down→up + test hai-insert-đồng-thời trên Postgres CI thật (on_conflict là hành vi Postgres, SQLite sẽ nói dối).), ran=2026-07-21T18:30
 ROADMAP: GD0-INGEST
 GOAL: Bảng `webhook_event_log(channel TEXT, platform_msg_id TEXT, shop_id TEXT, received_at TIMESTAMPTZ)` PK `(channel, platform_msg_id)`; `WebhookEventRepo.record_event(channel, platform_msg_id, shop_id) -> bool` trả `True` lần đầu, `False` khi trùng (on_conflict_do_nothing + re-check); test HAI record_event đồng thời cùng key ⇒ đúng MỘT row, cái sau `False`; migration up→down→up sạch.
 APPROACH: `on_conflict_do_nothing` trên PK compound — cùng cơ chế race-safe spec 09 dùng cho `Conversation` (KHÔNG select-then-insert; đó là ISSUE-017). `record_event` không scope `shop_id` vào PK: `platform_msg_id` đã duy nhất theo channel toàn nền tảng; `shop_id` lưu để audit + truy vết. Repo KHÔNG có `shop_scope` (khác các repo khác) vì idempotency là biên giới nền-tảng, không phải dữ liệu tenant — ghi rõ trong docstring để đừng ai "sửa" thành shop-scoped. **KHÔNG wire vào `api/webhook.py`** (đó là runtime `GD0-INGEST`, cần signature-verify PRE-004 đứng trước).
