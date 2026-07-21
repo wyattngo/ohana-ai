@@ -87,10 +87,17 @@ class PendingReplyRepo:
         draft_text: str,
         intent: str,
         confidence: float,
+        snapshot: dict[str, Any] | None = None,
+        expires_at: datetime | None = None,
     ) -> PendingReply:
         """Insert a new parked draft. `shop_id` is baked from the repo scope — the caller
         does NOT pass it, so a compromised caller cannot cause a row to land under a shop
-        other than the one this repo was scoped to."""
+        other than the one this repo was scoped to.
+
+        `snapshot` / `expires_at` are OPTIONAL (spec 14 A0) — the tier-1 T0 snapshot and the
+        TTL are captured by deferred runtime; today every call-site omits them and the row
+        lands with both NULL. Wiring them is a later phase, but the columns exist now so that
+        wiring is an INSERT-shape change, not a data migration on live shop rows."""
         row = PendingReply(
             reply_id=reply_id,
             shop_id=self._shop_scope,
@@ -100,6 +107,8 @@ class PendingReplyRepo:
             intent=intent,
             confidence=confidence,
             status="pending",
+            snapshot=snapshot,
+            expires_at=expires_at,
         )
         self._session.add(row)
         await self._session.commit()
@@ -132,16 +141,24 @@ class PendingReplyRepo:
         seller cannot approve a shop_a draft even if they somehow know the reply_id."""
         if new_status not in {"approved", "rejected", "sent"}:
             raise ValueError(f"invalid status transition: {new_status!r}")
+        # `label` = train signal cho auto-send (spec 14 A0, workflow §8.1) — derive TRONG repo
+        # từ `new_status`, KHÔNG để caller tự khai (caller khai = chỗ ghi sai nhãn vào training
+        # set). CHỈ approve/reject là quyết định của SELLER; `sent` là lifecycle worker gửi,
+        # không phải tín hiệu train ⇒ KHÔNG đè label (một reply approved→sent giữ label
+        # 'approved'). `edited` là đường ghi riêng khi edit-endpoint land (chưa có).
+        values: dict[str, Any] = {
+            "status": new_status,
+            "decided_by": decided_by,
+            "decided_at": datetime.now(UTC),
+        }
+        if new_status in {"approved", "rejected"}:
+            values["label"] = new_status
         stmt = (
             update(PendingReply)
             .where(PendingReply.shop_id == self._shop_scope)
             .where(PendingReply.reply_id == reply_id)
             .where(PendingReply.status.in_(["pending", "approved"]))
-            .values(
-                status=new_status,
-                decided_by=decided_by,
-                decided_at=datetime.now(UTC),
-            )
+            .values(**values)
         )
         # `AsyncSession.execute` is typed as returning `Result`, but a DML statement always
         # yields a `CursorResult` — that is the only variant carrying `rowcount`, and the

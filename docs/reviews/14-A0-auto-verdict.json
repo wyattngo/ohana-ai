@@ -1,0 +1,10 @@
+{
+  "verdict": "APPROVE",
+  "model": "claude-haiku-4-5-20251001",
+  "tier": "medium",
+  "summary": "A0 schema-shaping: 3 nullable cols + DB CHECK, label derived in repo from new_status (sent does not overwrite), migration reversible (down_rev 0007), call-sites backward-compat, tests cover invariants. No scope creep.",
+  "findings": [],
+  "scope_ok": true,
+  "diff_sha256": "170cce9b177d45bdb6aeb3d2ba8200907b1370ca63988435f3e7727e884fb5f3",
+  "stamped_at": "2026-07-21T18:19"
+}

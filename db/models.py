@@ -289,12 +289,30 @@ class PendingReply(Base):
     decided_by: Mapped[str | None] = mapped_column(Text, nullable=True)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Spec 14 A0 (workflow §2.3/§2.5/§8.1) — schema-shaping, nullable ⇒ không backfill.
+    #
+    # `snapshot`: dữ kiện tầng-1 tại T0 (giá/tồn/order-status). Chỗ CHỨA — đường ghi (capture
+    #   lúc draft) là runtime sau, validate-lúc-ghi lúc đó. Nullable vì draft gọi trực tiếp
+    #   (không qua webhook) có thể chưa có snapshot.
+    # `expires_at`: TTL = min(messaging window platform, ngưỡng shop). Chỗ CHỨA — tính toán +
+    #   cron expiry là runtime sau.
+    # `label`: tín hiệu train auto-send (§8.1) — KHÁC `status` (lifecycle gửi). Trùng cho
+    #   approve/reject, LỆCH cho `edited` (sửa text rồi duyệt: status=approved, label=edited).
+    #   Gộp vào `status` = mất `edited` mãi mãi. CHECK ở DB là hàng rào không ai bypass được.
+    snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    label: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     # spec 06 F0: `conversation_id` / `customer_id` were bare Text with nothing behind them —
     # they could point at ids that never existed and Postgres accepted it. Now composite FKs,
     # same reasoning as Conversation: they pin the referenced row to THIS shop, not merely to
     # an existing row. Gate: test_pending_reply_orphan_columns_now_have_fk.
     __table_args__ = (
         Index("idx_pending_shop_status_created", "shop_id", "status", "created_at"),
+        CheckConstraint(
+            "label IS NULL OR label IN ('approved', 'rejected', 'edited')",
+            name="ck_pending_reply_label",
+        ),
         ForeignKeyConstraint(
             ["shop_id", "conversation_id"],
             ["conversations.shop_id", "conversations.id"],

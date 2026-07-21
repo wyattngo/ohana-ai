@@ -201,8 +201,17 @@ async def test_missing_emit_reply_call_raises_not_fabricate(fresh_db) -> None:
 
 def _first_party_imports(path: Path) -> set[str]:
     roots = {
-        "api", "app", "agent", "auth", "bridge",
-        "channels", "db", "parsing", "retrieval", "storage", "tools",
+        "api",
+        "app",
+        "agent",
+        "auth",
+        "bridge",
+        "channels",
+        "db",
+        "parsing",
+        "retrieval",
+        "storage",
+        "tools",
     }
     found: set[str] = set()
     tree = ast.parse(path.read_text(encoding="utf-8"))

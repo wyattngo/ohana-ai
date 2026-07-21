@@ -238,9 +238,7 @@ class LLMDrafter:
             return emit
         raise ValueError("model không gọi emit_reply kể cả khi chỉ offer nó — không bịa draft")
 
-    async def _dispatch(
-        self, tc: Any, *, shop_id: str, customer_id: str
-    ) -> dict[str, Any]:
+    async def _dispatch(self, tc: Any, *, shop_id: str, customer_id: str) -> dict[str, Any]:
         """Chạy một tool_call. `shop_id` verified TỪ tham số; `user_id`=`customer_id`; `args`
         (LLM-emitted) chỉ mang field trong `parameters`. Tool lạ ⇒ envelope lỗi, KHÔNG raise —
         model đọc được và tự sửa lượt sau, thay vì rơi cả draft."""
