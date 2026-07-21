@@ -7,19 +7,19 @@ is rewritten by `gen_codebase_map.py` and must not be hand-edited.
 
 ## Packages
 
-| Package | Files | Lines |
-|---|---:|---:|
-| `agent` | 11 | 1201 |
-| `api` | 6 | 721 |
-| `app` | 3 | 357 |
-| `auth` | 2 | 203 |
-| `bridge` | 3 | 243 |
-| `channels` | 4 | 229 |
-| `db` | 13 | 1407 |
-| `parsing` | 4 | 218 |
-| `retrieval` | 3 | 84 |
-| `storage` | 3 | 48 |
-| `tools` | 5 | 374 |
+| Package | Files |
+|---|---:|
+| `agent` | 11 |
+| `api` | 6 |
+| `app` | 3 |
+| `auth` | 2 |
+| `bridge` | 3 |
+| `channels` | 4 |
+| `db` | 13 |
+| `parsing` | 4 |
+| `retrieval` | 3 |
+| `storage` | 3 |
+| `tools` | 5 |
 
 ## Modules
 

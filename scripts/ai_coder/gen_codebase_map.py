@@ -74,25 +74,21 @@ def detect_first(root: Path, candidates: list[str]) -> str:
     return ""
 
 
-def loc(p: Path) -> int:
-    try:
-        return len(p.read_text(encoding="utf-8", errors="replace").splitlines())
-    except OSError:
-        return 0
-
-
 # ------------------------------------------------------------------ sections
 
 
 def section_packages(root: Path, packages: list[str]) -> list[str]:
-    rows = ["| Package | Files | Lines |", "|---|---:|---:|"]
+    # File count only, deliberately no LOC: a per-line count makes the map stale on
+    # every edit, so the staleness gate would fire on changes that touch no structure.
+    # The map exists to catch structural drift (a module/tool/migration added but not
+    # recorded), not to track line churn.
+    rows = ["| Package | Files |", "|---|---:|"]
     for name in packages:
         d = root / name
         if not d.is_dir():
-            rows.append(f"| `{name}` | — | *missing from tree* |")
+            rows.append(f"| `{name}` | *missing from tree* |")
             continue
-        files = py_files(d)
-        rows.append(f"| `{name}` | {len(files)} | {sum(loc(f) for f in files)} |")
+        rows.append(f"| `{name}` | {len(py_files(d))} |")
     return rows
 
 
