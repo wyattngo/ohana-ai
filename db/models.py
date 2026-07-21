@@ -423,3 +423,31 @@ class ShopProfile(Base):
             name="ck_shop_profile_persona_len",
         ),
     )
+
+
+class WebhookEventLog(Base):
+    """Sổ idempotency cho inbound webhook (spec 14 B0, workflow §2.1 ràng buộc #2).
+
+    Một row = "đã xử lý event này". Zalo/FB retry cùng payload ⇒ PK compound
+    `(channel, platform_msg_id)` từ chối bản sao ở TẦNG DB, không dựa vào cache (workflow §2.1
+    nói thẳng "Không dựa vào cache"). Đây là cơ chế chống-nhân-đôi mà `messages` cố ý KHÔNG có
+    (spec 10 H1: `messages` không idempotent, dedup sống ở ĐÂY).
+
+    ⚠️ **KHÔNG shop-scoped, KHÔNG FK về `shops`.** `platform_msg_id` duy nhất theo channel
+    trên toàn nền tảng — idempotency là biên giới NỀN-TẢNG, không phải dữ liệu tenant. `shop_id`
+    lưu để audit/truy vết, không vào PK và không ràng buộc FK: khi wire runtime, `shop_id` suy
+    từ `(endpoint, page_id sau verify)` và có thể là sentinel/pre-verify chưa là shop thật
+    (cùng lý do `embeddings._platform`, spec 11 PRE-1104).
+
+    B0 chỉ dựng bảng + repo. Wire vào `api/webhook.py` là runtime `GD0-INGEST`, cần
+    signature-verify (`GD0-ZALO`, PRE-004) đứng trước.
+    """
+
+    __tablename__ = "webhook_event_log"
+
+    channel: Mapped[str] = mapped_column(Text, primary_key=True)
+    platform_msg_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    shop_id: Mapped[str] = mapped_column(Text, nullable=False)
+    received_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )

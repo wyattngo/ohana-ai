@@ -1,0 +1,10 @@
+{
+  "verdict": "APPROVE",
+  "model": "claude-haiku-4-5-20251001",
+  "tier": "medium",
+  "summary": "B0 webhook idempotency: single ON CONFLICT DO NOTHING RETURNING (race-safe, not select-then-insert), compound PK (channel, platform_msg_id), repo NOT shop-scoped, shop_id no FK to shops, concurrency test asserts one row/one True, migration 0009 reversible. No runtime wiring.",
+  "findings": [],
+  "scope_ok": true,
+  "diff_sha256": "976094c6bbfffff3d08e154b58cf0931b7d4cd279291a668754a18edc9d32fc9",
+  "stamped_at": "2026-07-21T18:29"
+}

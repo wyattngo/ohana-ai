@@ -23,11 +23,19 @@ from datetime import UTC, datetime
 from typing import Any, cast
 
 from sqlalchemy import select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent.persona import PERSONA_MAX_CHARS
-from db.models import Conversation, Message, PendingReply, ShopKnowledge, ShopProfile
+from db.models import (
+    Conversation,
+    Message,
+    PendingReply,
+    ShopKnowledge,
+    ShopProfile,
+    WebhookEventLog,
+)
 
 # Khai tường minh thay vì nhận string tuỳ ý: `role` sai chính tả (vd "Assistant") sẽ làm
 # `last_n` trả đúng row nhưng LLM đọc sai vai — hỏng âm thầm, không exception nào.
@@ -304,3 +312,35 @@ class ShopProfileRepo:
             row.published_at = published_at
         await self._session.commit()
         return row
+
+
+class WebhookEventRepo:
+    """Idempotency cho inbound webhook (spec 14 B0, workflow §2.1 #2).
+
+    KHÔNG `shop_scope`, KHÁC mọi repo khác trong file này — idempotency là biên giới
+    NỀN-TẢNG, không phải dữ liệu tenant. 🚫 Đừng "sửa" thành shop-scoped: `platform_msg_id`
+    duy nhất theo channel trên toàn nền tảng, và scope theo shop sẽ cho retry của cùng một
+    event (đến trước lúc `shop_id` được suy ra) lọt hai lần.
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def record_event(self, *, channel: str, platform_msg_id: str, shop_id: str) -> bool:
+        """Ghi một event lần đầu. Trả `True` nếu đây là lần đầu thấy `(channel, platform_msg_id)`,
+        `False` nếu đã thấy (retry) — caller dùng `False` để bỏ qua, KHÔNG enqueue lại.
+
+        MỘT câu `INSERT ... ON CONFLICT DO NOTHING RETURNING` — race-safe ở tầng DB. KHÔNG
+        select-then-insert: hai webhook đồng thời cùng key sẽ cùng thấy "chưa có" rồi insert
+        cả hai (đúng ISSUE-017 mà spec 09 đóng cho Conversation). Ở đây conflict ⇒ RETURNING
+        rỗng ⇒ `False`, và Postgres đảm bảo đúng một bên thắng.
+        """
+        stmt = (
+            pg_insert(WebhookEventLog)
+            .values(channel=channel, platform_msg_id=platform_msg_id, shop_id=shop_id)
+            .on_conflict_do_nothing(index_elements=["channel", "platform_msg_id"])
+            .returning(WebhookEventLog.platform_msg_id)
+        )
+        inserted = (await self._session.execute(stmt)).first()
+        await self._session.commit()
+        return inserted is not None
