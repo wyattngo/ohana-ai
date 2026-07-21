@@ -1,0 +1,12 @@
+{
+  "verdict": "APPROVE",
+  "summary": "Phase D0 impl correct, complete, safe. 6 GOAL clauses implemented with TDD RED-first tests. No forbidden imports, defensive error handling, multi-tenant scoping via ShopProfileRepo. Zero regression (3 new files, 0 RISK_PATHS).",
+  "correctness": "Parse/logic sound. _parse_emit_reply validates tool args defensively + raises when emit_reply missing. _build_system_prompt handles missing Shop/Profile gracefully. Message order system->history->user correct.",
+  "completeness": "All 6 GOAL clauses implemented AND test-pinned (intent/confidence-from-LLM, persona-injection, history-threading, enum superset, raise-on-missing, import-boundary).",
+  "safety": "shop_id from param only (not LLM/body); zero imports to sender/channels/policy_gate/orchestrator (AST-enforced); no fabricated confidence; ShopProfileRepo SQL-level scope; enum-gap test prevents silent sensitive-intent bypass.",
+  "findings": [],
+  "model": "claude-haiku-4-5-20251001",
+  "risk_tier": "high",
+  "diff_sha256": "7db0d49369b60f3df5e49910fce0b005e3483d78e76a49518f020069f70f6832",
+  "stamped_at": "2026-07-21T15:03"
+}
