@@ -77,7 +77,8 @@ Mount cần **hai** điều kiện (orchestrator docstring + `webhook.py` docstr
 ---
 
 <!-- ADP:PHASE D0 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=dc282b4, gate_exit=0, duration=13s, review=PASS(judge=APPROVE,model=claude-haiku-4-5-20251001,bound=7db0d49369b6,tier=high), smoke=PASS(bound=7db0d49369b6), ran=2026-07-21T15:04
 ROADMAP: GD0-DRAFTER
 GOAL: `agent/drafter.py` định nghĩa `LLMDrafter` implement `Drafter` (mypy structural check pass). `draft(*, shop_id, customer_id, message, history)` trả object `.text/.intent/.confidence` với intent+confidence LẤY TỪ args `emit_reply` của LLM (test: `FakeLLMClient` trả hai payload khác nhau ⇒ drafter surface đúng cả hai, chứng minh không hardcode). System prompt gửi tới LLM CHỨA `build_persona_prompt(profile.persona_md, shop_display_name=…)` (test capture messages). `history` xâu theo thứ tự vào messages. `intent` enum bao trọn `{complaint,refund,price_negotiation,specific_order,general}` (test assert schema enum ⊇ 4 mã nhạy cảm). Import-graph: `agent/drafter.py` KHÔNG import sender/channels/policy_gate/PendingReply (test bao đóng import, đỏ khi vi phạm). `pytest tests/test_drafter.py` xanh.
 APPROACH: File mới `agent/drafter.py` (§2). `LLMDrafter(llm, session_factory)` — `draft()` load `ShopProfile`+`Shop.display_name` qua repo, `build_persona_prompt`, ráp `[system(persona), *history, user(message)]`, gọi `llm.step(messages, tools=[EMIT_REPLY_TOOL])` với `emit_reply{text,intent(enum),confidence}` bắt buộc, parse args → `_DraftResult`. Cap vòng lặp = 1 ở D0 (chưa grounding tool). intent+confidence = args ⇒ từ LLM. KHÔNG import đường-gửi (giữ ranh giới như `api/chat.py`).
