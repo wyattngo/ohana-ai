@@ -139,7 +139,8 @@ PRE-1404: `label` derive-from-status bây giờ vs chờ edit path — Wyatt xá
 ### Phase A0 — `PendingReply` +snapshot/expires_at/label + label-on-decide
 
 <!-- ADP:PHASE A0 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=346ff46, gate_exit=0, duration=14s, review=PASS(judge=APPROVE,model=claude-haiku-4-5-20251001,bound=170cce9b177d,tier=medium), smoke=N/A(migration schema — không có service runtime người dùng quan sát; đúng-sai verify bằng alembic up→down→up trên Postgres thật (§10) + CI alembic step + test hai-insert trên Postgres CI thật.), ran=2026-07-21T18:20
 ROADMAP: GD0-DRAFTSCHEMA
 GOAL: `PendingReply` có 3 cột nullable `snapshot JSONB` / `expires_at TIMESTAMPTZ` / `label TEXT` (CHECK ∈ {approved,rejected,edited} hoặc NULL); `PendingReplyRepo.create` nhận `snapshot`/`expires_at` optional (default None — call-site cũ không đổi); `mark_decided(new_status="approved")` set `label="approved"`, `"rejected"`→`"rejected"`; migration up→down→up sạch trên Postgres thật; toàn bộ test cũ xanh nguyên (cột nullable).
 APPROACH: ALTER thêm 3 cột nullable — không backfill (PRE-1402=0 row kỳ vọng). `label` derive TRONG `mark_decided` từ `new_status`, KHÔNG thêm tham số cho caller ⇒ `api/inbox.py` KHÔNG đổi (giữ blast radius = repo + schema). CHECK constraint ở DB cho `label` (Pydantic chưa cần vì chưa có đường ghi snapshot). `snapshot` để JSONB free-form GĐ này — shape sẽ pin khi capture land (spec runtime), validate-lúc-ghi lúc đó. Cột `expires_at` chỉ là chỗ chứa; tính `min(window, ngưỡng shop)` là runtime sau.
