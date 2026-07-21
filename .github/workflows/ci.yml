@@ -87,6 +87,13 @@ jobs:
       - name: Mypy (strict)
         run: mypy app agent retrieval parsing storage db bridge tools api auth
 
+      # AI-coder map: docs/codebase-map.md must match the tree. The generator + check are
+      # stdlib-only and vendored (mirror of .claude/skills/AI-coder/scripts/, which lives
+      # outside this repo so CI cannot reach it — see scripts/ai_coder/README.md). Catches a
+      # tree change that skipped regenerating the map, unbypassably.
+      - name: AI-coder codebase map is current
+        run: python3 scripts/ai_coder/gen_codebase_map.py --check
+
       - name: DB migrate (empty tree at Phase 1.3 — first migration lands at Phase 2)
         run: alembic upgrade head
 
