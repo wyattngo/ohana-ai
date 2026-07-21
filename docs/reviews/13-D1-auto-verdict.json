@@ -1,0 +1,12 @@
+{
+  "verdict": "APPROVE",
+  "summary": "Phase D1 tool-loop grounding correct: loop dispatch (emit/tool/finalize/cap), multi-tenant shop_id from param not LLM args (test-pinned), grounding directive + forced-emit finalize keep facts. 5 unit tests + 2 live smokes. Clean import-graph, no missing error handling.",
+  "correctness": "Loop: emit_reply->return; tool_call->dispatch+thread(assistant tool_calls + role=tool tool_call_id)->repeat; content-no-tool+tools->_finalize(only emit_reply offered); content-no-tool+no-tools->raise (D0 semantics kept); MAX_TOOL_ROUNDS caps infinite loop. _extract_emit distinguishes None (no emit) vs raise (bad args).",
+  "completeness": "D1 GOAL fully covered + test-pinned: cross-tenant rejection, tool-result threading, loop cap, finalize fallback, D0 backward-compat. Live smoke grounds on seeded XL3 (not guessed).",
+  "safety": "Multi-tenant HIGH: _dispatch passes shop_id from draft() param, NOT tc.arguments; test injects bogus shop_id in args -> dropped, handler gets real. additionalProperties:false blocks extra fields. Grounding HIGH: _GROUNDING_DIRECTIVE mandates tool use for facts; not_found not fabricated; _finalize keeps tool results in messages. Import-graph clean (tools.registry adds no forbidden). Confidence/intent validated, fail-loud.",
+  "findings": [],
+  "model": "claude-haiku-4-5-20251001",
+  "risk_tier": "high",
+  "diff_sha256": "a3417442de0c97e9777c208e0d69cef7b6b7356f104c7d33a7afe9634ce14c6d",
+  "stamped_at": "2026-07-21T15:29"
+}

@@ -100,7 +100,7 @@ REVIEW: PASS ref=docs/reviews/13-D0-auto-verdict.json human=docs/reviews/13-D0-h
 ---
 
 <!-- ADP:PHASE D1 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 ROADMAP: GD0-DRAFTER
 GOAL: `LLMDrafter` offer thêm `lookup_size`/`lookup_shipping` (từ `tools/shop_kb`) vào cùng loop với `emit_reply`; chạy tool-call loop tất định. Câu hỏi size/ship ⇒ draft grounded trên tool result (test: `FakeLLMClient` phát `lookup_size` tool_call trước rồi `emit_reply`; drafter dispatch handler với `shop_id` TỪ tham số `draft()` — không từ LLM args — và xâu result vào messages trước lượt cuối). `shop_id` gửi tới handler ≠ bất kỳ giá trị nào trong tool args (test tiêm args mang `shop_id` giả ⇒ bị bỏ, handler vẫn nhận shop_id thật). Cap vòng lặp chặn loop vô hạn (test: model gọi tool mãi ⇒ raise sau N vòng, KHÔNG treo). `pytest tests/test_drafter_tools.py` xanh.
 APPROACH: Mở rộng `agent/drafter.py` (KHÔNG file mới): `LLMDrafter(llm, session_factory, tools=[...])` — inject `list[Tool]` (DI, như `build_router`), test tiêm fake tool. Loop: `step(tools=grounding+emit_reply)` → nếu tool_call ∈ grounding: `TOOLS[name].handler(user_id, shop_id=<draft arg>, args)`, append tool-result message, lặp; nếu `emit_reply`: kết. Cap `MAX_TOOL_ROUNDS` (đề xuất 4) — vượt ⇒ raise, không trả draft rỗng/bịa. `shop_id` baked từ tham số, args chỉ field trong `parameters`.
@@ -110,7 +110,8 @@ GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && .venv/bin/mypy 
 RETRY: 0/3
 RISK: high (grounding sai vẫn là fact sai tới khách qua auto_send; và dispatch tool với `shop_id` sai = cross-tenant fact leak. Roadmap §8 "Fact hallucination"/"Multi-tenant data leak" = HIGH. TDD RED-first + per-step confirm.)
 BLOCKED_BY: D0
-SMOKE: N/A placeholder-TODO — D1 SẼ live-smoke lúc DONE: seller-shop thật có bảng size → câu "1m6 50kg mặc gì" ⇒ draft chứa size đúng từ `lookup_size` (không đoán). Executor đổi thành PASS ref=docs/smokes/13-D1.md khi chạy.
+SMOKE: PASS ref=docs/smokes/13-D1.md
+REVIEW: PASS ref=docs/reviews/13-D1-auto-verdict.json human=docs/reviews/13-D1-human.md
 <!-- /ADP -->
 
 1. Test (**RED first**, RISK:high): `tests/test_drafter_tools.py` — `FakeLLMClient` kịch bản: lượt 1 phát `lookup_size` tool_call (args kèm `shop_id` giả), lượt 2 phát `emit_reply`. Assert: (a) handler nhận `shop_id` thật (draft arg), không phải giá trị giả trong args; (b) tool result xâu vào messages lượt 2; (c) draft cuối phản ánh result; (d) cap: model gọi tool vô hạn ⇒ raise sau `MAX_TOOL_ROUNDS`. Confirm ĐỎ.

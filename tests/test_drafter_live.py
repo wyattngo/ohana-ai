@@ -90,3 +90,59 @@ async def test_drafter_real_model_structured_and_no_identity_leak(fresh_db) -> N
         f"\n[SMOKE 13-D0] intent={result.intent} confidence={result.confidence}\n"
         f"[SMOKE 13-D0] text={result.text!r}"
     )
+
+
+@pytest.mark.asyncio
+async def test_drafter_grounds_size_from_tool_not_guess(fresh_db) -> None:
+    """D1: model tra `lookup_size` THẬT rồi trả size từ tool, KHÔNG đoán.
+
+    Bảng size seed dùng token đặc biệt `XL3` cho 160cm/50kg — một size không bao giờ model tự
+    đoán ra. Draft chứa `XL3` ⇒ nó ĐÃ gọi tool + đọc result (grounded). Không chứa ⇒ model
+    đoán bừa, và đó là failure mode "Fact hallucination" D1 phải chặn.
+    """
+    _require_key()
+    from agent.providers.together_client import TogetherClient
+    from tools.shop_kb import build_size_tool
+
+    engine, sf = await fresh_db()
+    shop = f"shop_{uuid.uuid4().hex[:12]}"
+    async with engine.begin() as c:
+        await c.execute(
+            sa.text("insert into shops (id, name, status) values (:i, :n, 'active')"),
+            {"i": shop, "n": "Shop Aspecies"},
+        )
+    async with sf() as s:
+        await ShopProfileRepo(s, shop_scope=shop).upsert(
+            persona_md="Shop thời trang nữ Aspecies. Xưng 'shop', thân thiện.",
+            knowledge={
+                "size_chart": [
+                    {
+                        "size": "XL3",
+                        "height_min_cm": 155,
+                        "height_max_cm": 165,
+                        "weight_min_kg": 45,
+                        "weight_max_kg": 55,
+                    }
+                ]
+            },
+        )
+        await s.commit()
+
+    result = await LLMDrafter(TogetherClient(), sf, tools=[build_size_tool(sf)]).draft(
+        shop_id=shop,
+        customer_id="cust_live",
+        message="Mình cao 160cm nặng 50kg thì shop tư vấn mặc size nào ạ?",
+        history=[],
+    )
+
+    assert result.text, "draft rỗng"
+    assert result.intent in INTENT_CODES
+    assert _LEAK.search(result.text) is None, f"lộ danh tính: {result.text!r}"
+    assert "XL3" in result.text, (
+        f"draft KHÔNG chứa size từ tool (XL3) ⇒ model đoán thay vì grounded: {result.text!r}"
+    )
+
+    print(
+        f"\n[SMOKE 13-D1] intent={result.intent} confidence={result.confidence}\n"
+        f"[SMOKE 13-D1] text={result.text!r}"
+    )
