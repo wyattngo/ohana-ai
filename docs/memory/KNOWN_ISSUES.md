@@ -105,6 +105,20 @@
   - ⚠️ **VẪN OPEN:** `app/alert_service.py` CHƯA port. Hôm nay **429 không được đếm ở đâu cả** trừ khi caller tự tiêm hook — đây là capability regression spec 07 chấp nhận có ý thức, KHÔNG phải đã giải quyết.
 - **Cập nhật 2026-07-17 (spec 05 P0):** `app/config.py` đã build (Settings 4 field). Hệ quả: `OpenAIEmbedder` (F1) giờ import + instantiate được — nửa embedder của ISSUE-010 + toàn bộ ISSUE-016 config-half GIẢI QUYẾT. NHƯNG `OpenAIClient` (LLM chat, F2/F3) VẪN vỡ vì `app/alert_service.py` chưa port. Encode ở `tests/test_config.py::test_openai_client_import_blocked_by_unported_alert_service` (`xfail(strict=True)` — flip hard-fail khi port xong, không rot).
 - **Action còn lại:** port `app/alert_service.py` (fire-and-forget 429 counter — stub no-op OK ở MVP) — thuộc **LLM-client wiring spec** (F2/F3, cùng lúc wire `OpenAIClient` + concrete `Drafter` + webhook mount, gated PRE-004). KHÔNG thuộc spec 05 (F1 không cần LLM client). Khi làm: xoá xfail ở test_config.py.
+- **Cập nhật 2026-07-21 (AI-coder audit + port nửa an toàn):**
+  - **Module ĐÃ land:** `app/alert_service.py` — `record_provider_429()` fire-and-forget, fail-OPEN
+    (không raise, gọi từ except của client), + `provider_429_count()` reader. Bộ đếm **in-memory
+    process-local** (Redis CHƯA wire trong ohana; drnick bản Redis kéo theo `health_service`+
+    `latency_service`+poller = spec 34/36/40, ngoài scope). Chữ ký khớp hook `on_rate_limit` để
+    tiêm thẳng. Test: `tests/test_alert_service.py` (4 ca — đếm, fail-open khi logging chết, chữ ký,
+    canh import-clean). Đổi ruột sang Redis sau KHÔNG phải đổi chữ ký.
+  - **Action "xoá xfail" = STALE:** xfail đã đảo chiều ở spec 07 G0 thành assertion thật
+    `test_openai_client_imports_without_alert_service`; `openai_client.py:28` giờ là `get_settings`,
+    không còn `from app import alert_service`. Không còn xfail nào để xoá.
+  - **⚠️ VẪN OPEN — 429 vẫn CHƯA được đếm ở đường thật:** client chỉ dựng ở `api/chat.py:83`
+    (`TogetherClient()`) mà KHÔNG tiêm `on_rate_limit`. Wire-in = sửa `api/chat.py` = **RISK_PATH ⇒
+    cần ADP phase** (đề xuất RISK:medium — chạm RISK_PATH nhưng telemetry fail-open, không đổi hành
+    vi gửi/tiền). Module này là ĐÍCH tiêm sẵn sàng; issue đóng khi phase đó wire + test đường 429 thật.
 
 ### ISSUE-011 — DrNick milestone/spec lore residue in ported agent/ files (audit gap)
 - **Origin:** spec 01 Phase 1 close audit (2026-07-16)
