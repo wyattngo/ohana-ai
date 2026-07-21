@@ -360,3 +360,31 @@ mặc định) · không idempotent (chờ `webhook_event_log` spec 03, BLOCKED)
 chờ PRE-004 (Zalo creds + signature, Tân).
 
 **CLAUDE.md update needed:** no (meta-sync chạy cuối phiên này).
+
+---
+
+## 2026-07-21 — Adopt backend-workflow as code structure + spec 14 schema-shaping (A0/B0/C0)
+
+- **Owner:** Wyatt + Claude (main loop)
+- **Duration:** ~1 phiên dài
+- **Context:** Bắt đầu từ tech-debt audit code ↔ `ohana-workflow-backend.md`. HEAD `52f943f` (spec 13 Drafter DONE). Câu hỏi: code đi đúng hướng workflow không.
+- **Done:**
+  - **Audit 3 chiều** (workflow doc ↔ L1 ROADMAP ↔ code): code bám L1 tốt ở data-tier/tenant/isolation; 6 điểm workflow lệch L1 (LLM-confidence gate, auto_send branch, snapshot, label-day-1, idempotency-as-internal, two-service).
+  - **DEC-OHANA-05:** Wyatt chốt `docs/backend-workflow.md` là **cấu trúc code chính thức** (workflow thắng khi lệch L1). Copy workflow vào repo canonical.
+  - **ROADMAP v6** (append-only, không rename/xoá ID): thêm `GD0-INGEST`/`GD0-DRAFTSCHEMA`/`GD0-SPLIT`/`GD0-PII`/`GD0-COALESCE`; siết `GD0-POLICY`(cấm auto_send GĐ0)/`GD0-DRAFTER`(confidence advisory)/`GD0-METER`(cost cap→PARK)/`GD0-HISTORY`(last-N=6). Mẫu số internal 28→33 (honest, §0.2). Commit `bb8e579`.
+  - **Spec 14 viết + execute trọn** (3 phase, schema-shaping only, KHÔNG runtime):
+    - A0 `346ff46` — `pending_reply` +snapshot/expires_at/label (nullable, CHECK) + label derive-from-status trong repo (sent không đè); migration `0008`. RISK medium.
+    - B0 `3d7bf62` — `webhook_event_log` PK `(channel,platform_msg_id)` + `record_event` race-safe (ON CONFLICT DO NOTHING RETURNING, không select-then-insert, repo KHÔNG shop-scoped); migration `0009`. RISK medium.
+    - C0 `34620c9` — 03:2 narrow-amend (option A) + ISSUE-025/026 + L3. RISK low.
+  - Mỗi phase: TDD RED→GREEN, GATE_FULL PASS, REVIEW APPROVE diff-bound (A0/B0 Haiku, C0 docs-only), SMOKE N/A.
+- **Decisions:** DEC-OHANA-05 (backend-workflow authoritative). Wyatt ký: supersede 03:2 (option A narrow-amend), RISK A0/B0=medium C0=low, ALLOWED_FILES_AMEND cho ISSUE-025.
+- **Issues touched:** ISSUE-025 ĐÓNG (spec-13 ruff format debt chặn GATE_FULL — fix cơ học fold vào A0). ISSUE-026 MỞ (5 nợ runtime schema spec 14: ACK/queue, snapshot capture, TTL cron, edit-path label, event_log retention).
+- **Files changed:** `db/models.py` (+3 cột PendingReply, +WebhookEventLog) · `db/repos.py` (+optional args, +label, +WebhookEventRepo) · `db/migrations/versions/0008,0009` · `tests/test_draft_schema_idempotency.py` (mới, 10 test) · `agent/drafter.py`+`tests/test_drafter.py` (ruff format) · `docs/backend-workflow.md` (mới) · `docs/ROADMAP.md` (v6) · `docs/tasks/03,14` · `docs/memory/DECISIONS.md,KNOWN_ISSUES.md`.
+- **Bài học đắt nhất phiên:**
+  1. **Nợ gate của phase trước = thuế của phase sau.** ISSUE-019 shape: spec 13 ship format-dirty ⇒ `ruff format --check` trong GATE_FULL của A0 đỏ dù A0 sạch. Un-break bằng ALLOWED_FILES_AMEND.
+  2. **L3 có timestamp non-deterministic.** `adp-roadmap.sh` stamp giờ sinh mỗi lần chạy ⇒ verify-only chen giữa stamp↔checkpoint làm đổi diff ⇒ REFUSE. Fix: re-stamp SAU regen cuối, checkpoint ngay, không verify-only chen giữa.
+  3. **Audit lúc execute cứu khỏi over-CANCELLED.** Spec viết "03:2 → CANCELLED" nhưng 03:2 chứa RealZaloSender+signature (spec 14 không làm) ⇒ narrow-amend (option A) thay vì mồ côi.
+  4. **Tách concern trước checkpoint:** commit planning (`bb8e579`) riêng để A0 diff chỉ còn code, review bind đúng phạm vi.
+- **Trạng thái:** `main` == `origin/main` @ `1c4de9e` (push 7 commit 2026-07-21). STATE_HASH `541b6218a61b`. **internal 14/33 (42%)** · phase 38/48. GD0-DRAFTSCHEMA + GD0-INGEST covered (schema; runtime = ISSUE-026). **CI: đã push, chờ 11-step xác nhận.**
+- **What's next:** chờ Wyatt: `GD0-SPLIT` timing · last-N 20→6 reconcile hay DEC giữ 20 · chặn auto_send branch GĐ0. Runtime GD0-INGEST/snapshot-capture chờ có người tiêu thụ (webhook mount kẹt PRE-004 Tân). Review async REVIEW_QUEUE (A0/B0/C0).
+- **CLAUDE.md update needed:** có — §7 status (spec 14 DONE, internal 14/33, migration tới 0009, test count 208→ mới), gate counts. Chạy meta-sync phiên sau.
