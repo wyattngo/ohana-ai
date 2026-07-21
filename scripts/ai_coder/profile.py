@@ -74,9 +74,11 @@ def load(root: Path | None = None) -> Profile:
             raise ProfileError(f"{cfg}:{lineno}: expected 'key = value', got {line!r}")
         key, val = key.strip(), val.strip()
         if key in REPEATABLE:
-            data.setdefault(key, [])
-            assert isinstance(data[key], list)
-            data[key].append(val)  # type: ignore[union-attr]
+            bucket = data.get(key)
+            if not isinstance(bucket, list):
+                bucket = []
+                data[key] = bucket
+            bucket.append(val)
         else:
             data[key] = val
     return Profile(root, data)
