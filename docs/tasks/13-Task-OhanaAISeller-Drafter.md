@@ -100,7 +100,8 @@ REVIEW: PASS ref=docs/reviews/13-D0-auto-verdict.json human=docs/reviews/13-D0-h
 ---
 
 <!-- ADP:PHASE D1 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=77c60c1, gate_exit=0, duration=14s, review=PASS(judge=APPROVE,model=claude-haiku-4-5-20251001,bound=a3417442de0c,tier=high), smoke=PASS(bound=a3417442de0c), ran=2026-07-21T15:30
 ROADMAP: GD0-DRAFTER
 GOAL: `LLMDrafter` offer thêm `lookup_size`/`lookup_shipping` (từ `tools/shop_kb`) vào cùng loop với `emit_reply`; chạy tool-call loop tất định. Câu hỏi size/ship ⇒ draft grounded trên tool result (test: `FakeLLMClient` phát `lookup_size` tool_call trước rồi `emit_reply`; drafter dispatch handler với `shop_id` TỪ tham số `draft()` — không từ LLM args — và xâu result vào messages trước lượt cuối). `shop_id` gửi tới handler ≠ bất kỳ giá trị nào trong tool args (test tiêm args mang `shop_id` giả ⇒ bị bỏ, handler vẫn nhận shop_id thật). Cap vòng lặp chặn loop vô hạn (test: model gọi tool mãi ⇒ raise sau N vòng, KHÔNG treo). `pytest tests/test_drafter_tools.py` xanh.
 APPROACH: Mở rộng `agent/drafter.py` (KHÔNG file mới): `LLMDrafter(llm, session_factory, tools=[...])` — inject `list[Tool]` (DI, như `build_router`), test tiêm fake tool. Loop: `step(tools=grounding+emit_reply)` → nếu tool_call ∈ grounding: `TOOLS[name].handler(user_id, shop_id=<draft arg>, args)`, append tool-result message, lặp; nếu `emit_reply`: kết. Cap `MAX_TOOL_ROUNDS` (đề xuất 4) — vượt ⇒ raise, không trả draft rỗng/bịa. `shop_id` baked từ tham số, args chỉ field trong `parameters`.
