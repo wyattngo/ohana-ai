@@ -1,6 +1,6 @@
 # ROADMAP STATUS — ohana-ai (L3, SINH MÁY)
 
-> **AUTO-GENERATED bởi `.claude/tools/adp-roadmap.sh` @ 2026-07-21T00:19.**
+> **AUTO-GENERATED bởi `.claude/tools/adp-roadmap.sh` @ 2026-07-21T11:34.**
 > Đây là VIEW join từ L1 (`docs/ROADMAP.md`) × L2 (`docs/tasks/*.md`) × git — **KHÔNG phải source of truth**.
 > ĐỪNG sửa tay phía trên `NOTES_HUMAN`. Muốn đổi kế hoạch → sửa L1. Muốn đổi trạng thái → chạy `adp-checkpoint.sh`.
 
@@ -8,7 +8,7 @@
 
 **Internal: 11/28 work item hoàn tất (39%)** ← đây là mẫu số của "100% Roadmap"
 External: 0/9 (0%) — chờ bên thứ ba, **không tính vào 100%**
-Phase gate-passed: 32/42
+Phase gate-passed: 33/43
 
 
 
@@ -27,7 +27,7 @@ Phase gate-passed: 32/42
 | `GD0-INTENT` | ⬜ TODO | 0/1 | 03:8  |
 | `GD0-METER` | ⬜ TODO | 0/1 | 03:5  |
 | `GD0-MULTITENANT` | ✅ DONE | 1/1 | 01:2  |
-| `GD0-OBS` | ⬜ TODO | 0/1 | 03:9  |
+| `GD0-OBS` | 🔶 một phần | 1/2 | 03:9 12:W0  |
 | `GD0-POLICY` | ✅ DONE | 1/1 | 01:5  |
 | `GD0-RESIDENCY` | ⚪ chưa có spec | 0/0 | — |
 | `GD0-ROUTER` | ⬜ TODO | 0/1 | 03:7  |
