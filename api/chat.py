@@ -80,7 +80,13 @@ def get_llm_client() -> LLMClient:
     if _client_cache is None:
         from agent.providers.together_client import TogetherClient
 
-        _client_cache = TogetherClient()
+        # Spec 12 W0 (ISSUE-010): tiêm bộ đếm 429 làm `on_rate_limit`. Import TRONG hàm —
+        # module-level `from app import alert_service` sẽ tái lập chính coupling mà G0 gỡ và
+        # `test_openai_client_imports_without_alert_service` canh. Hook fire-and-forget, re-raise
+        # `RateLimitError` nguyên vẹn (funnel `OpenAIClient._create`).
+        from app import alert_service
+
+        _client_cache = TogetherClient(on_rate_limit=alert_service.record_provider_429)
     return _client_cache
 
 

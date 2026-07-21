@@ -33,7 +33,7 @@ poller = spec 34/36/40); reader/alerting poller; các counter khác (tool-error,
 ## Phases
 
 <!-- ADP:PHASE W0 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 ROADMAP: GD0-OBS
 GOAL: `api/chat.py:get_llm_client()` dựng client với `on_rate_limit=alert_service.record_provider_429`; một `openai.RateLimitError` từ tầng client làm `provider_429_count()` tăng đúng 1 VÀ `RateLimitError` vẫn thoát ra nguyên vẹn (không bị hook che). Không tiêm ⇒ đếm 0.
 APPROACH: Tiêm hook tại điểm dựng DUY NHẤT (`get_llm_client`), không ở module scope — giữ nguyên lý do dựng-lười (thiếu key chỉ chết `/api/chat`, không chết cả app). Test đường 429 ở TẦNG CLIENT bằng fake `AsyncOpenAI` ném `RateLimitError` (không cần key/mạng), cộng một test rằng `get_llm_client` truyền đúng hook (patch `TogetherClient`, bắt kwargs, reset `_client_cache`). Fail-open của bộ đếm đã có test riêng ở `test_alert_service.py` — KHÔNG lặp lại. KHÔNG đụng `agent/providers/` (TogetherClient đã forward).
@@ -44,6 +44,7 @@ RETRY: 0/3
 RISK: medium (Wyatt ký 2026-07-21. Floor: `api/chat.py` ∈ RISK_PATHS. Không high: telemetry fire-and-forget, re-raise `RateLimitError` nguyên vẹn, KHÔNG đổi hành vi gửi/tiền, KHÔNG chạm policy_gate/pending_reply.)
 BLOCKED_BY: none (chat path chạy thật từ spec 07; KHÔNG chờ PRE-004)
 SMOKE: N/A 429 provider không ép được on-demand để smoke đường thật; regression boot phủ bởi suite qua dependency_overrides, đường 429 phủ bởi fake RateLimitError ở test
+REVIEW: PASS ref=docs/reviews/12-W0-auto-verdict.json
 <!-- /ADP -->
 
 1. Test (**RED trước**): (a) fake `AsyncOpenAI.chat.completions.create` ném `openai.RateLimitError` → `OpenAIClient(on_rate_limit=record_provider_429).step(...)` phải re-raise `RateLimitError` VÀ `provider_429_count()==1`; (b) `get_llm_client()` (sau `_reset`) truyền `on_rate_limit is alert_service.record_provider_429` vào `TogetherClient`.
