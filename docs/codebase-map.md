@@ -11,7 +11,7 @@ is rewritten by `gen_codebase_map.py` and must not be hand-edited.
 |---|---:|---:|
 | `agent` | 11 | 1201 |
 | `api` | 6 | 721 |
-| `app` | 3 | 339 |
+| `app` | 3 | 357 |
 | `auth` | 2 | 203 |
 | `bridge` | 3 | 243 |
 | `channels` | 4 | 229 |
