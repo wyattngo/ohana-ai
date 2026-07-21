@@ -108,3 +108,17 @@ hơn 3.5× trên bảng giá nhưng đắt hơn 2.4× khi dùng, vì nói dài g
 
 Chi tiết + cách tái lập: `docs/decisions/DEC-OHANA-02-chat-model-selection.md`.
 
+## DEC-OHANA-05 — `backend-workflow.md` là cấu trúc code chính thức (2026-07-21)
+
+- **Status:** ACCEPTED
+- **Signed-by:** Wyatt · 2026-07-21
+- **Context:** Wyatt xem xét lại và chốt `docs/backend-workflow.md` (mô tả luồng backend hai persona) làm **quyết định cấu trúc code chính thức**. Audit trước đó phát hiện 6 điểm workflow lệch với L1 `ROADMAP.md`, và code đang bám L1.
+- **Decision:** Workflow doc là nguồn cấu trúc code authoritative. **Khi L1 và workflow lệch → workflow thắng.** L1 v6 hoà giải, KHÔNG phá vỡ hiện trạng (không đụng code/L2 spec).
+- **Rationale:** Một nguồn cấu trúc duy nhất; các cú đặt cược an toàn của workflow (idempotency-first, snapshot bắt buộc, label-day-1, no-auto-send GĐ0, gate không tin LLM confidence, two-service, PII filter) khớp priority order safety→trust→stability→growth.
+- **Consequences:**
+  - L1 v6: thêm `GD0-INGEST` (tách idempotency internal khỏi `GD0-ZALO`), `GD0-DRAFTSCHEMA`, `GD0-SPLIT`, `GD0-PII`, `GD0-COALESCE`; siết `GD0-POLICY`/`GD0-DRAFTER`/`GD0-METER`/`GD0-HISTORY`; append-only (không rename/xoá ID).
+  - Mẫu số `internal` GĐ0 tăng +5 (% giảm honest, §0.2).
+  - Code chưa đổi — hành vi (chặn auto_send, snapshot, last-N=6, idempotency) land qua ADP spec riêng, RISK tier do Wyatt gán.
+  - Hai tài liệu-doc-conflict cần Wyatt xác nhận sequencing: `GD0-SPLIT` (two-service) đặt pre-prod; last-N 6-vs-20 reconcile về 6.
+- **Supersedes:** none (bổ sung; không thay DEC nào)
+

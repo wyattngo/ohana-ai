@@ -1,14 +1,14 @@
 # ROADMAP STATUS — ohana-ai (L3, SINH MÁY)
 
-> **AUTO-GENERATED bởi `.claude/tools/adp-roadmap.sh` @ 2026-07-21T15:30.**
+> **AUTO-GENERATED bởi `.claude/tools/adp-roadmap.sh` @ 2026-07-21T17:30.**
 > Đây là VIEW join từ L1 (`docs/ROADMAP.md`) × L2 (`docs/tasks/*.md`) × git — **KHÔNG phải source of truth**.
 > ĐỪNG sửa tay phía trên `NOTES_HUMAN`. Muốn đổi kế hoạch → sửa L1. Muốn đổi trạng thái → chạy `adp-checkpoint.sh`.
 
 ## Mục tiêu 100%
 
-**Internal: 12/28 work item hoàn tất (42%)** ← đây là mẫu số của "100% Roadmap"
+**Internal: 12/33 work item hoàn tất (36%)** ← đây là mẫu số của "100% Roadmap"
 External: 0/9 (0%) — chờ bên thứ ba, **không tính vào 100%**
-Phase gate-passed: 35/45
+Phase gate-passed: 35/48
 
 
 
@@ -18,20 +18,25 @@ Phase gate-passed: 35/45
 |---|---|---|---|
 | `GD0-BOOTSTRAP` | ✅ DONE | 5/5 | 01:1 02:1.0 02:1.1 02:1.2 02:1.3  |
 | `GD0-CHAT` | ✅ DONE | 3/3 | 07:G0 07:G1 07:G2  |
+| `GD0-COALESCE` | ⚪ chưa có spec | 0/0 | — |
 | `GD0-CONFIG` | ✅ DONE | 3/3 | 05:P0 05:P1 05:P2  |
 | `GD0-DRAFTER` | ✅ DONE | 2/2 | 13:D0 13:D1  |
+| `GD0-DRAFTSCHEMA` | ⬜ TODO | 0/1 | 14:A0  |
 | `GD0-EMBED` | ✅ DONE | 3/3 | 08:E0 08:E1 08:E2  |
 | `GD0-EVAL` | ⬜ TODO | 0/1 | 03:6  |
 | `GD0-FOUNDATION` | ✅ DONE | 3/3 | 06:F0 06:F2 09:C0  |
 | `GD0-HISTORY` | ✅ DONE | 3/3 | 10:H0 10:H1 10:H2  |
+| `GD0-INGEST` | ⬜ TODO | 0/2 | 14:B0 14:C0  |
 | `GD0-INTENT` | ⬜ TODO | 0/1 | 03:8  |
 | `GD0-METER` | ⬜ TODO | 0/1 | 03:5  |
 | `GD0-MULTITENANT` | ✅ DONE | 1/1 | 01:2  |
 | `GD0-OBS` | 🔶 một phần | 1/2 | 03:9 12:W0  |
+| `GD0-PII` | ⚪ chưa có spec | 0/0 | — |
 | `GD0-POLICY` | ✅ DONE | 1/1 | 01:5  |
 | `GD0-RESIDENCY` | ⚪ chưa có spec | 0/0 | — |
 | `GD0-ROUTER` | ⬜ TODO | 0/1 | 03:7  |
 | `GD0-SHOPS` | ✅ DONE | 4/4 | 11:S0 11:S1 11:S2 11:S3  |
+| `GD0-SPLIT` | ⚪ chưa có spec | 0/0 | — |
 | `GD0-UI` | ✅ DONE | 3/3 | 04:P0 04:P1 04:P2  |
 | `GD0-WIKI` | ⛔ BLOCKED | 1/2 | 01:3 03:3  |
 | `GD1-STATE` | ⚪ chưa có spec | 0/0 | — |
@@ -61,7 +66,10 @@ Phase gate-passed: 35/45
 
 ## ⚠️ Uncovered — mục L1 chưa spec nào nhận
 
+- `GD0-COALESCE` (internal)
+- `GD0-PII` (internal)
 - `GD0-RESIDENCY` (internal)
+- `GD0-SPLIT` (internal)
 - `GD1-COD` (external)
 - `GD1-PAY` (external)
 - `GD1-SHIP` (external)
@@ -91,5 +99,6 @@ Phase ở đây là **scope drift**: đang làm việc không nằm trong kế h
 - 2026-07-19T12:38 25 internal_denominator
 - 2026-07-20T13:23 27 internal_denominator
 - 2026-07-20T21:23 28 internal_denominator
+- 2026-07-21T17:10 33 internal_denominator
 
 <!-- NOTES_HUMAN — phần dưới đây generator KHÔNG ghi đè -->
