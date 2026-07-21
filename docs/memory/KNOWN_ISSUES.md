@@ -449,3 +449,40 @@ và chưa có `Drafter` implementation nào.
 Không vá trong H2 vì `api/webhook.py` ngoài `ALLOWED_FILES`. **Nguyên nhân gốc là sự TRÙNG
 LẶP** — hai bản khai của cùng một khái niệm, sửa một dòng chỉ đồng bộ được tới lần đổi sau.
 Cách đóng đúng: webhook import thẳng `Drafter` từ `agent.orchestrator`, xoá bản sao.
+
+## ISSUE-025 — `agent/drafter.py` + `tests/test_drafter.py` ship format-dirty (spec 13)
+
+**Trạng thái:** ✅ ĐÓNG 2026-07-21 (spec 14 A0) · **Mở:** spec 13 D0/D1 (`dc282b4`/`77c60c1`)
+
+Spec 13 checkpoint DONE hai file với `ruff format --check .` ĐỎ — `git show HEAD:agent/drafter.py
+| ruff format --check` xác nhận, ruff đúng bản pin `0.15.22`. Đây là hình dạng ISSUE-019 (gate
+ký DONE trong khi thực ra đỏ): `GATE_FULL` có `ruff format --check` mà vẫn qua ⇒ hoặc checkpoint
+spec 13 không chạy đủ bước, hoặc chạy trên state khác.
+
+**Vá:** `ruff format` hai file (cơ học thuần, ZERO đổi hành vi — diff chỉ whitespace/wrap), fold
+vào spec 14 A0 checkpoint qua `ALLOWED_FILES_AMEND` (Wyatt duyệt option 1). Un-break `GATE_FULL`
+chung cho mọi phase sau.
+
+**Bài học:** một gate đỏ trên HEAD chặn checkpoint của MỌI phase kế — không phải nợ của người
+gây ra, mà là thuế của người kế tiếp. Gate phải là hàm của source; format-check phải xanh lúc
+checkpoint chứ không phải "sửa sau".
+
+## ISSUE-026 — 5 nợ RUNTIME của schema spec 14 (schema sẵn, chưa ai tiêu thụ)
+
+**Trạng thái:** 🟡 MỞ 2026-07-21 (spec 14 A0+B0 DONE) · cùng hình dạng "persona chưa có Drafter" (spec 11)
+
+Spec 14 CỐ Ý chỉ dựng SCHEMA (workflow §7: "sai schema từ đầu là refactor lớn"). Cột/bảng đã
+sẵn nhưng ĐƯỜNG GHI chưa tồn tại — ghi ra để không trôi:
+
+1. **ACK-then-process + queue + worker drain** (`GD0-INGEST` runtime) — webhook hiện draft INLINE;
+   chưa có queue. `record_event` (spec 14 B0) chưa được gọi ở đâu.
+2. **Snapshot CAPTURE lúc draft** — cột `pending_reply.snapshot` nullable sẵn; `agent/orchestrator.py`
+   chưa ghi dữ kiện tầng-1 T0 vào đó. Đường ghi tương lai PHẢI validate lúc GHI (bài học spec 11).
+3. **TTL computation + cron expiry** — cột `expires_at` sẵn; chưa tính `min(window, ngưỡng shop)`,
+   chưa có cron chuyển `pending`→`expired`.
+4. **Edit-path `label='edited'`** — CHECK nhận giá trị đó; chưa có edit endpoint nào ghi nó.
+   Hiện chỉ approve/reject set label ⇒ auto-send GĐ1 thiếu tín hiệu `edited` tới khi edit UI land.
+5. **`webhook_event_log` retention** — bảng append-only, chưa có cleanup ⇒ `GD3-HARDEN` (log retention).
+
+Wire các phần này là `GD0-INGEST` runtime + `GD0-DRAFTSCHEMA` capture, mỗi cái một spec riêng
+khi có người tiêu thụ (webhook mount cần PRE-004 ở Tân).

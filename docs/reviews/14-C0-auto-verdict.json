@@ -1,0 +1,10 @@
+{
+  "verdict": "APPROVE",
+  "model": "docs-only-machine-verified",
+  "tier": "low",
+  "summary": "C0 docs-only: 03:2 narrow-amend (idempotency table SUPERSEDED by spec 14 B0, sender+signature stay BLOCKED — option A, no orphaning), ISSUE-025/026 recorded, L3 regenerated deterministically. GATE = adp-roadmap machine-verifies coverage. No code touched.",
+  "findings": [],
+  "scope_ok": true,
+  "diff_sha256": "ba9c0562ac2ef1f404082e752768b340caf86fd442490fc9f2ef40ce4801bfb7",
+  "stamped_at": "2026-07-21T20:13"
+}

@@ -161,7 +161,7 @@ Ohana priority order: **safety → user trust → stability → growth**. Filter
 - `api/inbox.py` — Phase 8 UI hint để seller thấy "cần bạn tự trả lời" khi escalate.
 - `auth/identity.py` — Phase 1 mở rộng claim source từ real onboard flow (không stub).
 - `db/models.py` — Phase 1 (Shop, WebhookEventLog), Phase 5 (CreditLedger).
-- `db/migrations/versions/` — dự kiến **Phase 1 = 0007 · Phase 2 = 0008 · Phase 5 = 0009**.
+- `db/migrations/versions/` — ⚠️ **số đã trôi (cấp theo LAND order, không plan order).** Spec 11 lấy `0007`, spec 14 A0 lấy `0008` (pending_reply cols), spec 14 B0 lấy `0009` (webhook_event_log). Phase 1 `03` giờ là `CANCELLED` (spec 11). Phase 2 KHÔNG còn cần migration riêng (idempotency table đã ở `0009`). Phase 5 metering sẽ lấy số kế tiếp lúc LAND, không giữ chỗ trước.
   *(Lịch sử: bản gốc ghi 0004/0005/0006 → +1 khi spec 08 lấy **0004** → +1 khi spec 09 lấy
   **0005** → +1 khi spec 10 ConversationHistory lấy **0006** (2026-07-20, PRE-1001). BA lần
   va chạm, cùng một nguyên nhân: spec 03 BLOCKED chờ Tân nên mọi spec internal đều land
@@ -283,13 +283,23 @@ BLOCKED_BY: PRE-007 (hosting region ADR phải ACCEPTED trước)
 4. Add `POST /api/admin/shops` endpoint (admin-only auth).
 5. STOP+WAIT (per-step confirm — RISK high).
 
-### Phase 2 — Real ZaloSender + webhook signature + idempotency
+### Phase 2 — Real ZaloSender + webhook signature verify
+
+> ⚠️ **PARTIAL-SUPERSEDE 2026-07-21 (spec 14 B0, PRE-1403 Wyatt ký · option A).** Phần
+> **idempotency table** của phase này — `WebhookEventLog` model + Alembic migration +
+> `record_event` dedup — đã DONE ở **spec 14 B0** (`webhook_event_log` PK `(channel,
+> platform_msg_id)`, commit `3d7bf62`, migration `0009`). Lý do tách: bảng + constraint là
+> INTERNAL, không cần Zalo creds; kẹt nó sau PRE-004 là kẹt nhầm.
+> **Phần CÒN LẠI của phase này** = RealZaloSender + signature verify — vẫn external, vẫn
+> BLOCKED PRE-004. KHÔNG CANCELLED toàn phase (sẽ mồ côi sender+signature); chỉ thu hẹp scope.
+> Khi wire runtime: gọi `WebhookEventRepo.record_event` (đã có) trong `api/webhook.py`.
+
 <!-- ADP:PHASE 2 -->
 STATUS: BLOCKED
 ROADMAP: GD0-ZALO
-GOAL: `RealZaloSender` gọi được Zalo Send API thật (staging OA); webhook inbound có signature verify; retry cùng event_id → duplicate rejected (idempotency).
-APPROACH: Replace `MockZaloSender` bằng `RealZaloSender` (interface stable); wire httpx client với retry + timeout; `WebhookEventLog` table + middleware verify signature + dedup theo event_id; contract test qua httpx.MockTransport (không call Zalo staging thật trong CI, verify shape).
-ALLOWED_FILES: bridge/zalo_sender.py, api/webhook.py, api/middleware.py, db/models.py, db/migrations/versions/, tests/test_zalo_sender.py, tests/test_webhook_idempotency.py, tests/conftest.py, docs/reviews/, docs/tasks/03-Task-GD0-AcceptanceBackfill.md
+GOAL: `RealZaloSender` gọi được Zalo Send API thật (staging OA); webhook inbound có signature verify trên body GỐC. (Idempotency table + dedup: DONE ở spec 14 B0 — wire `record_event` vào webhook là bước runtime của phase này, không phải dựng lại bảng.)
+APPROACH: Replace `MockZaloSender` bằng `RealZaloSender` (interface stable); wire httpx client với retry + timeout; middleware verify signature trên raw body; dedup DÙNG LẠI `WebhookEventRepo.record_event` (spec 14 B0), KHÔNG dựng `WebhookEventLog` mới; contract test qua httpx.MockTransport (không call Zalo staging thật trong CI, verify shape).
+ALLOWED_FILES: bridge/zalo_sender.py, api/webhook.py, api/middleware.py, tests/test_zalo_sender.py, tests/test_webhook_idempotency.py, tests/conftest.py, docs/reviews/, docs/tasks/03-Task-GD0-AcceptanceBackfill.md
 GATE: .venv/bin/python -m pytest tests/test_zalo_sender.py tests/test_webhook_idempotency.py -x -q
 GATE_FULL: .venv/bin/python -m pytest tests/test_zalo_sender.py tests/test_webhook_idempotency.py tests/test_orchestrator.py tests/test_tenant_isolation.py -x -q
 RETRY: 0/3
@@ -298,10 +308,10 @@ BLOCKED_BY: PRE-004 (Zalo creds + signature spec + rate-limit)
 <!-- /ADP -->
 
 6. `test_zalo_sender.py` (RED, MockTransport): (a) send message trả success shape; (b) retry on 5xx; (c) rate-limit 429 back-off.
-7. `test_webhook_idempotency.py` (RED): (a) valid signature accepted; (b) invalid signature rejected 401; (c) duplicate event_id rejected 200 (idempotent no-op).
+7. `test_webhook_idempotency.py` (RED): (a) valid signature accepted; (b) invalid signature rejected 401; (c) duplicate event_id rejected 200 (idempotent no-op) — dùng `WebhookEventRepo.record_event`.
 8. `RealZaloSender` implement (httpx + retry + timeout).
-9. `WebhookEventLog` model + Alembic 0008.
-10. Signature verify middleware + dedup wrapper trong `api/webhook.py`.
+9. ~~`WebhookEventLog` model + Alembic 0008~~ — **DONE spec 14 B0** (`webhook_event_log`, migration `0009`).
+10. Signature verify middleware + wire `record_event` dedup trong `api/webhook.py`.
 11. STOP+WAIT (per-step confirm — RISK high, user-facing production).
 
 ### Phase 3 — Real Wiki corpus ingest (batch + delta) + admin UI

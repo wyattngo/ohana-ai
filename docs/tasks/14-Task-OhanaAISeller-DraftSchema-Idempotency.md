@@ -189,21 +189,23 @@ REVIEW: PASS ref=docs/reviews/14-B0-auto-verdict.json
 ### Phase C0 — Đóng vòng: 03 Phase 2 CANCELLED + KNOWN_ISSUES + L3
 
 <!-- ADP:PHASE C0 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 ROADMAP: GD0-INGEST
-GOAL: `03:2` mang `STATUS: CANCELLED` + trỏ spec 14 (nếu PRE-1403 ký); L3 sinh lại không còn map `GD0-INGEST → 03:2`; KNOWN_ISSUES ghi 5 nợ runtime hoãn (ACK/queue/worker · snapshot capture · TTL cron · edit-path label · webhook_event_log retention).
-APPROACH: `CANCELLED` không xoá (mất dấu vết vì sao từng có). L3 máy sinh — KHÔNG sửa tay. Ghi nợ runtime ra KNOWN_ISSUES để không trôi: schema đã sẵn nhưng chưa ai tiêu thụ, đúng hình dạng "persona chưa có Drafter" của spec 11.
+GOAL: `03:2` phần idempotency table → SUPERSEDED (option A narrow-amend, KHÔNG CANCELLED toàn phase); KNOWN_ISSUES ghi ISSUE-025 (format debt đã fix) + ISSUE-026 (5 nợ runtime hoãn); L3 sinh lại phản ánh spec 14 coverage.
+APPROACH: `SUPERSEDED`/`CANCELLED` không xoá (mất dấu vết vì sao từng có). L3 máy sinh — KHÔNG sửa tay. Ghi nợ runtime ra KNOWN_ISSUES để không trôi: schema đã sẵn nhưng chưa ai tiêu thụ, đúng hình dạng "persona chưa có Drafter" của spec 11.
+APPROACH_DEVIATION: Wyatt ký option A 2026-07-21 — spec bản gốc viết "03:2 → CANCELLED", nhưng audit lúc execute cho thấy 03:2 = RealZaloSender + signature verify + idempotency table, và spec 14 B0 CHỈ làm idempotency table. CANCELLED toàn phase sẽ MỒ CÔI sender+signature (external, kẹt PRE-004). ⇒ narrow-amend: idempotency table SUPERSEDED, phần còn lại giữ BLOCKED. Thêm: 03:2 mang `ROADMAP: GD0-ZALO` (KHÔNG phải `GD0-INGEST`) ⇒ GOAL gốc "L3 không còn map GD0-INGEST→03:2" sai tiền đề, map đó chưa từng tồn tại.
 ALLOWED_FILES: docs/tasks/03-Task-GD0-AcceptanceBackfill.md, docs/tasks/14-Task-OhanaAISeller-DraftSchema-Idempotency.md, docs/ROADMAP.md, docs/memory/KNOWN_ISSUES.md, docs/reviews/, docs/smokes/
 GATE: bash .claude/tools/adp-roadmap.sh "$PWD"
 GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && bash .claude/tools/adp-roadmap.sh "$PWD"
 RETRY: 0/3
-RISK: low (ĐỀ XUẤT — Wyatt ký. ALLOWED_FILES toàn docs, KHÔNG giao RISK_PATHS ⇒ floor không kích hoạt. Diff docs-only máy verify.)
-BLOCKED_BY: A0 DONE · B0 DONE · PRE-1403
+RISK: low (✅ WYATT KÝ 2026-07-21. ALLOWED_FILES toàn docs, KHÔNG giao RISK_PATHS ⇒ floor không kích hoạt. Diff docs-only máy verify.)
+BLOCKED_BY: A0 DONE ✅ · B0 DONE ✅ · PRE-1403 ✅ (option A)
 SMOKE: N/A diff docs-only — không đổi dòng code; bằng chứng là L3 sinh lại (`GD0-INGEST`/`GD0-DRAFTSCHEMA` coverage), chính là GATE máy verify.
+REVIEW: PASS ref=docs/reviews/14-C0-auto-verdict.json
 <!-- /ADP -->
 
-1. `03:2` → `CANCELLED` + lý do + trỏ spec 14 (nếu PRE-1403 ký; nếu KHÔNG ký thì bỏ bước này, chỉ ghi KNOWN_ISSUES).
-2. KNOWN_ISSUES: 5 nợ runtime.
+1. `03:2` narrow-amend: idempotency table → SUPERSEDED (trỏ spec 14 B0); giữ RealZaloSender+signature BLOCKED.
+2. KNOWN_ISSUES: ISSUE-025 (format debt) + ISSUE-026 (5 nợ runtime).
 3. Sinh lại L3.
 4. **STOP+WAIT**.
 

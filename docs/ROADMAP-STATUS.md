@@ -1,6 +1,6 @@
 # ROADMAP STATUS — ohana-ai (L3, SINH MÁY)
 
-> **AUTO-GENERATED bởi `.claude/tools/adp-roadmap.sh` @ 2026-07-21T18:30.**
+> **AUTO-GENERATED bởi `.claude/tools/adp-roadmap.sh` @ 2026-07-21T20:14.**
 > Đây là VIEW join từ L1 (`docs/ROADMAP.md`) × L2 (`docs/tasks/*.md`) × git — **KHÔNG phải source of truth**.
 > ĐỪNG sửa tay phía trên `NOTES_HUMAN`. Muốn đổi kế hoạch → sửa L1. Muốn đổi trạng thái → chạy `adp-checkpoint.sh`.
 
