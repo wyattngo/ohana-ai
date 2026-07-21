@@ -6,9 +6,9 @@
 
 ## Mục tiêu 100%
 
-**Internal: 13/33 work item hoàn tất (39%)** ← đây là mẫu số của "100% Roadmap"
+**Internal: 14/33 work item hoàn tất (42%)** ← đây là mẫu số của "100% Roadmap"
 External: 0/9 (0%) — chờ bên thứ ba, **không tính vào 100%**
-Phase gate-passed: 37/48
+Phase gate-passed: 38/48
 
 
 
@@ -26,7 +26,7 @@ Phase gate-passed: 37/48
 | `GD0-EVAL` | ⬜ TODO | 0/1 | 03:6  |
 | `GD0-FOUNDATION` | ✅ DONE | 3/3 | 06:F0 06:F2 09:C0  |
 | `GD0-HISTORY` | ✅ DONE | 3/3 | 10:H0 10:H1 10:H2  |
-| `GD0-INGEST` | 🔶 một phần | 1/2 | 14:B0 14:C0  |
+| `GD0-INGEST` | ✅ DONE | 2/2 | 14:B0 14:C0  |
 | `GD0-INTENT` | ⬜ TODO | 0/1 | 03:8  |
 | `GD0-METER` | ⬜ TODO | 0/1 | 03:5  |
 | `GD0-MULTITENANT` | ✅ DONE | 1/1 | 01:2  |

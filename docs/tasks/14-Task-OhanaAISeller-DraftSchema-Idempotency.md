@@ -189,7 +189,8 @@ REVIEW: PASS ref=docs/reviews/14-B0-auto-verdict.json
 ### Phase C0 — Đóng vòng: 03 Phase 2 CANCELLED + KNOWN_ISSUES + L3
 
 <!-- ADP:PHASE C0 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=34620c9, gate_exit=0, duration=15s, review=PASS(judge=APPROVE,model=docs-only-machine-verified,bound=ba9c0562ac2e,tier=low), smoke=N/A(diff docs-only — không đổi dòng code; bằng chứng là L3 sinh lại (`GD0-INGEST`/`GD0-DRAFTSCHEMA` coverage), chính là GATE máy verify.), ran=2026-07-21T20:14
 ROADMAP: GD0-INGEST
 GOAL: `03:2` phần idempotency table → SUPERSEDED (option A narrow-amend, KHÔNG CANCELLED toàn phase); KNOWN_ISSUES ghi ISSUE-025 (format debt đã fix) + ISSUE-026 (5 nợ runtime hoãn); L3 sinh lại phản ánh spec 14 coverage.
 APPROACH: `SUPERSEDED`/`CANCELLED` không xoá (mất dấu vết vì sao từng có). L3 máy sinh — KHÔNG sửa tay. Ghi nợ runtime ra KNOWN_ISSUES để không trôi: schema đã sẵn nhưng chưa ai tiêu thụ, đúng hình dạng "persona chưa có Drafter" của spec 11.
