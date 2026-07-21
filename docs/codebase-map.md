@@ -11,7 +11,7 @@ is rewritten by `gen_codebase_map.py` and must not be hand-edited.
 |---|---:|
 | `agent` | 11 |
 | `api` | 6 |
-| `app` | 3 |
+| `app` | 4 |
 | `auth` | 2 |
 | `bridge` | 3 |
 | `channels` | 4 |
@@ -25,7 +25,7 @@ is rewritten by `gen_codebase_map.py` and must not be hand-edited.
 
 **`agent/`** — `embedder.py` · `llm_client.py` · `orchestrator.py` · `persona.py` · `policy_gate.py` · `openai_client.py` · `openai_embedder.py` · `together_client.py` · `together_embedder.py`
 **`api/`** — `admin.py` · `chat.py` · `inbox.py` · `mock_auth.py` · `webhook.py`
-**`app/`** — `config.py` · `main.py`
+**`app/`** — `alert_service.py` · `config.py` · `main.py`
 **`auth/`** — `identity.py`
 **`bridge/`** — `ohana_client.py` · `zalo_sender.py`
 **`channels/`** — `base.py` · `identity.py`
