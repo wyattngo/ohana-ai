@@ -398,6 +398,22 @@ if [ -x "$ROOT/.claude/tools/adp-roadmap.sh" ] && [ -f "$ROOT/docs/ROADMAP.md" ]
         ROADMAP_OUT="⚠️ adp-roadmap.sh lỗi (checkpoint vẫn tiếp tục): ${ROADMAP_OUT}"
 fi
 
+# HTML dashboards (gitignored views) — luôn phản ánh L3/spec vừa sinh (Wyatt 2026-07-22
+# "dashboard luôn phản ánh thực tế" + merge adp-progress-dashboard). Best-effort: KHÔNG
+# git-add (cả hai untracked+gitignored), lỗi generator KHÔNG làm hỏng checkpoint — view sai
+# < checkpoint vỡ, cùng luật với L3. ~0.04s + ~0.28s.
+#   1) adp-dashboard.html      — spine status + audit logs + roadmap coverage (tool local)
+#   2) adp-progress-dashboard.html — spec cards + phase drawer + roadmap TIMELINE (tool workspace)
+if [ -x "$ROOT/.claude/tools/adp-dashboard.sh" ]; then
+    bash "$ROOT/.claude/tools/adp-dashboard.sh" >/dev/null 2>&1 \
+        || echo "⚠️ adp-dashboard.sh lỗi (checkpoint vẫn tiếp tục; dashboard có thể cũ)"
+fi
+_WS_PROG="$(cd "$ROOT/.." 2>/dev/null && pwd)/.claude/tools/adp-progress-dashboard.sh"
+if [ -x "$_WS_PROG" ]; then
+    bash "$_WS_PROG" "$ROOT/docs/adp-progress-dashboard.html" "$ROOT" >/dev/null 2>&1 \
+        || echo "⚠️ adp-progress-dashboard.sh lỗi (checkpoint vẫn tiếp tục; progress dashboard có thể cũ)"
+fi
+
 git add "$SPEC_FILE" "docs/.adp-state-hash" 2>/dev/null
 [ -f "$ROOT/docs/memory/REVIEW_QUEUE.md" ] && git add "docs/memory/REVIEW_QUEUE.md" 2>/dev/null
 [ -f "$ROOT/docs/ROADMAP-STATUS.md" ] && git add "docs/ROADMAP-STATUS.md" "docs/.roadmap-denominator.log" 2>/dev/null

@@ -77,6 +77,18 @@ if [ -f "$ADP_LIB" ]; then
                 ADP_CTX="${ADP_CTX} || ⚠️ STATE DRIFT: project_state_hash hiện tại (${CUR_HASH}) ≠ stamp cuối (${LAST_HASH}) — ADP state đã đổi NGOÀI checkpoint. Đối chiếu SESSION_LOG/DECISIONS gần nhất trước khi tin STATUS."
             fi
         fi
+        # HTML dashboards (gitignored views) — refresh mỗi session-open để "luôn phản ánh
+        # thực tế" (Wyatt 2026-07-22 + merge adp-progress-dashboard). Best-effort, TẤT CẢ
+        # output→/dev/null (TUYỆT ĐỐI không chạm JSON contract của hook ở cuối file). Đọc L3/spec
+        # hiện có trên đĩa. ~0.04s + ~0.28s. KHÔNG regen L3 ở đây: L3 tracked, chỉ máy ghi lúc
+        # checkpoint (giữ write-contract). Cả hai html untracked+gitignored ⇒ không git noise.
+        if [ -x "$ADP_ROOT/.claude/tools/adp-dashboard.sh" ]; then
+            bash "$ADP_ROOT/.claude/tools/adp-dashboard.sh" >/dev/null 2>&1 || true
+        fi
+        _WS_PROG="$(cd "$ADP_ROOT/.." 2>/dev/null && pwd)/.claude/tools/adp-progress-dashboard.sh"
+        if [ -x "$_WS_PROG" ]; then
+            bash "$_WS_PROG" "$ADP_ROOT/docs/adp-progress-dashboard.html" "$ADP_ROOT" >/dev/null 2>&1 || true
+        fi
     fi
 fi
 
