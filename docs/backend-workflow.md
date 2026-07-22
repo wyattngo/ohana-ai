@@ -303,6 +303,33 @@ Ràng buộc an toàn, không phải sở thích thiết kế.
 ---
 
 ## 7. Thứ tự triển khai
+<!-- anchor:w-7.1-webhook -->
+### 7.1 Webhook + queue + idempotency
+...
+
+<!-- anchor:w-7.2-rules-intent -->
+### 7.2 Rules layer intent nhạy cảm
+...
+
+<!-- anchor:w-7.3-draftschema -->
+### 7.3 Draft schema TTL + snapshot + label
+...
+
+<!-- anchor:w-7.4-shop-profile -->
+### 7.4 Hồ sơ shop
+...
+
+<!-- anchor:w-7.5-draft-pipeline -->
+### 7.5 Bộ soạn nháp
+...
+
+<!-- anchor:w-7.6-pii-dpia -->
+### 7.6 PII filter + DPIA
+...
+
+<!-- anchor:w-7.7-corpus-luong-a -->
+### 7.7 Corpus Ohana AI (Luồng A)
+...
 
 Có phụ thuộc kiến trúc, không đảo được:
 
