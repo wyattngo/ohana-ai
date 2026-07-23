@@ -23,7 +23,11 @@ venv/
 secure/
 
 # ADP generated artifacts (regeneratable từ spine)
+# Hai file dưới bị GHI TRONG LÚC execute (audit log mỗi lần chấm gate; red-proof lúc
+# `adp-review.sh red`, tức trước code). Tracked thì mỗi lần ghi là `git diff HEAD` đổi
+# ⇒ verdict vừa stamp hết bind, checkpoint REFUSE oan (KI-020).
 .adp-audit.jsonl
+.adp-red-proof.json
 .adp-state/
 
 # Claude local overrides (không share)
