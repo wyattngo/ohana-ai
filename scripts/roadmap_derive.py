@@ -57,8 +57,6 @@ PIPE_SPLIT_RE = re.compile(r"(?<!\\)\|")
 # trên `python3` hệ thống (CI dùng đúng lệnh đó) và ở đó pyyaml KHÔNG có sẵn.
 GATE_FM_RE = re.compile(r"^(gate_id|derives_from|approved_by|approved_at):\s*(.+?)\s*$", re.M)
 GATE_BOUND_RE = re.compile(r"^-\s*`(GD\d-[A-Z]+)`", re.M)
-TEST_OPEN_RE = re.compile(r"^-\s*\[ \]", re.M)
-TEST_DONE_RE = re.compile(r"^-\s*\[[xX]\]", re.M)
 
 # Phase block trong docs/tasks/*.md.
 PHASE_ID_RE = re.compile(r"<!--\s*ADP:PHASE\s+(\S+)\s*-->")
@@ -275,8 +273,6 @@ class Gate:
     anchor: str
     approved_by: str
     bound_declared: tuple[str, ...]
-    tests_open: int
-    tests_done: int
 
     @property
     def signed(self) -> bool:
@@ -302,8 +298,6 @@ def parse_gates(root: Path) -> list[Gate]:
                 anchor=fm.get("derives_from", "").split("#")[-1],
                 approved_by=fm.get("approved_by", "null"),
                 bound_declared=tuple(GATE_BOUND_RE.findall(raw)),
-                tests_open=len(TEST_OPEN_RE.findall(raw)),
-                tests_done=len(TEST_DONE_RE.findall(raw)),
             )
         )
     return sorted(out, key=lambda g: g.order)
@@ -390,13 +384,12 @@ def tree(root: Path) -> int:
                 f"{g.gate_id}: gate khai {sorted(g.bound_declared)} ≠ §4.1.1 "
                 f"{sorted(e.work_id for e in items)}"
             )
-        total = g.tests_open + g.tests_done
         last_g = i == len(gates) - 1 and not by_anchor
         bar = "  " if last_g else "│ "
         print(
             f"{'└─' if last_g else '├─'} {g.gate_id:<10} {g.anchor:<22} "
             f"{'✍ ' + g.approved_by if g.signed else '✗ CHƯA KÝ':<12} "
-            f"tests {g.tests_done}/{total}"
+            f"{len(g.bound_declared)} item(s) bound"
         )
         for j, e in enumerate(items):
             show(e, j == len(items) - 1, bar + " ")
