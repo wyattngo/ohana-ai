@@ -224,10 +224,14 @@ def derive(root: Path) -> int:
         "không có",
     )
 
+    # Đếm gate THẬT (GD0-STEP*.md), KHÔNG đếm README — không thì con số nói dối.
     gates = root / GATES_REL
-    state = (
-        f"có {len(list(gates.glob('*.md')))} file" if gates.is_dir() else "CHƯA tồn tại (Session 4)"
-    )
+    if gates.is_dir():
+        files = sorted(gates.glob("GD0-STEP*.md"))
+        unsigned = sum(1 for f in files if "approved_by: null" in f.read_text(encoding="utf-8"))
+        state = f"{len(files)} gate · {unsigned} chưa ký"
+    else:
+        state = "CHƯA tồn tại (Session 4)"
     print(f"[4] Tầng gate: {state}")
     return 0
 
