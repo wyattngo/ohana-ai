@@ -12,10 +12,10 @@ approved_at: 2026-07-23
 - DPIA hoàn tất **per-provider** trước khi rời sandbox.
 - Destination của mọi LLM call được log cho audit.
 
-## Tests (PHẢI tồn tại TRƯỚC khi bắt tay task)
+## Test policy (đã ký — hợp đồng bất biến; L2 spec sinh JIT phải tiêu thụ mỗi câu thành `GATE:` assertion)
 
-- [ ] Gate **grep-only**: file DPIA tồn tại + frontmatter `status: ACCEPTED` (không content-check — ADR §4).
-- [ ] Mọi LLM call có destination log; assert không call nào thiếu.
+- Gate **grep-only**: file DPIA tồn tại + frontmatter `status: ACCEPTED` (không content-check — ADR §4).
+- Mọi LLM call có destination log; assert không call nào thiếu.
 
 ## Bound work items (ROADMAP §4)
 

@@ -13,12 +13,12 @@ approved_at: 2026-07-23
 - Multi-match cho kết quả **tất định**.
 - `injection_attempt` là intent hạng nhất, không phải phụ lục.
 
-## Tests (PHẢI tồn tại TRƯỚC khi bắt tay task)
+## Test policy (đã ký — hợp đồng bất biến; L2 spec sinh JIT phải tiêu thụ mỗi câu thành `GATE:` assertion)
 
-- [ ] 5–6 nhóm nhạy cảm match đúng: khiếu nại/hoàn tiền/dọa kiện · 'có phải bot' · luật/cơ quan · injection.
-- [ ] Multi-match ⇒ ESCALATE thắng; `escalation_reasons[]` chứa **mọi** intent match được.
-- [ ] **PRE-010 C5** — hoán vị thứ tự rule ⇒ intent chọn ra KHÔNG đổi.
-- [ ] Import-graph: không đường nào đọc LLM confidence để quyết gate.
+- 5–6 nhóm nhạy cảm match đúng: khiếu nại/hoàn tiền/dọa kiện · 'có phải bot' · luật/cơ quan · injection.
+- Multi-match ⇒ ESCALATE thắng; `escalation_reasons[]` chứa **mọi** intent match được.
+- **PRE-010 C5** — hoán vị thứ tự rule ⇒ intent chọn ra KHÔNG đổi.
+- Import-graph: không đường nào đọc LLM confidence để quyết gate.
 
 ## Bound work items (ROADMAP §4)
 

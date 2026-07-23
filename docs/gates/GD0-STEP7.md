@@ -13,14 +13,14 @@ approved_at: 2026-07-23
 - **Không nhánh GỬI** ở GĐ0 — mọi outcome là PARK hoặc PARK+ESCALATE.
 - Draft không lộ Ohana.
 
-## Tests (PHẢI tồn tại TRƯỚC khi bắt tay task)
+## Test policy (đã ký — hợp đồng bất biến; L2 spec sinh JIT phải tiêu thụ mỗi câu thành `GATE:` assertion)
 
-- [ ] E2E: tin khách → draft sinh; `intent`+`confidence` đến từ LLM, không hardcode.
-- [ ] Regex trên **output THẬT** (không phải prompt): không chứa 'Ohana' / 'trợ lý ảo' / 'tôi là AI'.
-- [ ] Assert **không outcome nào = send** — `auto_send` chặn cứng ở GĐ0.
-- [ ] Tầng 1 API fail ⇒ ESCALATE `data_unavailable`, KHÔNG draft.
-- [ ] Media ⇒ auto-ESCALATE `media_content`, không gọi LLM.
-- [ ] Import-graph: `Drafter` KHÔNG tự gọi sender.
+- E2E: tin khách → draft sinh; `intent`+`confidence` đến từ LLM, không hardcode.
+- Regex trên **output THẬT** (không phải prompt): không chứa 'Ohana' / 'trợ lý ảo' / 'tôi là AI'.
+- Assert **không outcome nào = send** — `auto_send` chặn cứng ở GĐ0.
+- Tầng 1 API fail ⇒ ESCALATE `data_unavailable`, KHÔNG draft.
+- Media ⇒ auto-ESCALATE `media_content`, không gọi LLM.
+- Import-graph: `Drafter` KHÔNG tự gọi sender.
 
 ## Bound work items (ROADMAP §4)
 

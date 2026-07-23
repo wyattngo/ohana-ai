@@ -13,13 +13,13 @@ approved_at: 2026-07-23
 - Chạm cap ngày ⇒ mọi tin còn lại PARK, **không gọi LLM**.
 - Debounce timer sống qua worker restart.
 
-## Tests (PHẢI tồn tại TRƯỚC khi bắt tay task)
+## Test policy (đã ký — hợp đồng bất biến; L2 spec sinh JIT phải tiêu thụ mỗi câu thành `GATE:` assertion)
 
-- [ ] Pre-charge reserve trước call; reconcile giải phóng phần dư.
-- [ ] Chạm cap ⇒ `policy_gate` PARK **và** assert LLM KHÔNG được gọi.
-- [ ] Gọi API trực tiếp (bypass UI) vẫn bị trừ credit.
-- [ ] Worker crash giữa lúc debounce ⇒ scheduler vẫn bắn (đọc lại từ DB).
-- [ ] **PRE-010 C2** — 2 scheduler song song cùng conversation ⇒ đúng 1 draft.
+- Pre-charge reserve trước call; reconcile giải phóng phần dư.
+- Chạm cap ⇒ `policy_gate` PARK **và** assert LLM KHÔNG được gọi.
+- Gọi API trực tiếp (bypass UI) vẫn bị trừ credit.
+- Worker crash giữa lúc debounce ⇒ scheduler vẫn bắn (đọc lại từ DB).
+- **PRE-010 C2** — 2 scheduler song song cùng conversation ⇒ đúng 1 draft.
 
 ## Bound work items (ROADMAP §4)
 

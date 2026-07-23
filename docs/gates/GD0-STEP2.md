@@ -13,13 +13,13 @@ approved_at: 2026-07-23
 - Mọi user-generated content nằm trong tag (`<customer_message>` / `<user_question>`).
 - Filter lỗi ⇒ **fail-closed**: không gọi LLM.
 
-## Tests (PHẢI tồn tại TRƯỚC khi bắt tay task)
+## Test policy (đã ký — hợp đồng bất biến; L2 spec sinh JIT phải tiêu thụ mỗi câu thành `GATE:` assertion)
 
-- [ ] Regex bắt: SĐT VN (03/05/07/08/09), CCCD 9 và 12 số, STK 8–19 số, email, địa chỉ.
-- [ ] **Kết quả tầng 1** (`order_status` trả địa chỉ + SĐT người nhận) BỊ lọc — không chỉ tin khách.
-- [ ] Prompt build ⇒ user content luôn được wrap; không có đường bypass.
-- [ ] Filter raise ⇒ assert LLM call KHÔNG xảy ra.
-- [ ] **PRE-010 C4** — script đo FN rate trên tập gán nhãn ≥200 tin, ra **con số**.
+- Regex bắt: SĐT VN (03/05/07/08/09), CCCD 9 và 12 số, STK 8–19 số, email, địa chỉ.
+- **Kết quả tầng 1** (`order_status` trả địa chỉ + SĐT người nhận) BỊ lọc — không chỉ tin khách.
+- Prompt build ⇒ user content luôn được wrap; không có đường bypass.
+- Filter raise ⇒ assert LLM call KHÔNG xảy ra.
+- **PRE-010 C4** — script đo FN rate trên tập gán nhãn ≥200 tin, ra **con số**.
 
 ## Bound work items (ROADMAP §4)
 

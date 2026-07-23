@@ -13,12 +13,12 @@ approved_at: 2026-07-23
 - Không tra được đoạn nào ⇒ **nói không biết**, không trả lời chay.
 - Luồng A không chạm dữ liệu shop.
 
-## Tests (PHẢI tồn tại TRƯỚC khi bắt tay task)
+## Test policy (đã ký — hợp đồng bất biến; L2 spec sinh JIT phải tiêu thụ mỗi câu thành `GATE:` assertion)
 
-- [ ] Ingest corpus thật → `search_wiki` trả chunk đúng chủ đề — kiểm **THỨ HẠNG**, không chỉ 'có trả về'.
-- [ ] Không có chunk liên quan ⇒ trả 'không biết'; assert không bịa.
-- [ ] Câu hỏi user được wrap `<user_question>` (§7.2 áp cả Luồng A).
-- [ ] Import-graph: Luồng A không đọc/ghi dữ liệu shop.
+- Ingest corpus thật → `search_wiki` trả chunk đúng chủ đề — kiểm **THỨ HẠNG**, không chỉ 'có trả về'.
+- Không có chunk liên quan ⇒ trả 'không biết'; assert không bịa.
+- Câu hỏi user được wrap `<user_question>` (§7.2 áp cả Luồng A).
+- Import-graph: Luồng A không đọc/ghi dữ liệu shop.
 
 ## Bound work items (ROADMAP §4)
 
