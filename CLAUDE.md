@@ -42,11 +42,18 @@ ADP:
 ```bash
 bash .claude/tools/adp-status.sh          # phase đã ký tới đâu
 bash .claude/tools/adp-roadmap.sh "$PWD"  # kế hoạch phủ tới đâu (sinh lại L3)
-bash .claude/tools/adp-dashboard.sh       # → docs/adp-dashboard.html (gitignored)
+bash .claude/tools/adp-dashboard.sh       # spine-state + audit-log, chạy TAY khi forensic
+
+# Derivation pipeline (ADR 2026-07-22):
+python3 scripts/roadmap_derive.py verify   # GATE: dangling anchor → exit≠0. Có trong CI.
+python3 scripts/roadmap_derive.py tree     # Phase → Step → Work item → Task (terminal)
+python3 scripts/roadmap_dashboard.py       # → docs/roadmap-dashboard.html — DASHBOARD DUY NHẤT,
+                                           # tự refresh ở checkpoint + session-start
 bash .claude/tools/adp-checkpoint.sh      # con đường DUY NHẤT để một phase thành DONE
 ```
 
-CI (`.github/workflows/ci.yml`): guardrail hook → ruff lint → ruff format → mypy → alembic upgrade → pytest, trên service **Postgres (pgvector:pg16) + Redis 7 thật**. Frontend chưa có job.
+CI (`.github/workflows/ci.yml`): guardrail hook → ruff lint → ruff format → mypy → **codebase-map `--check`** → **derivation map `verify`** → alembic upgrade → pytest, trên service **Postgres (pgvector:pg16) + Redis 7 thật**. Frontend chưa có job.
+⚠️ Hai step in đậm **KHÔNG có trong vòng verify local mặc định** — chúng là lý do CI đỏ 12 run mà local vẫn xanh (§7). Chạy cả hai trước khi push.
 
 ---
 
@@ -69,9 +76,28 @@ db/           models.py (tenant-first) · repos (Conversation/PendingReply/Messa
 web/          Vite+React+TS. State-based routing (KHÔNG react-router). dist/ committed.
 tests/        pytest; conftest.py cung cấp fixture fresh_db (drop+create schema, dispose kể cả khi raise)
 .claude/      ADP v2.3 — hooks/ (guardrail.py) + tools/ (adp-*.sh)
-docs/         tasks/ (spec = L2) · ROADMAP.md (L1) · ROADMAP-STATUS.md (L3 máy sinh)
-              decisions/ · adr/ · reviews/ · smokes/ · memory/ · briefs/ · archive/
+scripts/      ai_coder/gen_codebase_map.py (CI gate) · roadmap_derive.py (verify|derive|tree)
+              · roadmap_dashboard.py + .tpl.html → docs/roadmap-dashboard.html (gitignored)
+docs/         backend-workflow.md (**nguồn WHY, có anchor**) · gates/ (9 gate đã ký = tầng Step)
+              · tasks/ (spec = L2) · ROADMAP.md (L1, §4.1.1 derivation map) · ROADMAP-STATUS.md (L3 máy sinh)
+              · decisions/ · adr/ · reviews/ · smokes/ · memory/ · briefs/ · archive/
 ```
+
+**Derivation pipeline 4 tầng** (ADR `docs/adr/2026-07-22-derivation-pipeline.md`, ACCEPTED):
+
+```
+backend-workflow.md   WHY + shape — Wyatt viết, mang <!-- anchor:w-… -->
+    ↓ derives_from (enforce: scripts/roadmap_derive.py verify — CI step + pre-commit)
+docs/gates/           Target + Tests, CC propose → Wyatt ký (approved_by)
+    ↓ contracts
+ROADMAP.md §4.1.1     work item + derives_from → anchor
+    ↓ triage
+docs/tasks/           L2 spec — sinh **JIT khi code**, KHÔNG preemptive
+```
+
+⚠️ **Anchor gần như immutable.** Rename chỉ được khi **safety-driven** VÀ audit mọi
+`derives_from` **cùng commit** với gate xanh (ADR §5.0). Sửa workflow §7 mà quên §4.1.1 ⇒
+`verify` đỏ, block commit — nó đã bắt đúng 12 dangling một lần.
 
 **Mount order (`app/main.py`):** mọi `/api/*` router include **TRƯỚC** `StaticFiles(web/dist)` ở `/` — static là catch-all, mount trước sẽ che hết `/api/*`.
 
@@ -177,7 +203,7 @@ CHECKPOINT_PREFIX: adp
   Vì sao có gate: spec 07 ship 3 lỗi mà 107 test xanh + mypy 0 + 3 vòng review không thấy → `docs/memory/SHIPPED-SURFACE.md`.
 - **Roadmap 3 tầng, 3 chủ:** L1 `docs/ROADMAP.md` (**người** viết) · L2 `docs/tasks/*.md` (spec, frozen) · L3 `docs/ROADMAP-STATUS.md` (**máy** sinh — không sửa tay). ⚠️ L1 nằm **NGOÀI** spec-lock có chủ ý: kéo vào vùng diff-bound = mỗi lần re-plan giữa sprint bị REFUSE vì DRIFT, tức máy cấm đổi ý. **Đừng "sửa" điều này.**
 - ⚠️ **Đọc số phase DONE cho đúng (WAIVER-001, DEC-OHANA-04):** CI chưa từng xanh cho tới `01c2479` (2026-07-19). **22/25 phase DONE được ký trong lúc CI đỏ** — và vì ruff chết ở step 7 nên `mypy`/`alembic`/`pytest` **chưa từng chạy trên CI** giai đoạn đó. Với 22 phase ấy, "DONE" = *"gate local pass, CI chưa xác nhận"*. Chỉ spec 08 (E0/E1/E2) + spec 09 (C0) + spec 10 (H0/H1/H2) ký trong thời kỳ CI xanh. Code hiện tại KHÔNG bị nghi ngờ — HEAD qua đủ 11 step CI.
-- **Hai bộ đếm, hai câu hỏi:** `adp-status.sh` = *phase đã ký* (38/47) · `adp-roadmap.sh` = *work item thật* (internal 14/33 · external 0/9). Mục tiêu 100% = mẫu số `internal`, không gộp `external` chờ bên thứ ba. Số roadmap thấp hơn vì mẫu số ĐÚNG hơn — không phải tiến độ xấu đi (DEC-OHANA-03).
+- **Ba bộ đếm, ba câu hỏi** (2026-07-23): `adp-status.sh` = *phase đã ký* (**38/51**) · `adp-roadmap.sh` = *work item thật* (**internal 13/36** · external 0/9) · `roadmap_dashboard.py` = *GĐ0 thôi* (**internal 12/23**). Mục tiêu 100% = mẫu số `internal`, không gộp `external`. Mẫu số **tăng** khi thêm spec/ID — % giảm là honest, không phải tiến độ xấu đi (DEC-OHANA-03). ⚠️ `adp-status` 51 vs L3 52 lệch 1 do đếm `CANCELLED` khác nhau — cả hai máy sinh, đừng "sửa" cho khớp bằng tay.
 - **Isolation:** ADP v2.3 riêng, KHÔNG dùng workspace v1.3 của Onfa/DrNick. Sandbox an toàn để calibrate decision-gate (SHADOW → hard-block sau ≥5 real decision). Contract: `docs/adr/hook-contract.md`.
 
 ---
@@ -202,11 +228,15 @@ CHECKPOINT_PREFIX: adp
 *(tóm tắt — nguồn thật ở `docs/tasks/` + `ROADMAP-STATUS.md`)*
 
 - ✅ **DONE:** Spec 01 (GĐ0 backend) · 02 (bootstrap) · 04 (GĐ0.5 UI) · 05 (config/embedder) · 06 (foundation) · 07 (General Chat — chạy THẬT end-to-end) · 08 (embedder swap → Together e5 1024-dim, 3/3) · 09 (unique constraint chặn race Conversation, 1/1 — đóng ISSUE-017) · 10 (conversation history — ghi + đọc `Message`, last-N vào `Drafter`, 3/3) · 11 (`shops` + `shop_profile` — persona vào prompt có cap, knowledge vào `lookup_size`/`lookup_shipping` tất định, 4/4) · 12 (wire provider-429 counter vào đường chat thật — đóng nửa còn lại ISSUE-010, 1/1) · 13 (`Drafter` — impl thật `agent.orchestrator.Drafter`, LLM adapter → draft `(text,intent,confidence)`, 2/2) · **14 (DraftSchema + Idempotency — `pending_reply` +snapshot/expires_at/label + `webhook_event_log` PK `(channel,platform_msg_id)` race-safe; KHÔNG wire runtime, 3/3)**.
+- 🔄 **Spec 15 (RuntimeWiring) — 4 phase TODO, chưa bắt đầu.** De-orphan tiểu-hệ-thống outbound: P1 dọn dead code (`storage/*`, `registry.register()`) · P2 verify Tool-shape + factory · P3 dựng `LLMDrafter` trong `main.py` + integration test (**KHÔNG mount webhook** — PDPL) · P4 đóng ISSUE-026.
 - ⏳ Spec 03 (acceptance backfill, 0/10, 4 BLOCKED chờ Tân) — **Phase 1 giờ là `CANCELLED`**, superseded bởi spec 11 (blocker PRE-007 ACCEPTED 2026-07-19 mà không ai gỡ; L1 `GD0-SHOPS` từng map vào HAI chủ, nay chỉ còn spec 11). Số migration cấp theo thứ tự LAND, không theo thứ tự lập kế hoạch (spec 08 lấy `0004`, spec 09 `0005`, spec 10 `0006`, spec 11 `0007`, **spec 14 lấy `0008`+`0009`**). ⚠️ **Bảng idempotency mà spec 03 Phase 2 định làm nay đã SUPERSEDED bởi spec 14 B0** (`webhook_event_log`, commit `34620c9`); sender+signature verify của spec 03 vẫn BLOCKED chờ Tân (PRE-004). Spec 03 sẽ phải renumber lại lần nữa khi land. §8 của spec 03 từng lệch với §Files của chính nó — đồng bộ 2026-07-20; xem ISSUE-021.
-- **Gate hiện tại:** pytest xanh (`-m 'not live'`, **208 test**, 6 live deselected) · ruff sạch (`--no-cache`) · mypy 0 lỗi / **57 file** — scope = toàn bộ code sản phẩm, không loại thư mục nào (re-verify 2026-07-22).
+- **Gate hiện tại:** pytest xanh (`-m 'not live'`, **212 test**, 9 live deselected) · ruff sạch (`--no-cache`) · mypy 0 lỗi / **57 file** · `roadmap_derive verify` **26/26, 0 dangling** · `gen_codebase_map --check` xanh (re-verify 2026-07-23).
+- 🔴 **CI ĐỎ ≥12 run liên tiếp (2026-07-22 → 07-23) — không ai kiểm.** Gốc: `docs/codebase-map.md` stale từ spec 13 (`agent` 11→12, `db` 13→15). **Đã vá, CI XANH tại `72b3564`** (xác minh bằng `gh run`, không suy đoán). Bài học lặp lại ISSUE-019 ở dạng mới: **gate local xanh KHÔNG chứng minh CI xanh** — `codebase-map --check` là step CHỈ CI chạy, không có trong vòng verify local. Sau mỗi đợt thêm/xoá file `.py`: chạy `python3 scripts/ai_coder/gen_codebase_map.py` rồi commit map.
 - **Live (chạy tay, ngoài CI):** `test_together_live.py` 2 · `test_wiki_rag_live.py` 4 — cả 6 PASS 2026-07-19 với key thật.
-- ✅ `main` đồng bộ `origin/main` (`github.com:wyattngo/ohana-ai`) — spec 14 A0/B0/C0 đã push, tip `6ae3bd7`. STATE_HASH **`541b6218a61b` @ spec 14 C0** (2026-07-21T20:14). ⚠️ **CI cho tip spec 14 CHƯA được xác nhận trong session này** — phải kiểm `gh run` trước khi coi tree qua đủ 11 step (đừng lặp lại giả định hình-dạng-ISSUE-019). Mốc CI-xanh gần nhất đã xác minh là tip spec 11 `16bc429` (2026-07-21).
-- **OPEN:** ISSUE-021 (L1 gỡ `shipping_info` nhưng spec 03 Phase 4 frozen vẫn khai 3 read-tool) · ISSUE-022 (cap persona 2000 chưa đo — Q1 đo 3.55, Q2 chờ shop) · ISSUE-023 (cap history 20/4000 — Q1 đo 3.55, Q2 chờ hội thoại thật) · **ISSUE-026 (5 nợ RUNTIME schema spec 14 — `snapshot`/`expires_at`/`label` + `webhook_event_log` đã có cột/bảng nhưng CHƯA đường code nào ghi/đọc; cùng hình dạng "persona chưa có Drafter")**.
+- ✅ `main` đồng bộ `origin/main` (`github.com:wyattngo/ohana-ai`), tip **`72b3564`** — **CI XANH đã xác minh** (`gh run`, 2026-07-23). Branch `adp/15-Task-OhanaAISeller-RuntimeWiring` ff cùng tip.
+- **Tầng gate (mới 2026-07-23):** `docs/gates/GD0-STEP1..9.md` — 9 Step ↔ 9 sub-step workflow §7, **Wyatt ký cả 9** (`approved_by: wyatt`). ⚠️ **Ký ≠ Tests đã pass**: hiện **0/40 ô test** được tick. Ký = "đúng là điều kiện tôi muốn"; đóng gate = test chạy thật. `GD0-STEP8` (DPIA) **cố ý không bind work item** — nửa external của `GD0-PII`, là điều kiện ship nhưng không vào mẫu số (option (a), Wyatt 2026-07-23).
+- **Dashboard: CHỈ CÒN MỘT** — `docs/roadmap-dashboard.html`. `adp-dashboard.html` + `adp-progress-dashboard.html` đã xoá; workspace tool `adp-progress-dashboard.sh` retire vào `_archive/` (0 consumer). Click Step → Target+Tests · work item → acceptance · phase → nguyên block ADP.
+- **OPEN:** ISSUE-023 (cap history 20/4000 chưa đo) · **PRE-010 — 5 ràng buộc implement** (C1 consumer idempotent · C2 scheduler `SKIP LOCKED` · C3 TTL clamp window · C4 FN-rate PII đo được · C5 severity order), nhúng sẵn vào Tests của gate tương ứng nên không thể quên · **ISSUE-026 (5 nợ RUNTIME schema spec 14 — `snapshot`/`expires_at`/`label` + `webhook_event_log` đã có cột/bảng nhưng CHƯA đường code nào ghi/đọc; cùng hình dạng "persona chưa có Drafter")**.
 - **Chưa ai nhận:** rule thật của các run CI đỏ 17–18/07 (log chưa đào được) · `window_status` hết hạn có mở conversation MỚI không (constraint spec 09 sẽ chặn — phải trả lời trước `GD0-WINDOW`) · chưa có index vector (ivfflat/hnsw) cho corpus thật · worker drain `approved` rows (chặn PRE-1004/PRE-1005, và là thứ làm history đủ phía shop).
 - **Blocked backfill** (chờ Tân — không chặn gate, chặn real-content): PRE-002 platform REST API spec · PRE-003 real wiki corpus · PRE-004 Zalo OA creds + webhook signature.
 
