@@ -219,11 +219,55 @@ adp_path_match() {
     return 1
 }
 
-# adp_work_diff_sha <repo_root> — sha256 canonical của working diff (git diff HEAD).
+# adp_index_untracked <repo_root> — intent-to-add (`git add -N`) mọi file untracked
+# KHÔNG bị gitignore, để `git diff HEAD` NHÌN THẤY chúng.
+#
+# Vì sao cần: `git diff HEAD` chỉ hiện file đã tracked. Phase nào THÊM FILE MỚI thì
+# verdict REVIEW/SMOKE bị bind vào một diff KHÔNG chứa dòng code nào vừa viết — ai đó
+# viết lại toàn bộ file mới sau khi review APPROVE, hash KHÔNG đổi, checkpoint vẫn nhận.
+# Đo thật 2026-07-23 trên ohana-ai spec 16 phase A0 (2 file mới agent/pii.py +
+# tests/test_pii_filter.py), CÙNG working tree:
+#     trước add -N: 2 file docs / 7 dòng    → 109df6a1e92b
+#     sau  add -N: 4 file    / 277 dòng     → 5697bf4c1aad
+#
+# `--exclude-standard` giữ file gitignore (.env, venv/, __pycache__) NGOÀI hash.
+# `-N` chỉ chạm INDEX — không đổi nội dung file, không phải add thật; `git add -A` ở
+# adp-checkpoint.sh vẫn stage đủ sau đó. Tất định: cùng working tree ⇒ cùng index ⇒
+# cùng bytes `git diff HEAD` ở review-time và checkpoint-time (hai đầu lệch = REFUSE giả).
+# Nuốt mọi lỗi, rc luôn 0 — không bao giờ exit caller.
+#
+# TRỪ RA (ADP_HASH_EXCLUDE) — chính artifact/state của ADP nằm TRONG repo. Đây KHÔNG
+# phải nới lỏng: chúng là bằng chứng VỀ diff, không bao giờ là code deliverable, và
+# đều được sinh SAU khi hash đã tính ⇒ nếu cho vào hash thì gate tự phá chính nó:
+#   · docs/reviews/<spec>-phase-<id>.json — adp-review.sh tính SHA rồi mới GHI file này.
+#     Không trừ ⇒ mọi review REFUSE 100% (artifact vừa ghi làm diff đổi ngay sau stamp).
+#   · docs/smokes/*.md                    — adp-smoke.sh, cùng thứ tự, cùng hệ quả.
+#   · docs/.adp-*                         — audit log / exec-state / red-proof / state-hash.
+#     Gate GHI vào chúng trong lúc chấm ⇒ chấm gate lại làm đổi diff mà gate đang bind.
+adp_index_untracked() {
+    local root="$1" f n=0
+    git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
+    local untracked
+    untracked=()
+    # -z + read -d '' : path có space/newline vẫn đúng. Gom 1 lần rồi add 1 lần
+    # (n>0 guard giữ "${untracked[@]}" khỏi unbound-variable dưới `set -u`, bash 3.2).
+    while IFS= read -r -d '' f; do
+        case "$f" in
+            docs/reviews/*|docs/smokes/*|docs/.adp-*|docs/.adp-state/*) continue ;;
+        esac
+        untracked+=("$f"); n=$((n + 1))
+    done < <(git -C "$root" ls-files --others --exclude-standard -z 2>/dev/null)
+    [ "$n" -gt 0 ] && git -C "$root" add -N -- "${untracked[@]}" >/dev/null 2>&1
+    return 0
+}
+
+# adp_work_diff_sha <repo_root> — sha256 canonical của working diff (git diff HEAD),
+# CÓ KỂ file untracked (qua adp_index_untracked — xem lỗ diff-binding mô tả ở đó).
 # Dùng CHUNG ở review-time (adp-review.sh) và checkpoint-time để 2 đầu hash giống hệt.
-# Echo 64-hex; rỗng nếu không phải git repo. Read-only, không exit caller.
+# Echo 64-hex; rỗng nếu không phải git repo. Không đổi nội dung file, không exit caller.
 adp_work_diff_sha() {
     git -C "$1" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo ""; return 0; }
+    adp_index_untracked "$1"
     git -C "$1" --no-pager diff HEAD 2>/dev/null | shasum -a 256 2>/dev/null | awk '{print $1}'
     return 0
 }
@@ -511,10 +555,13 @@ PY
 # files given, OR the in-scope diff is empty (no-op-diff → caller treats as FAIL,
 # fix #5 — NOTE: empty must be distinguished here, else `shasum` of empty input
 # yields a non-empty constant hash and the no-op slips through). Read-only, rc0.
+# Untracked NEW files are indexed first (adp_index_untracked) — without that a task
+# whose whole deliverable is a new file hashed EMPTY and was scored `no-op-diff` FAIL.
 adp_task_diff_sha() {
     local root="$1"; shift
     git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo ""; return 0; }
     [ "$#" -gt 0 ] || { echo ""; return 0; }
+    adp_index_untracked "$root"
     local d
     d=$(git -C "$root" --no-pager diff HEAD -- "$@" 2>/dev/null)
     [ -n "$d" ] || { echo ""; return 0; }
@@ -526,10 +573,13 @@ adp_task_diff_sha() {
 # changed file (git diff HEAD --name-only) matches a declared path (exact/prefix via
 # adp_path_match); rc1 + echo the first out-of-scope file otherwise. Empty diff →
 # rc0 (vacuously in scope; no-op is caught separately by adp_task_diff_sha).
-# Read-only, never exits caller.
+# Untracked NEW files are indexed first (adp_index_untracked) — this guard was
+# fail-OPEN without it: a subagent could create an out-of-scope NEW file and
+# `git diff HEAD --name-only` would not list it at all. Read-only, never exits caller.
 adp_task_diff_in_scope() {
     local root="$1" declared="$2" f
     git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
+    adp_index_untracked "$root"
     while IFS= read -r f; do
         [ -z "$f" ] && continue
         adp_path_match "$f" "$declared" exact || { echo "$f"; return 1; }

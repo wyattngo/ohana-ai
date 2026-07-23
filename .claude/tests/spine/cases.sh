@@ -720,3 +720,60 @@ out=$(adp_coder_mode "$P4OFF" backend "app/util.py"); rc=$?
 # 19.7 coder.md documents the generic gate (CHECK 7: new mechanism must be guarded in agent doc)
 has "P4: coder.md documents generic gate (adp_coder_mode)" "$(cat "$HOME/.claude/agents/coder.md" 2>/dev/null)" "adp_coder_mode"
 
+
+# ---------------------------------------------------------------------------
+echo "[21] P1b diff-binding — file untracked (lỗ đo 2026-07-23)"
+# `git diff HEAD` KHÔNG thấy file untracked ⇒ phase nào thêm file MỚI thì verdict
+# REVIEW/SMOKE bị bind vào một diff không chứa dòng code nào của deliverable.
+UR="$TMP/repo-untracked"; mkdir -p "$UR"
+( cd "$UR" && git init -q && git config user.email t@t.t && git config user.name t \
+   && echo base > tracked.txt && printf 'ignored.txt\n' > .gitignore \
+   && git add tracked.txt .gitignore && git commit -qm init ) 2>/dev/null
+
+( cd "$UR" && echo edit >> tracked.txt )
+U_BASE=$(adp_work_diff_sha "$UR")
+( cd "$UR" && printf 'def a():\n    return 1\n' > brandnew.py )
+U_NEW=$(adp_work_diff_sha "$UR")
+[ "$U_BASE" != "$U_NEW" ] && ok "thêm file untracked → hash ĐỔI (lỗ cũ: không đổi)" \
+  || no "untracked vào hash" "hash đứng yên khi thêm file mới ($U_BASE)"
+has "git diff HEAD thấy file mới sau add -N" "$(cd "$UR" && git --no-pager diff HEAD --name-only)" "brandnew.py"
+
+# file gitignore (.env/venv) KHÔNG được lọt vào hash — --exclude-standard
+( cd "$UR" && echo 'SECRET=1' > ignored.txt )
+eq "file gitignore KHÔNG vào hash" "$(adp_work_diff_sha "$UR")" "$U_NEW"
+
+# ADP_HASH_EXCLUDE — artifact/state của CHÍNH gate không được vào hash, nếu không
+# gate tự phá nó: adp-review.sh tính SHA rồi MỚI ghi docs/reviews/*.json ⇒ không trừ
+# thì mọi review REFUSE 100%; audit log thì bị GHI trong lúc chấm ⇒ chấm làm đổi diff.
+adp_audit_event "$UR" gate=selftest outcome=X
+eq "audit log (docs/.adp-*) KHÔNG vào hash" "$(adp_work_diff_sha "$UR")" "$U_NEW"
+mkdir -p "$UR/docs/reviews" "$UR/docs/smokes"
+echo '{}' > "$UR/docs/reviews/self.json"; echo 'x' > "$UR/docs/smokes/self.md"
+eq "review/smoke artifact KHÔNG vào hash (chống tự phá)" "$(adp_work_diff_sha "$UR")" "$U_NEW"
+
+# tất định: review-time và checkpoint-time phải ra CÙNG hash, nếu không = REFUSE giả
+eq "hash tất định qua 2 lần gọi" "$(adp_work_diff_sha "$UR")" "$(adp_work_diff_sha "$UR")"
+eq "add -N chỉ chạm index, không đổi nội dung file" "$(cat "$UR/brandnew.py")" "$(printf 'def a():\n    return 1\n')"
+
+# CASE chính: stamp xong → viết lại FILE MỚI → checkpoint phải REFUSE
+printf '{"verdict":"APPROVE","model":"haiku"}' > "$TMP/vin-u.json"
+bash "$TOOLS/adp-review.sh" stamp "$UR" "$TMP/vin-u.json" "$TMP/art-u.json" >/dev/null 2>&1
+( ROOT="$UR" REVIEW_VAL="PASS ref=$TMP/art-u.json" REVIEW_REF="$TMP/art-u.json"; review_validate_artifact medium >/dev/null 2>&1 ) \
+  && ok "stamp xong, chưa sửa gì → allowed" || no "bound match (untracked)" "rc=$?"
+( cd "$UR" && printf 'def a():\n    return 999  # viết lại SAU review\n' > brandnew.py )
+( ROOT="$UR" REVIEW_VAL="PASS ref=$TMP/art-u.json" REVIEW_REF="$TMP/art-u.json"; review_validate_artifact medium >/dev/null 2>&1 ) \
+  && no "sửa file MỚI sau stamp phải refuse" "got rc0 — verdict cũ vẫn được nhận" \
+  || ok "sửa file MỚI sau stamp → REFUSED"
+
+# per-task binding (gate-verdict): task chỉ đẻ file mới từng bị chấm no-op-diff FAIL
+TS_SHA=$(adp_task_diff_sha "$UR" brandnew.py)
+[ -n "$TS_SHA" ] && ok "adp_task_diff_sha: task chỉ có file mới → có hash (was no-op-diff)" \
+  || no "task_diff_sha untracked" "rỗng"
+# scope guard từng fail-OPEN: file MỚI ngoài scope không hiện trong --name-only
+# (docs/ khai luôn: review_validate_artifact ở trên đã ghi docs/.adp-audit.jsonl vào
+#  repo này, nếu không khai thì nó mới là file out-of-scope đầu tiên và case đo nhầm)
+( cd "$UR" && printf 'x\n' > sneaky.py )
+OOS_U=$(adp_task_diff_in_scope "$UR" "brandnew.py,tracked.txt,docs"); SCOPE_U=$?
+[ "$SCOPE_U" -ne 0 ] && ok "scope guard bắt file MỚI ngoài scope" \
+  || no "scope guard untracked" "fail-open: rc0 dù sneaky.py ngoài scope"
+eq "scope guard chỉ đúng file mới vi phạm" "$OOS_U" "sneaky.py"
