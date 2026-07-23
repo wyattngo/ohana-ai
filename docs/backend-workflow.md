@@ -332,8 +332,7 @@ Ràng buộc an toàn, không phải sở thích thiết kế.
 <!-- anchor:w-7.7-corpus-luong-a -->
 ### 7.7 Corpus Ohana AI (Luồng A)
 ...
-## 8. AI engineering
-......
+
 Có phụ thuộc kiến trúc, không đảo được:
 
 1. **Webhook + queue + idempotency** (§2.1). Không có nền này, mọi thứ sau đều gửi trùng.
@@ -409,3 +408,24 @@ Mỗi quyết định đơn giản ở các mục trên được chọn vì nân
 ---
 
 Bốn đường tiến hoá này là lý do các mục trên chọn được phương án đơn giản mà không hối tiếc: mỗi nâng cấp đều **thêm**, không **thay**.
+
+---
+
+<!-- anchor:w-9-ai-eng -->
+## 9. AI engineering
+
+> ⚠️ **PLACEHOLDER — Wyatt viết nội dung.** Anchor `w-9-ai-eng` đã tồn tại để
+> `GD0-EVAL` / `GD0-ROUTER` / `GD0-OBS` neo vào (ROADMAP §4.1.1), nhưng **WHY
+> chưa được viết**. Tới khi có nội dung thật, đây là anchor hợp lệ về cơ học
+> nhưng rỗng về nội dung — đúng thứ ADR §5.1 cảnh báo ("anchor giả chỉ để thoả
+> enforcement"). Nguồn để paste gọn: `ROADMAP.md` §6.1 (eval harness), §6.2
+> (model routing), §6.3 (LLM observability).
+
+Ba mối quan tâm cross-cutting, không thuộc một bước nào của §7:
+
+- **Eval harness** — golden set + multi-dim assertion + regression gate. Đổi
+  prompt/model/RAG mà không chạy suite = thả regression im lặng.
+- **Model routing** — `plan_tier → model_id` qua abstraction; cấm hardcode model
+  id trong orchestrator.
+- **LLM observability** — token/cost per conv, tool-call success, RAG hit-rate,
+  fallback rate, Manual Override Rate, trace correlation.
