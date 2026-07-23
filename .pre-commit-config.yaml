@@ -1,0 +1,20 @@
+# Pre-commit — enforcement tầng local cho derivation pipeline (ADR 2026-07-22).
+#
+# ⚠️ Config này KHÔNG tự chạy. Phải cài một lần:
+#     .venv/bin/pip install pre-commit && .venv/bin/pre-commit install
+# Chưa cài ⇒ file này là trang trí, không phải gate. CI mới là chốt chặn luôn-bật
+# (`.github/workflows/ci.yml` step "Derivation map"), nên đừng dựa mình nó.
+#
+# `language: system` — dùng python của môi trường, KHÔNG để pre-commit tự dựng
+# venv riêng: gate phải chạy trên đúng interpreter repo dùng, không phải bản khác.
+
+repos:
+  - repo: local
+    hooks:
+      - id: verify-derives
+        name: verify_derives — ROADMAP §4.1.1 vs workflow anchors
+        entry: python3 scripts/roadmap_derive.py verify
+        language: system
+        pass_filenames: false
+        # Chỉ nổ khi đúng những file có thể làm gãy khoá nối bị sửa.
+        files: ^docs/(ROADMAP\.md|backend-workflow\.md|gates/.*\.md)$

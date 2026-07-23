@@ -94,6 +94,12 @@ jobs:
       - name: AI-coder codebase map is current
         run: python3 scripts/ai_coder/gen_codebase_map.py --check
 
+      # Derivation pipeline (ADR 2026-07-22): ROADMAP §4.1.1 `derives_from` phải trỏ
+      # anchor CÓ THẬT trong backend-workflow.md. Đây là chốt chặn luôn-bật —
+      # `.pre-commit-config.yaml` chỉ chạy sau khi ai đó `pre-commit install`, CI thì không.
+      - name: Derivation map (ROADMAP derives_from vs workflow anchors)
+        run: python3 scripts/roadmap_derive.py verify
+
       - name: DB migrate (empty tree at Phase 1.3 — first migration lands at Phase 2)
         run: alembic upgrade head
 
