@@ -59,7 +59,8 @@ def collect(root: Path) -> dict:
             "waits": cols[5] if len(cols) > 5 else "",
         }
 
-    # docs/gates — Target + Tests đầy đủ.
+    # docs/gates — Target + Test policy đầy đủ (DEC-OHANA-06: policy là hợp đồng
+    # bất biến, không state; L2 spec sinh JIT sẽ tiêu thụ mỗi câu thành GATE:).
     gmeta: dict[str, dict] = {}
     gdir = root / rd.GATES_REL
     for g in gates:
@@ -67,11 +68,11 @@ def collect(root: Path) -> dict:
         raw = f.read_text(encoding="utf-8") if f.is_file() else ""
         gmeta[g.gate_id] = {
             "title": (re.search(r"^# .*?— (.*)$", raw, re.M) or [None, ""])[1],
-            "targets": TARGET_RE.findall(_section(raw, "## Target", "## Tests")),
-            "tests": [
-                {"done": t.startswith("[x]"), "text": t[3:].strip()}
+            "targets": TARGET_RE.findall(_section(raw, "## Target", "## Test policy")),
+            "policy": [
+                t.strip()
                 for t in re.findall(
-                    r"^-\s+(\[[ xX]\].*)$", _section(raw, "## Tests", "## Bound"), re.M
+                    r"^-\s+(.+)$", _section(raw, "## Test policy", "## Bound"), re.M
                 )
             ],
         }
@@ -135,8 +136,6 @@ def collect(root: Path) -> dict:
                 "signed": g.signed,
                 "by": g.approved_by,
                 "items": its,
-                "tests_done": g.tests_done,
-                "tests_total": g.tests_open + g.tests_done,
                 **gmeta.get(g.gate_id, {}),
             }
         )
@@ -174,8 +173,6 @@ def collect(root: Path) -> dict:
             "internal_total": len(internal),
             "steps_signed": sum(1 for g in gates if g.signed),
             "steps": len(gates),
-            "tests_done": sum(g.tests_done for g in gates),
-            "tests_total": sum(g.tests_open + g.tests_done for g in gates),
         },
     }
 
@@ -197,7 +194,6 @@ def main() -> int:
     print(
         f"  {k['steps']} step ({k['steps_signed']} ký) · {k['items']} work item · "
         f"internal {k['internal_done']}/{k['internal_total']} · "
-        f"tests {k['tests_done']}/{k['tests_total']} · "
         f"dangling {len(data['dangling'])} · drift {len(data['drift'])}"
     )
     return 0

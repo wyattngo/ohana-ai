@@ -44,7 +44,7 @@ const esc=s=>String(s==null?"":s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;","
 // để thô thì đọc rất khó. Thứ tự escape-trước là bắt buộc, không đảo.
 const md=s=>esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/`([^`]+)`/g,"<code>$1</code>");
 const K=D.kpi,kp=[["Work item",K.items],["Internal GĐ0",K.internal_done+"/"+K.internal_total],
- ["Step đã ký",K.steps_signed+"/"+K.steps],["Gate tests",K.tests_done+"/"+K.tests_total],
+ ["Step đã ký",K.steps_signed+"/"+K.steps],
  ["Dangling",D.dangling.length],["Drift",D.drift.length]];
 kpis.innerHTML=kp.map(([k,v])=>`<div class="kpi">${k}<b>${v}</b></div>`).join("");
 
@@ -58,7 +58,7 @@ function stepHTML(s){
  return `<details class="step" open><summary data-k="s:${s.id}">
    <span class="sid">${esc(s.id)}</span><span class="anch">${esc(s.anchor)}</span>
    <span class="pill ${s.signed?'ok':'warn'}">${s.signed?'✍ '+esc(s.by):'CHƯA KÝ'}</span>
-   <span class="pill">tests ${s.tests_done}/${s.tests_total}</span></summary>${its}</details>`;}
+   <span class="pill">${(s.policy||[]).length} policy</span></summary>${its}</details>`;}
 
 tree.innerHTML=D.steps.map(stepHTML).join("")+
  (D.outside.length?`<h3 style="font-size:12px;color:var(--mut);margin:18px 0 8px">NGOÀI §7 — không thuộc Step nào</h3>`+
@@ -78,8 +78,8 @@ function show(k){
  const[t,...r]=k.split(":"),v=r.join(":");
  if(t==="s"){const s=D.steps.find(x=>x.id===v);det.innerHTML=`<h2>${esc(s.id)} — ${esc(s.title||"")}</h2>
   <div class="hint mono">derives_from: workflow#${esc(s.anchor)}</div>
-  <h3>Target (ý định Wyatt, đo được)</h3><ul class="t">${s.targets.map(x=>`<li>${md(x)}</li>`).join("")}</ul>
-  <h3>Tests — phải có TRƯỚC khi bắt tay task</h3><ul class="t">${s.tests.map(x=>`<li>${x.done?"☑":"☐"} ${md(x.text)}</li>`).join("")}</ul>
+  <h3>Target (ý định Wyatt, đo được)</h3><ul class="t">${(s.targets||[]).map(x=>`<li>${md(x)}</li>`).join("")}</ul>
+  <h3>Test policy (đã ký — hợp đồng bất biến; L2 spec sinh JIT tiêu thụ thành <code>GATE:</code>)</h3><ul class="t">${(s.policy||[]).map(x=>`<li>${md(x)}</li>`).join("")}</ul>
   <h3>Bound work items</h3><ul class="t">${s.items.map(i=>`<li><code>${esc(i.id)}</code> — ${i.status}</li>`).join("")||"<li>(không có)</li>"}</ul>`;}
  else if(t==="i"){const i=findItem(v);det.innerHTML=`<h2>${esc(i.id)}</h2>
   <div class="hint mono">${esc(i.derives)} · Class ${esc(i.cls)} · ${i.status}</div>
