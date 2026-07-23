@@ -49,8 +49,7 @@ chạm tới — vì chúng là vấn đề SEMANTIC của cách đếm coverage
 - **F1** (tách túi 03) + **F2** (slug collision) → **N/A**: hệ quả của §9.3
   preemptive, bỏ cùng paradigm cũ. Túi 03 = tech debt refactor JIT khi bắt tay,
   không proactive.
-- **F5** (brief ref §8) → fix cơ học ngoài ADR (Task 3 session drafting).
-
+- **F5** (brief ref §8) → fix cơ học ngoài ADR (patch `CLAUDE-CODE-BRIEF.md` line 47: `ROADMAP §8` → `backend-workflow.md §8`).
 ## Section 2 — Decision
 
 Adopt **derivation pipeline 4 tầng**:
@@ -149,6 +148,20 @@ Ví dụ:
 
 Ràng buộc: mỗi `derives_from: <layer>#<anchor>` phải trỏ tới một anchor tồn tại
 ở tầng trên. Dangling = block commit (enforcement).
+
+### 5.1 Exemption: ID Class `scaffold`
+
+**ID Class `scaffold` KHÔNG cần `derives_from`.**
+
+Lý do: scaffold là hạ tầng dựng sẵn (repo chạy được, config loader, seller UI shell). Nó không phải architecture decision → không có WHY ở workflow để neo vào. Ép `derives_from` sẽ đẻ anchor giả ở workflow chỉ để thoả enforcement — làm hỏng chính thứ workflow dùng để nói.
+
+Ranh giới: một ID là scaffold khi **đổi nó không đổi luồng dữ liệu, ranh giới an toàn, hay quyết định kiến trúc** — chỉ đổi cách code được dựng hoặc trình bày. Bất cứ thứ gì chạm 3 trục trên **KHÔNG** phải scaffold, kể cả khi trông giống hạ tầng.
+
+Áp cho: `GD0-BOOTSTRAP`, `GD0-CONFIG`, `GD0-UI`.
+
+`verify_derives` bỏ qua ID `Class: scaffold` khi quét dangling.
+
+**Quan hệ với `Class` §0.1**: `scaffold` là **trục derivation riêng**, không phải giá trị của cột `Class`. ID scaffold giữ `Class: internal` — mẫu số không đổi. Chỉ derivation map đánh dấu `n/a (scaffold)`.
 
 ## Section 6 — Migration path (session sau)
 
