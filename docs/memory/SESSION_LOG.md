@@ -388,3 +388,42 @@ chờ PRE-004 (Zalo creds + signature, Tân).
 - **Trạng thái:** `main` == `origin/main` @ `1c4de9e` (push 7 commit 2026-07-21). STATE_HASH `541b6218a61b`. **internal 14/33 (42%)** · phase 38/48. GD0-DRAFTSCHEMA + GD0-INGEST covered (schema; runtime = ISSUE-026). **CI: đã push, chờ 11-step xác nhận.**
 - **What's next:** chờ Wyatt: `GD0-SPLIT` timing · last-N 20→6 reconcile hay DEC giữ 20 · chặn auto_send branch GĐ0. Runtime GD0-INGEST/snapshot-capture chờ có người tiêu thụ (webhook mount kẹt PRE-004 Tân). Review async REVIEW_QUEUE (A0/B0/C0).
 - **CLAUDE.md update needed:** có — §7 status (spec 14 DONE, internal 14/33, migration tới 0009, test count 208→ mới), gate counts. Chạy meta-sync phiên sau.
+
+---
+
+## 2026-07-23 — Derivation pipeline: ADR → anchor → gate → tooling; vá CI đỏ 12 run
+
+- **Owner:** Wyatt Ngo (main loop) + Claude (Opus 4.8)
+- **Duration:** ~1 ngày, 18 commit
+- **Context:** Vào session với ROADMAP v7 §9.3 draft (BDUF cluster) đã bị Wyatt REJECT. CI đang đỏ nhưng **chưa ai biết**.
+- **Done:**
+  - **ADR `2026-07-22-derivation-pipeline` ACCEPTED** — bỏ BDUF cluster, chuyển sang derivation 4 tầng (workflow → gates → ROADMAP §4.1.1 → L2 JIT). Giải F3 (coverage aggregate) + F4 (ADR-only ID → token phase grep-only).
+  - **Anchor layer:** Wyatt add `w-7.1..w-7.7`; CC thêm `w-3-data-tiers`, `w-5-boundary`, `w-9-ai-eng`. ROADMAP **§4.1.1 derivation map 26/26 ID**.
+  - **Audit workflow bản chỉnh: 20/20 mục đóng** (B1–B4, G1–G7, D1–D4, 5 nits). Land + **remap 12 `derives_from`** (§7 renumber 7→9 sub-step). Patch R1 (outbox `RETURNING`) + R5 (PII phủ tầng 1).
+  - **PRE-010** — 5 implementation constraint (C1 consumer idempotent · C2 scheduler `SKIP LOCKED` · C3 TTL clamp · C4 FN-rate đo được · C5 severity order) gắn vào §7 sub-step tương ứng.
+  - **Tooling:** `scripts/roadmap_derive.py` (`verify` gate / `derive` advisory / `tree`), CI step + `.pre-commit-config.yaml`. **Test âm 4 ca chứng minh gate ĐỎ thật.**
+  - **Tầng gate:** `docs/gates/GD0-STEP1..9.md`, **Wyatt ký cả 9**. STEP8 (DPIA) option (a) — cố ý không bind ID.
+  - **Dashboard:** merge 3 view rời → **1** (`docs/roadmap-dashboard.html`), xoá 2 artifact cũ, retire workspace tool.
+  - **Spec 15** (RuntimeWiring) freeze 4 phase. **Spec 16** (PII filter) viết + ký RISK.
+- **Decisions:** ADR §5.0 (waiver rename anchor khi safety-driven + audit refs cùng commit) · ADR §5.1 (`scaffold` miễn `derives_from`, trục riêng nên mẫu số không đổi) · STEP8 option (a) · spec 16 RISK A0/B0/C0 = medium.
+- **Issues touched:** ISSUE-023, ISSUE-026 còn MỞ. **PRE-1603 mới** (zero traffic ⇒ không đo được FN-rate).
+- **Files changed:** `docs/backend-workflow.md` (bản chỉnh + 10 anchor) · `docs/ROADMAP.md` §4.1.1 · `docs/adr/2026-07-22-*` · `docs/gates/` (10 file) · `scripts/roadmap_derive.py` + `roadmap_dashboard.py` · `.ai-coder.conf` · `.github/workflows/ci.yml` · `CLAUDE.md` · spec 15, 16.
+- **Blockers surfaced:**
+  - **PRE-1603** — `GD0-PII` D0 (đo FN-rate) BLOCKED: webhook chưa mount ⇒ **zero tin khách thật** để gán nhãn. KHÔNG gỡ bằng synthetic (ROADMAP §6.1 cấm đúng lối tắt đó).
+  - **Spec 15 RISK chưa ký** — 4 phase TODO nhưng không execute được.
+  - **Gate tests 0/40 tick** — ký gate ≠ Tests đã pass.
+- **Bài học đắt nhất:** CI đỏ **≥12 run** mà không ai biết, gốc là `docs/codebase-map.md` stale. Éo le: script sinh map là của **chính skill AI-coder**, chỉ vì `gate_full` không gọi nó. Đã vá `gate_full` phủ **7/7 step CI chạy được** (`b819b98`). Cùng hình dạng ISSUE-019: **gate local xanh KHÔNG chứng minh CI xanh**.
+
+### Next — kickoff session sau
+
+**Trạng thái vào session:** `main b819b98`, **CI XANH** (3 commit cuối). 2 branch chờ: `adp/15-…RuntimeWiring`, `adp/16-…PIIFilter`.
+
+**Việc 1 — execute spec 16 A0** (sẵn sàng nhất: RISK đã ký, không chờ ai).
+Trước khi code, chốt 3 câu §14 còn mở:
+- **Q2** — `agent/pii.py` (đề xuất, đã trong `packages` + mypy scope) hay package `security/` mới (phải sửa `.ai-coder.conf` + mypy + guardrail scope)?
+- **Q3** — chấp nhận ship A0–C0 khi **chưa biết FN-rate**? Nghĩa là `GD0-PII` ở trạng thái *"filter có chạy, chưa biết lọt bao nhiêu"* — tick 4/5 ô Tests STEP2, không phải 5/5.
+- **Q4** — thứ tự spec 15 vs 16. Spec 15 P3 thêm **điểm dựng LLM thứ hai** (`app/main.py` cho Drafter). Ai land trước thì bên kia phải bọc/dựng qua wrapper. *(Thực tế spec 15 đang kẹt vì RISK chưa ký ⇒ 16 đi trước là đường ít ma sát nhất.)*
+
+**Việc 2 — ký RISK spec 15** (P1/P2 medium · P3 **high** · P4 low, CC đề xuất). Chưa ký thì 4 phase nằm im.
+
+**Lưu ý khi code:** A0/B0 **thêm file `.py` mới** ⇒ `docs/codebase-map.md` sẽ stale ⇒ CI đỏ nếu quên regenerate. `gate_full` giờ đã bắt được — chạy nó, đừng chạy pytest suông.
