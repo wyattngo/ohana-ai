@@ -23,8 +23,6 @@ venv/
 secure/
 
 # ADP generated artifacts (regeneratable từ spine)
-docs/adp-dashboard.html
-docs/adp-progress-dashboard.html
 .adp-audit.jsonl
 .adp-state/
 
