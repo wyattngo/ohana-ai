@@ -426,6 +426,7 @@ Có phụ thuộc kiến trúc, không đảo được:
 
 <!-- anchor:w-7.1-webhook -->
 ### 7.1 Webhook + outbox + binding table + queue
+> ⛔ **PRE-010 C1** — consumer phải idempotent (outbox→queue là at-least-once).
 
 Không có nền này, mọi thứ sau đều gửi trùng hoặc sai shop. Bao gồm:
 - Bảng `wiho_shop_channel_binding` với verify flow lúc onboard
@@ -435,16 +436,19 @@ Không có nền này, mọi thứ sau đều gửi trùng hoặc sai shop. Bao 
 
 <!-- anchor:w-7.2-pii-filter -->
 ### 7.2 PII filter regex + injection defense wrapping
+> ⛔ **PRE-010 C4** — FN rate của filter phải đo được (trigger §8.5).
 
 **Đứng trước §7.3** vì mọi LLM call sau đây đều phải qua filter. Rẻ (regex), làm được trong 1–2 ngày. Injection wrapping = 1 helper function + persona instruction update.
 
 <!-- anchor:w-7.3-rules-intent -->
 ### 7.3 Rules layer intent nhạy cảm
+> ⛔ **PRE-010 C5** — severity order tường minh cho multi-match.
 
 Danh sách keyword/regex cho 5–6 nhóm intent nhạy cảm (bao gồm injection_attempt). Precedence rule. Chốt được trong 1–2 ngày.
 
 <!-- anchor:w-7.4-draftschema -->
 ### 7.4 Draft schema
+> ⛔ **PRE-010 C3** — gia hạn TTL phải clamp theo messaging window.
 
 Bao gồm: TTL, snapshot tầng 1, persona_version_at_draft, label field, escalation_reasons[], status enum có 'sending' để optimistic lock. Sai schema từ đầu là refactor lớn.
 
@@ -455,6 +459,7 @@ Persona (có version, có cổng duyệt), tri thức tầng 2, cost cap config,
 
 <!-- anchor:w-7.6-cost-cap -->
 ### 7.6 Cost cap pre-charge + persistent debounce scheduler
+> ⛔ **PRE-010 C2** — scheduler phải claim atomic (SKIP LOCKED).
 
 Cost cap phải có **trước** khi §7.7 chạy pipeline thật, nếu không bug đầu tiên = shop bị bill trắng. Persistent debounce scheduler cũng là infra chung, làm cùng đợt.
 
@@ -474,6 +479,24 @@ Phải xong trước khi ra khỏi môi trường sandbox. Đây là filing phá
 Độc lập với B, có thể chạy song song từ bước 1. Vẫn phải qua injection wrapping (§7.2).
 
 Bước 7.1–7.4 là khoá — làm sai thì mọi thứ sau phải làm lại.
+
+### PRE-010 — Implementation constraints
+
+Năm ràng buộc từ audit 2026-07-22 (R2–R7). Không chặn việc land doc, **chặn
+acceptance của sub-step tương ứng**. Gộp 1 PRE thay vì 5 issue rời — chúng cùng
+một họ: *"đúng khi mọi thứ chạy bình thường, sai khi có concurrency hoặc lỗi"*.
+
+| # | Sub-step | Ràng buộc | Acceptance (đo được) |
+|---|---|---|---|
+| **C1** | §7.1 | **Consumer phải idempotent.** Outbox→queue là *at-least-once*, không phải exactly-once: enqueue OK mà mark `delivered` fail ⇒ deliver lại. Lỗ B3 được vá ở biên webhook nhưng dời xuống một chặng. | Bảng message có khoá dedup `(conversation_id, platform_msg_id)`; test deliver CÙNG event 2 lần ⇒ đúng **1** row. ⚠️ Hiện `messages` **chưa có** khoá dedup nào. |
+| **C2** | §7.6 | **Scheduler phải claim atomic.** `poll next_debounce_at <= NOW()` không có lock ⇒ 2 instance (hoặc tick chồng tick) bắn cùng conversation ⇒ 2 draft. Cùng họ với optimistic lock §2.5 — đã vá cho draft, chưa vá cho scheduler. | `FOR UPDATE SKIP LOCKED` hoặc cột claim chuyển trạng thái atomic; test 2 scheduler song song trên cùng conversation ⇒ đúng **1** draft. |
+| **C3** | §7.4 | **Gia hạn TTL phải clamp theo window.** `TTL = min(window, ngưỡng shop)`, nhưng "+N phút khi mở edit" (§2.5) có thể vượt messaging window ⇒ gửi fail ở adapter, seller mất công soạn. | `new_ttl = min(old_ttl + N, window_end)`; test gia hạn khi window còn < N ⇒ TTL = `window_end`, không vượt. |
+| **C4** | §7.2 | **False-negative của PII filter phải đo được.** Trigger nâng cấp §8.5 là `FN rate > 5%` — không có cách đo thì trigger không bao giờ kích hoạt và regex ở lại vĩnh viễn. | Tập mẫu gán nhãn PII (≥200 tin thật, có nhãn) + script đo FN rate; ra **con số**, không phải cảm nhận. |
+| **C5** | §7.3 | **Severity order phải tường minh.** §2.4 nói "chọn intent nhạy cảm nhất" khi multi-match nhưng không định nghĩa thứ tự ⇒ kết quả phụ thuộc thứ tự duyệt rule. | Bảng severity rank cho các intent nhạy cảm; test multi-match ⇒ intent chọn ra là **hàm tất định của tập match**, không đổi khi hoán vị thứ tự rule. |
+
+**Vì sao gộp:** cả năm đều là lỗi *chỉ hiện khi có concurrency hoặc failure*, và
+đều rẻ khi làm cùng sub-step, đắt khi retrofit sau. Tách 5 issue rời sẽ vụn và
+dễ rơi từng cái.
 
 ---
 

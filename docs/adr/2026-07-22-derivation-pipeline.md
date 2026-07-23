@@ -149,6 +149,31 @@ Ví dụ:
 Ràng buộc: mỗi `derives_from: <layer>#<anchor>` phải trỏ tới một anchor tồn tại
 ở tầng trên. Dangling = block commit (enforcement).
 
+### 5.0 Waiver: rename anchor khi safety-driven  [Wyatt 2026-07-22]
+
+Luật `Immutable` ở trên là mặc định, **không phải tuyệt đối**. Rename được phép
+khi thoả **CẢ HAI** điều kiện, không phải một:
+
+1. **Safety-driven** — việc đánh số lại đến từ một sửa lỗi an toàn/thứ tự, không
+   phải sở thích trình bày. Ví dụ đã dùng: audit B1 buộc PII filter chạy TRƯỚC
+   draft pipeline ⇒ §7 phải đổi thứ tự ⇒ anchor đổi theo. Đổi tên cho "gọn hơn"
+   **không** đủ điều kiện.
+2. **Audit refs cùng commit** — mọi `derives_from` trỏ anchor cũ phải được rà và
+   cập nhật **trong chính commit đó**, và `verify_derives` phải XANH ở commit ấy.
+   Không được để một commit trung gian đỏ rồi "vá sau".
+
+Tiền lệ: commit `4438617` (2026-07-22) — §7 renumber theo audit B1, 5 anchor đổi
+tên, 12 `derives_from` cập nhật cùng commit, gate PASS 26/26.
+
+**Vì sao nới:** giữ redirect cho MỌI lần đổi sẽ tích rác ngay từ vòng đầu, khi
+chưa L2 spec nào tiêu thụ anchor. Nhưng nới mà không có điều kiện (2) thì rename
+thành miễn phí và khoá nối mất nghĩa — nên (2) là phần không thương lượng: gate
+xanh trong cùng commit chính là bằng chứng đã audit, do máy kiểm chứ không do
+người khai.
+
+⚠️ Khi đã có L2 spec trỏ vào anchor, cân nhắc **redirect thay vì rename**: lúc đó
+lịch sử đối chiếu bắt đầu có giá trị thật.
+
 ### 5.1 Exemption: ID Class `scaffold`
 
 **ID Class `scaffold` KHÔNG cần `derives_from`.**
