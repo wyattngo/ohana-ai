@@ -9,13 +9,13 @@ is rewritten by `gen_codebase_map.py` and must not be hand-edited.
 
 | Package | Files |
 |---|---:|
-| `agent` | 11 |
+| `agent` | 12 |
 | `api` | 6 |
 | `app` | 4 |
 | `auth` | 2 |
 | `bridge` | 3 |
 | `channels` | 4 |
-| `db` | 13 |
+| `db` | 15 |
 | `parsing` | 4 |
 | `retrieval` | 3 |
 | `storage` | 3 |
@@ -23,13 +23,13 @@ is rewritten by `gen_codebase_map.py` and must not be hand-edited.
 
 ## Modules
 
-**`agent/`** — `embedder.py` · `llm_client.py` · `orchestrator.py` · `persona.py` · `policy_gate.py` · `openai_client.py` · `openai_embedder.py` · `together_client.py` · `together_embedder.py`
+**`agent/`** — `drafter.py` · `embedder.py` · `llm_client.py` · `orchestrator.py` · `persona.py` · `policy_gate.py` · `openai_client.py` · `openai_embedder.py` · `together_client.py` · `together_embedder.py`
 **`api/`** — `admin.py` · `chat.py` · `inbox.py` · `mock_auth.py` · `webhook.py`
 **`app/`** — `alert_service.py` · `config.py` · `main.py`
 **`auth/`** — `identity.py`
 **`bridge/`** — `ohana_client.py` · `zalo_sender.py`
 **`channels/`** — `base.py` · `identity.py`
-**`db/`** — `env.py` · `0001_initial_tenant_first.py` · `0002_pending_reply.py` · `0003_foundation_entities.py` · `0004_embedding_dim_1024.py` · `0005_conversation_unique.py` · `0006_message_conversation_fk.py` · `0007_shops_profile.py` · `models.py` · `repos.py` · `session.py` · `shop_repo.py`
+**`db/`** — `env.py` · `0001_initial_tenant_first.py` · `0002_pending_reply.py` · `0003_foundation_entities.py` · `0004_embedding_dim_1024.py` · `0005_conversation_unique.py` · `0006_message_conversation_fk.py` · `0007_shops_profile.py` · `0008_pending_reply_snapshot_ttl_label.py` · `0009_webhook_event_log.py` · `models.py` · `repos.py` · `session.py` · `shop_repo.py`
 **`parsing/`** — `chunk.py` · `extract.py` · `ingest.py`
 **`retrieval/`** — `base.py` · `pgvector.py`
 **`storage/`** — `base.py` · `local.py`
@@ -37,7 +37,7 @@ is rewritten by `gen_codebase_map.py` and must not be hand-edited.
 
 ## Migrations
 
-Count: 7 · latest on disk: `0007_shops_profile.py`
+Count: 9 · latest on disk: `0009_webhook_event_log.py`
 
 ```
 0001_initial_tenant_first.py
@@ -47,6 +47,8 @@ Count: 7 · latest on disk: `0007_shops_profile.py`
 0005_conversation_unique.py
 0006_message_conversation_fk.py
 0007_shops_profile.py
+0008_pending_reply_snapshot_ttl_label.py
+0009_webhook_event_log.py
 ```
 
 ## Registered tool names (candidates)
@@ -67,5 +69,6 @@ Count: 7 · latest on disk: `0007_shops_profile.py`
 `ShopProfile` (db/models.py)
 `Shop` (db/models.py)
 `SizeRule` (db/models.py)
+`WebhookEventLog` (db/models.py)
 
 <!-- AUTOGEN:END -->
