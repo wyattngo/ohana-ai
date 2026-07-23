@@ -1,0 +1,26 @@
+{
+  "verdict": "APPROVE",
+  "model": "claude-haiku-4-5-20251001",
+  "phase": "16-A0",
+  "rounds": 4,
+  "summary": "Implementation is correct and well-tested. The 1-word street name case is legitimate (Vietnamese streets like 'ngõ Huế', 'đường A' exist). The 'number + proper nouns' ambiguity is a known regex limitation, not a new defect, and is properly documented in module docstring. No new unaddressed issues found.",
+  "findings": [],
+  "verified": [
+    "New test `test_street_keyword_is_strong_enough_signal` correctly verifies 1-word cases after street keyword: '12 ngõ Huế', '2026 đường A', '1950 đường Nguyễn Huệ'. All are legitimate Vietnamese street naming conventions.",
+    "Year-to-address disambiguation explicitly scoped: branch 1 requires keyword (allows 1-4 name words), branch 2 blocks yearish without keyword (requires 2-4 name words). Covered by test_street_keyword_is_strong_enough_signal + test_year_before_proper_noun_is_not_an_address (4 cases).",
+    "Module docstring documents the '350 Nguyễn Huệ' case as inherent regex ambiguity (number + proper nouns IS the address signature); real price forms '350k'/'350 đồng'/'350 triệu' pass through because the following word is lowercase. Routed to model-based filter (§8.5) with D0 FN-rate as the trigger.",
+    "Test suite 37 → 40; GATE_FULL 7/7 (pytest 252, mypy 58 files, ruff check + format, guardrail 27 paths, codebase-map current, roadmap_derive 26/26).",
+    "No regression on PII capture: phone (all prefixes), CCCD (9 and 12 digit), email, bank account, core addresses. Idempotency holds — replacement tokens match no branch."
+  ],
+  "unverified": [
+    "Email edge case without TLD ('user@internal') not tested explicitly; pattern requires at least one dot-group so it should reject, but this was reasoned from pattern structure, not executed."
+  ],
+  "review_history": [
+    "R1 NEEDS_REVIEW — 2 medium bác bỏ (đọc nhầm {1,3} thành 0-3 lần lặp), 1 low nhận (hợp đồng ưu tiên nhãn chưa ghim) → thêm test_label_priority_is_pinned",
+    "R2 APPROVE với 1 low — coordinator KHÔNG đóng: kiểm thật thấy low đó là lỗi GOAL ('sinh năm 1999 Nguyễn Văn Nam' → 'sinh năm [ĐỊA_CHỈ]'), reviewer đã đoán giảm nhẹ trong mục unverified → vá bằng tách nhánh + chặn dải 1900-2099",
+    "R3 NEEDS_REVIEW — 1 medium sai tiền đề (lookahead chỉ thu hẹp, không thể sinh FP mới), 1 medium là mơ hồ nội tại không giải được bằng regex → ghi docstring; 1 medium về process nhận → thêm test_street_keyword_is_strong_enough_signal",
+    "R4 APPROVE, findings rỗng"
+  ],
+  "diff_sha256": "d8b3d2ad739873c1a08bd13a47bb838dbd5ea3061cff30ced23bbf2d979e2dba",
+  "stamped_at": "2026-07-23T18:03"
+}

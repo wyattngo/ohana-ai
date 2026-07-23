@@ -161,18 +161,19 @@ PRE-1603 [BLOCKER cho D0]: Tập gán nhãn ≥200 tin THẬT — KHÔNG CÓ.
 ### Phase A0 — Redactor thuần `agent/pii.py`
 
 <!-- ADP:PHASE A0 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 ROADMAP: GD0-PII
 GOAL: `redact(text) -> RedactionResult(text, hits: dict[str,int])` bắt đúng 5 lớp workflow §5: SĐT VN (10-11 số, prefix 03/05/07/08/09), CCCD/CMND (9 và 12 số), STK (8-19 số liên tiếp), email, địa chỉ (số nhà + tên đường). Thay bằng token có nhãn (`[SĐT]`, `[CCCD]`…) giữ hình dạng câu, KHÔNG xoá trắng. Hàm thuần, chưa ai gọi.
 APPROACH: Regex thuần, deterministic, không phụ thuộc thứ tự áp dụng (test hoán vị). Ưu tiên pattern DÀI trước (CCCD 12 số trước STK 8-19 số) để không cắt nhầm. `hits` đếm theo loại — đây là thứ destination-log sẽ ghi (số lượng, KHÔNG phải text). Số không-PII (số lượng, giá) KHÔNG được đụng: test khẳng định "2 cái", "350k" đi qua nguyên vẹn.
 ALLOWED_FILES: agent/pii.py, tests/test_pii_filter.py, docs/tasks/16-Task-OhanaAISeller-PIIFilter.md, docs/reviews/, docs/smokes/
+ALLOWED_FILES_AMEND: Wyatt duyệt 2026-07-23 — `docs/codebase-map.md`, BỊ ÉP CƠ HỌC bởi chính `GATE_FULL` step `gen_codebase_map --check`, KHÔNG phải mở scope tuỳ ý. Mọi phase thêm/xoá file `.py` đều cần nó; spec 13 thiếu đúng dòng này và đó là gốc của CI-đỏ-12-run (`agent` 11→12, `db` 13→15).
 GATE: .venv/bin/python -m pytest tests/test_pii_filter.py -x -q
 GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && .venv/bin/mypy app agent retrieval parsing storage db bridge tools api auth && .venv/bin/ruff check . --no-cache && .venv/bin/ruff format --check . --no-cache && .venv/bin/python .claude/hooks/guardrail.py $(find app agent retrieval parsing storage -name '*.py') && python3 scripts/ai_coder/gen_codebase_map.py --check && python3 scripts/roadmap_derive.py verify
 RETRY: 0/3
 RISK: medium (✅ WYATT KÝ 2026-07-23. Không hạ `low` dù `agent/pii.py` ngoài RISK_PATHS: đây là safety control, redactor sót = PII rời máy không thu hồi được.)
 BLOCKED_BY: —
 SMOKE: N/A hàm thuần, không có mặt runtime người dùng quan sát; đúng-sai chứng minh bằng test tất định trên chuỗi vào/ra.
-REVIEW: (chờ execute)
+REVIEW: PASS ref=docs/reviews/16-A0-auto-verdict.json
 <!-- /ADP -->
 
 1. Test (**RED trước**): 5 lớp bắt đúng · số lượng/giá KHÔNG bị đụng · hoán vị thứ tự regex ⇒ kết quả không đổi · `hits` đếm đúng.
