@@ -161,7 +161,8 @@ PRE-1603 [BLOCKER cho D0]: Tập gán nhãn ≥200 tin THẬT — KHÔNG CÓ.
 ### Phase A0 — Redactor thuần `agent/pii.py`
 
 <!-- ADP:PHASE A0 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=36b7525, gate_exit=0, duration=15s, review=PASS(judge=APPROVE,model=claude-haiku-4-5-20251001,bound=d8b3d2ad7398,tier=medium), smoke=N/A(hàm thuần, không có mặt runtime người dùng quan sát; đúng-sai chứng minh bằng test tất định trên chuỗi vào/ra.), ran=2026-07-23T18:03
 ROADMAP: GD0-PII
 GOAL: `redact(text) -> RedactionResult(text, hits: dict[str,int])` bắt đúng 5 lớp workflow §5: SĐT VN (10-11 số, prefix 03/05/07/08/09), CCCD/CMND (9 và 12 số), STK (8-19 số liên tiếp), email, địa chỉ (số nhà + tên đường). Thay bằng token có nhãn (`[SĐT]`, `[CCCD]`…) giữ hình dạng câu, KHÔNG xoá trắng. Hàm thuần, chưa ai gọi.
 APPROACH: Regex thuần, deterministic, không phụ thuộc thứ tự áp dụng (test hoán vị). Ưu tiên pattern DÀI trước (CCCD 12 số trước STK 8-19 số) để không cắt nhầm. `hits` đếm theo loại — đây là thứ destination-log sẽ ghi (số lượng, KHÔNG phải text). Số không-PII (số lượng, giá) KHÔNG được đụng: test khẳng định "2 cái", "350k" đi qua nguyên vẹn.
