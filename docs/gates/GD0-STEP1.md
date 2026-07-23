@@ -24,6 +24,6 @@ approved_at: 2026-07-23
 ## Bound work items (ROADMAP §4)
 
 - `GD0-INGEST`
-- `GD0-ZALO *(weak)*`
-- `GD0-COALESCE *(weak)*`
-- `GD0-WINDOW *(weak)*`
+- `GD0-ZALO` *(weak)*
+- `GD0-COALESCE` *(weak)*
+- `GD0-WINDOW` *(weak)*

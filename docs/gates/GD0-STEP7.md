@@ -27,4 +27,4 @@ approved_at: 2026-07-23
 - `GD0-DRAFTER`
 - `GD0-HISTORY`
 - `GD0-POLICY`
-- `GD0-TOOLS *(weak)*`
+- `GD0-TOOLS` *(weak)*
