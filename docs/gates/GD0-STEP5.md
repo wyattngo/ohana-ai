@@ -1,8 +1,8 @@
 ---
 gate_id: GD0-STEP5
 derives_from: workflow#w-7.5-shop-profile
-approved_by: null
-approved_at: null
+approved_by: wyatt
+approved_at: 2026-07-23
 ---
 
 # GD0-STEP5 — Hồ sơ shop

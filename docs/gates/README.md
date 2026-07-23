@@ -30,12 +30,19 @@ Một gate = **một sub-step của workflow §7**, mang ba thứ:
 
 ## Trạng thái
 
-9 gate ↔ 9 sub-step `§7.1`–`§7.9`. **Tất cả đang `approved_by: null`** — chờ Wyatt ký từng file.
+9 gate ↔ 9 sub-step `§7.1`–`§7.9`. **Tất cả đã ký — `approved_by: wyatt`, `approved_at: 2026-07-23`.**
+Gate đã ký ⇒ **bind** work item; từ đây một task chạm `GD0-*` phải đóng được Tests của
+gate tương ứng, không phải chỉ "code xong là done".
 
-⚠️ **`GD0-STEP8` (DPIA) chưa có work item nào bind.** Đây là nửa **external** của
-`GD0-PII` (filter là internal `w-7.2`, DPIA là filing pháp lý `w-7.8`). Hai lựa chọn,
-Wyatt quyết: (a) chấp nhận gate không bound — nó vẫn là điều kiện ship; hoặc (b) đẻ ID
-mới cho DPIA (cần DEC theo ROADMAP §9.4).
+**`GD0-STEP8` (DPIA) — ký theo option (a), Wyatt 2026-07-23.** Gate này **cố ý không
+bind work item nào**: nó là nửa **external** của `GD0-PII` (filter internal ở `w-7.2`,
+DPIA là filing pháp lý ở `w-7.8`). Hệ quả đã chấp nhận: DPIA **vẫn là điều kiện ship**
+nhưng **không vào mẫu số** `internal` — nó không đo tiến độ, nó chặn cửa.
+Option (b) — đẻ ID riêng cho DPIA — bị bỏ vì cần DEC (§9.4) cho một mục mà tiến độ
+nằm ngoài tay đội.
+
+⚠️ Một gate đã ký **không** có nghĩa Tests đã pass. Ký = "đây đúng là điều kiện tôi
+muốn". Đóng gate = mọi ô `[ ]` tick bằng test chạy thật. Đừng lẫn hai việc.
 
 ⚠️ **`GD0-RESIDENCY` token phase (ADR §4 / F4) CHƯA land.** Cơ chế đã chốt — 1 phase
 block `ROADMAP: GD0-RESIDENCY` với gate grep-only trên

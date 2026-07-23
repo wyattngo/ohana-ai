@@ -1,8 +1,8 @@
 ---
 gate_id: GD0-STEP2
 derives_from: workflow#w-7.2-pii-filter
-approved_by: null
-approved_at: null
+approved_by: wyatt
+approved_at: 2026-07-23
 ---
 
 # GD0-STEP2 — PII filter + injection defense wrapping

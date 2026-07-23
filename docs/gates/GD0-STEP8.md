@@ -1,8 +1,8 @@
 ---
 gate_id: GD0-STEP8
 derives_from: workflow#w-7.8-dpia
-approved_by: null
-approved_at: null
+approved_by: wyatt
+approved_at: 2026-07-23
 ---
 
 # GD0-STEP8 — DPIA cross-border

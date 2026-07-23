@@ -1,8 +1,8 @@
 ---
 gate_id: GD0-STEP9
 derives_from: workflow#w-7.9-corpus-luong-a
-approved_by: null
-approved_at: null
+approved_by: wyatt
+approved_at: 2026-07-23
 ---
 
 # GD0-STEP9 — Nối corpus nền tảng vào Luồng A
