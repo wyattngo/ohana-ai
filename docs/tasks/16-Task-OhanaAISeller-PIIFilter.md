@@ -169,7 +169,7 @@ ALLOWED_FILES: agent/pii.py, tests/test_pii_filter.py, docs/tasks/16-Task-OhanaA
 GATE: .venv/bin/python -m pytest tests/test_pii_filter.py -x -q
 GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && .venv/bin/mypy app agent retrieval parsing storage db bridge tools api auth && .venv/bin/ruff check . --no-cache && .venv/bin/ruff format --check . --no-cache && .venv/bin/python .claude/hooks/guardrail.py $(find app agent retrieval parsing storage -name '*.py') && python3 scripts/ai_coder/gen_codebase_map.py --check && python3 scripts/roadmap_derive.py verify
 RETRY: 0/3
-RISK: medium (ĐỀ XUẤT — `agent/pii.py` KHÔNG thuộc RISK_PATHS nên floor không kích hoạt, nhưng đây là safety control: redactor sót = PII rời máy. Hạ `low` được nếu Wyatt thấy "hàm thuần chưa ai gọi" là đủ tách rủi ro.)
+RISK: medium (✅ WYATT KÝ 2026-07-23. Không hạ `low` dù `agent/pii.py` ngoài RISK_PATHS: đây là safety control, redactor sót = PII rời máy không thu hồi được.)
 BLOCKED_BY: —
 SMOKE: N/A hàm thuần, không có mặt runtime người dùng quan sát; đúng-sai chứng minh bằng test tất định trên chuỗi vào/ra.
 REVIEW: (chờ execute)
@@ -190,7 +190,7 @@ ALLOWED_FILES: agent/pii_client.py, api/chat.py, tests/test_pii_filter.py, docs/
 GATE: .venv/bin/python -m pytest tests/test_pii_filter.py -x -q
 GATE_FULL: (như A0)
 RETRY: 0/3
-RISK: medium (ĐỀ XUẤT — floor: `api/chat.py` ∈ RISK_PATHS. Không high: không đổi hành vi endpoint, chỉ chèn lớp bọc; không chạm đường gửi khách.)
+RISK: medium (✅ WYATT KÝ 2026-07-23. Floor: `api/chat.py` ∈ RISK_PATHS. Không high: chỉ chèn lớp bọc, không đổi hành vi endpoint, không chạm đường gửi khách.)
 BLOCKED_BY: A0 DONE · PRE-1601 · PRE-1602
 SMOKE: PASS ref=docs/smokes/16-B0.md — có mặt runtime. Điền OBSERVED bằng `uvicorn app.main:app` + POST `/api/chat` thật với chuỗi chứa SĐT, dán log destination + `hits` THẬT. KHÔNG viết "OK".
 REVIEW: (chờ execute)
@@ -212,7 +212,7 @@ ALLOWED_FILES: agent/drafter.py, api/chat.py, agent/pii_client.py, tests/test_pi
 GATE: .venv/bin/python -m pytest tests/test_pii_filter.py -x -q
 GATE_FULL: (như A0)
 RETRY: 0/3
-RISK: medium (ĐỀ XUẤT — floor: `api/chat.py` ∈ RISK_PATHS. Chạm `agent/drafter.py` = đường soạn nháp; không high vì draft vẫn PARK, không có nhánh gửi.)
+RISK: medium (✅ WYATT KÝ 2026-07-23. Floor: `api/chat.py` ∈ RISK_PATHS. Chạm `agent/drafter.py` = đường soạn nháp; không high vì draft vẫn PARK, không nhánh gửi.)
 BLOCKED_BY: B0 DONE
 SMOKE: PASS ref=docs/smokes/16-C0.md — dán prompt THẬT gửi lên provider (đã redact) chứng minh tag có mặt, + dòng log destination thật.
 REVIEW: (chờ execute)
@@ -295,9 +295,9 @@ python3 scripts/roadmap_derive.py verify
 
 | Phase | Nội dung | STATUS | RISK (đề xuất) |
 |---|---|---|---|
-| A0 | Redactor thuần `agent/pii.py` | TODO | medium |
-| B0 | Chokepoint `PIIFilteringClient` + wire | TODO | medium |
-| C0 | Injection wrapping + destination log | TODO | medium |
+| A0 | Redactor thuần `agent/pii.py` | TODO | **medium ✅ ký** |
+| B0 | Chokepoint `PIIFilteringClient` + wire | TODO | **medium ✅ ký** |
+| C0 | Injection wrapping + destination log | TODO | **medium ✅ ký** |
 | D0 | Đo FN-rate (PRE-010 C4) | **BLOCKED** | — |
 
 Đóng A0–C0 tick được **4/5** ô Tests của `GD0-STEP2`. Ô thứ 5 (FN-rate) chờ D0.
@@ -306,8 +306,8 @@ python3 scripts/roadmap_derive.py verify
 
 ## §14 — Open questions (Wyatt quyết)
 
-**Q1 · RISK tiers.** Đề xuất A0/B0/C0 = medium. Hạ A0→low được (hàm thuần, chưa ai gọi)?
-B0/C0 bị floor `api/chat.py` giữ ở medium, không hạ được nếu không có RISK_WAIVER.
+**Q1 · RISK tiers — ✅ ĐÃ CHỐT (Wyatt 2026-07-23): A0/B0/C0 = `medium`.** A0 giữ medium
+dù ngoài RISK_PATHS (safety control). D0 chưa gán — còn BLOCKED.
 
 **Q2 · `agent/pii.py` hay package riêng?** Đề xuất `agent/` (đã trong `packages` của
 `.ai-coder.conf` + mypy scope, không phải sửa CI). Package mới `security/` sạch hơn về
