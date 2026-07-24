@@ -2,10 +2,9 @@
 
 > Nơi log deferred bugs / assumption breaks / waivers / open PRE checks. Update mỗi sub-phase (ghi mới, KHÔNG xoá cũ — chỉ đổi STATUS + gắn resolved commit SHA).
 >
-> Last updated: 2026-07-20 · Status: Spec 01/02/04/05/06/07/08/09 DONE (**ADP 25/35**, internal 9/25). Gate: 137 test xanh · ruff sạch (`--no-cache`, pin) · mypy 0 lỗi/40 file. Live 6/6 PASS tay. **CI XANH** (`08c030a`, đủ 11 step trên container sạch).
-> · ✅ ĐÓNG session này: ISSUE-016 (F1 wiki-RAG chạy thật trên e5).
-> · ⚠️ MỞ session này: ISSUE-018 (blank-env không phủ complex field) · ISSUE-019 (gate ADP từng cho kết quả sai vì cache+version trôi — **19/22 phase DONE cũ không tái lập được `ruff check`**) · ISSUE-021 (L1 gỡ `shipping_info`, spec 03 Phase 4 frozen vẫn khai 3 tool) · ISSUE-022 (cap 2000 ký tự persona là số đặt tạm, chưa đo).
-> · Chưa ai nhận: trạng thái CI THẬT chưa ai mở tab Actions xác nhận · runtime deps chưa pin · PRE-002/003/004 chờ Tân.
+> ⚠️ **Nguồn sự thật là dòng `Status:` của TỪNG entry, không phải header này.** Header viết tay, không sinh máy, đã rot ít nhất 2 lần (ISSUE-018 khai MỞ sau khi `be91ef9` đóng · ISSUE-019 khai MỞ sau khi WAIVER-001 đóng). Nếu header nói khác entry, tin entry. Dashboard trạng thái sống: `docs/roadmap-dashboard.html`.
+>
+> Trạng thái sprint (chốt 2026-07-24, có thể lag sau session gần nhất): xem `docs/ROADMAP-STATUS.md` (máy sinh) và `docs/memory/SESSION_LOG.md`. Không chép số vào đây.
 
 ---
 
@@ -243,7 +242,7 @@ Cùng source, cùng binary. Xoá `.ruff_cache` rồi chạy lại lệnh CŨ ⇒
 - **Origin:** spec 07 G0 (`app/config.py`) — phát hiện khi so sánh 2 bản CLAUDE.md, 2026-07-19
 - **Discovered:** 2026-07-19 · session claude-md-merge
 - **Severity:** medium (không chảy máu prod hôm nay; là lỗ trong chính hàng rào dựng lên để chặn lớp bug này)
-- **Status:** OPEN
+- **Status:** ✅ RESOLVED 2026-07-21 (`be91ef9` fix + `4531805` docstring). `reasoning_models: Annotated[frozenset[str], NoDecode]` + `_parse_reasoning_models` validator (`app/config.py:146-151`) — `NoDecode` tắt JSON-parse tầng `EnvSettingsSource`, chuỗi thô lọt tới `_blank_env_means_unset`, rỗng ⇒ frozenset(). Field phức thứ hai xuất hiện ⇒ lặp lại đúng cặp `NoDecode` + validator, KHÔNG trông vào `_blank_env_means_unset` một mình.
 - **Detail:** `_blank_env_means_unset` là `@model_validator(mode="before")`, lọc `""` khỏi dict input. Nhưng với field kiểu phức (`reasoning_models: frozenset[str]`), pydantic-settings `EnvSettingsSource` **parse JSON TRƯỚC** khi validator chạy ⇒ chuỗi rỗng nổ ngay tại tầng source, validator không bao giờ thấy. Kiểm thật:
   ```
   REASONING_MODELS= → SettingsError: error parsing value for field "reasoning_models"

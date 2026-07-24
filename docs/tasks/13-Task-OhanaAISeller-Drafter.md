@@ -3,7 +3,6 @@
 <!-- adp-spec v2.3 · Wyatt directive 2026-07-21 "author GD0-DRAFTER" -->
 <!-- PROJECT: Ohana AI Seller. NOT ONFA wallet. §4 trục safety→trust→stability→growth, -->
 <!-- KHÔNG dùng Survival Framework — Ohana không có cột tài chính. -->
-<!-- STATUS: DRAFT — chờ Wyatt ký RISK tier trước khi bất kỳ phase nào IN_PROGRESS. -->
 
 ## §0 — Header
 
