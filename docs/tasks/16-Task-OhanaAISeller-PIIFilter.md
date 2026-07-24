@@ -184,7 +184,8 @@ REVIEW: PASS ref=docs/reviews/16-A0-auto-verdict.json
 ### Phase B0 — Chokepoint `PIIFilteringClient` + wire (bypass-proof)
 
 <!-- ADP:PHASE B0 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=9467fda, gate_exit=0, duration=16s, review=PASS(judge=APPROVE,model=claude-sonnet-5 (via output-evaluator Ohana project override, DEC-OHANA-07),bound=b07fe9fdc12d,tier=medium), smoke=PASS(bound=b07fe9fdc12d), ran=2026-07-24T15:15
 ROADMAP: GD0-PII
 GOAL: `PIIFilteringClient(LLMClient)` bọc `inner`, redact **mọi** content trong `messages` (kể cả tool-result) rồi mới uỷ nhiệm; phủ CẢ `complete`/`step`/`step_stream`. Redactor raise ⇒ **KHÔNG** gọi `inner` (fail-closed). `api/chat.py::get_llm_client()` trả client **đã bọc**. Test bypass-proof: gọi qua endpoint `/api/chat` với payload chứa SĐT ⇒ fake inner client nhận được text **đã redact**.
 APPROACH: Decorator implement chính ABC ⇒ call-site không cần biết filter tồn tại; call-site thứ 4 thêm sau vẫn an toàn. Test phải đi **qua endpoint**, KHÔNG gọi thẳng `redact()` — test gọi thẳng hàm chỉ chứng minh regex chạy, không chứng minh nó nằm trên đường đi. Fail-closed: bắt exception của redactor và re-raise TRƯỚC `await inner`, không try/except quanh cả block.
