@@ -381,13 +381,10 @@ STATE_HASH=$(adp_state_hash "$ROOT" "$SPEC_DIR")
 mkdir -p "$ROOT/docs"
 echo "${STATE_HASH} @ ${TS} ${SPEC_ID} phase-${PHASE_ID} DONE" >> "$ROOT/docs/.adp-state-hash"
 
-# Async diff review queue (medium/low — tier high đã được Wyatt review sync trước checkpoint)
-if [ "$TIER" != "high" ]; then
-    QF="$ROOT/docs/memory/REVIEW_QUEUE.md"
-    mkdir -p "$ROOT/docs/memory"
-    [ -f "$QF" ] || printf '# ADP Review Queue — async diff review (v1.3, DEC-019)\n\nCheckpoint tier medium/low ghi vào đây; Wyatt review batch, tick [x] khi đã xem.\nRevert 1 lệnh kèm sẵn (evidence commit revert riêng nếu cần).\n\n' > "$QF"
-    echo "- [ ] ${TS} · ${SPEC_ID} phase-${PHASE_ID} · tier=${TIER} · review=${REVIEW_NOTE} · smoke=${SMOKE_NOTE:-n/a} · commit=${HASH} · revert: git revert ${HASH}" >> "$QF"
-fi
+# DEC-OHANA-07: REVIEW_QUEUE.md retired. Auto-verdict (adp-review.sh, Haiku) là gate
+# DUY NHẤT cho tier medium/low. RISK high vẫn cần Wyatt sync review trước checkpoint —
+# đường bypass duy nhất là RISK_WAIVER do Wyatt viết. Audit trail cho phase pre-DEC-007
+# nằm trong git history của REVIEW_QUEUE.md: `git log --all -- docs/memory/REVIEW_QUEUE.md`.
 
 # L3 roadmap view — sinh lại từ L1×L2 sau khi STATUS đã thành DONE.
 # Generator KHÔNG ghi vào L1 (docs/ROADMAP.md) — L1 là tầng ý định, chỉ người viết.
@@ -408,14 +405,12 @@ if [ -f "$ROOT/scripts/roadmap_dashboard.py" ]; then
 fi
 
 git add "$SPEC_FILE" "docs/.adp-state-hash" 2>/dev/null
-[ -f "$ROOT/docs/memory/REVIEW_QUEUE.md" ] && git add "docs/memory/REVIEW_QUEUE.md" 2>/dev/null
 [ -f "$ROOT/docs/ROADMAP-STATUS.md" ] && git add "docs/ROADMAP-STATUS.md" "docs/.roadmap-denominator.log" 2>/dev/null
 git commit -q -m "adp/${SPEC_ID} phase-${PHASE_ID}: checkpoint evidence" 2>/dev/null
 EV_HASH=$(git rev-parse --short HEAD)
 
 echo "STATUS: DONE · EVIDENCE stamped (evidence commit ${EV_HASH}) · STATE_HASH: ${STATE_HASH}"
 [ -n "$ROADMAP_OUT" ] && printf 'ROADMAP L3:\n%s\n' "$ROADMAP_OUT"
-[ "$TIER" != "high" ] && echo "REVIEW_QUEUE: appended → docs/memory/REVIEW_QUEUE.md (Wyatt review async; revert: git revert ${HASH})"
 
 if [ "$ADVANCED" -eq 1 ]; then
     echo "AUTO-ADVANCE (low→low): phase ${NEXT_ID} → IN_PROGRESS — ${NEXT_GOAL}"
@@ -424,7 +419,7 @@ elif [ -n "$NEXT_ID" ]; then
     echo "NEXT-UP (suggest-only): phase ${NEXT_ID} — ${NEXT_GOAL}${NEXT_RISK:+ · RISK: ${NEXT_RISK}}"
     case "$TIER" in
         high) echo "NEXT: Wyatt review diff sync → approve → flip phase kế IN_PROGRESS → ANCHOR ritual (protocol §5.2)." ;;
-        *)    echo "NEXT: diff review async qua REVIEW_QUEUE.md. Phase kế tier=${NEXT_TIER} — medium: 1 confirm Wyatt tại ANCHOR; high: per-step confirm. Flip IN_PROGRESS sau confirm → ANCHOR ritual." ;;
+        *)    echo "NEXT: auto-verdict (adp-review.sh) là gate cho medium/low (DEC-OHANA-07). Phase kế tier=${NEXT_TIER} — medium: 1 confirm Wyatt tại ANCHOR; high: per-step confirm. Flip IN_PROGRESS sau confirm → ANCHOR ritual." ;;
     esac
 else
     echo "NEXT-UP: không còn phase TODO trong spec này — milestone gate / meta-sync / SESSION_LOG."

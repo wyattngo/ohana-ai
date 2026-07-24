@@ -193,7 +193,7 @@ Wyatt confirm proposed tiers:
 **No RISK_WAIVER needed** — không có phase nào propose low với RISK_PATHS overlap.
 
 **Autonomy per tier (ADP v2.3 DEC-019 semantic áp dụng cho Ohana):**
-- P0/P1 (medium): 1 confirm tại ANCHOR + reviewer gate + auto-checkpoint + async REVIEW_QUEUE.md
+- P0/P1 (medium): 1 confirm tại ANCHOR + auto-verdict Haiku là gate (DEC-OHANA-07, superseded async REVIEW_QUEUE) + auto-checkpoint
 - P2 (low): full auto-flow + auto-advance sang phase low kế tiếp (không có phase low kế tiếp — kết thúc spec)
 
 ---
