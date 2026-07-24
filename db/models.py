@@ -451,3 +451,46 @@ class WebhookEventLog(Base):
     received_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+
+
+class ZaloOAToken(Base):
+    """Credentials + secret của MỘT OA (spec 17 P0, `GD0-ZALO`).
+
+    `shop_id` PK ⇒ đúng MỘT OA per shop ở GĐ0 (multi-brand — nhiều OA cho 1 shop — là item
+    riêng, không đổi PK ở đây; đổi PK sang `(shop_id, oa_id)` sau này là migration schema,
+    không phải nới nhánh code).
+
+    **`oa_secret_key` ở CÙNG BẢNG với token, không tách sang `shops`.** Cùng vòng đời liên
+    kết App↔OA, cùng phải xoay khi rotate. Tách ra = 2 query mỗi webhook (P1 verify + P2
+    send) + 2 nơi phải sync khi Tân cấp lại creds. `oa_secret_key` **KHÁC** `ZALO_APP_SECRET_KEY`:
+    OA Secret là per-OA (dùng verify webhook, bẫy #1), App Secret là per-App (dùng OAuth v4).
+
+    **`access_expires_at` là `TIMESTAMPTZ`, không phải `expires_in` seconds.** Zalo trả
+    `expires_in` (giây) nhưng lưu như vậy phải cộng `now()` mỗi lần đọc — mở đường cho
+    off-by-race giữa refresh cron và send. Snapshot lúc refresh ⇒ so sánh tất định.
+
+    Index `idx_zalo_oa_tokens_oa_id` để P1 lookup verify key theo `oa_id` (suy từ
+    `sender.id`/`recipient.id` trong webhook body chưa verify) — không dùng làm scope,
+    chỉ để tra secret rồi verify.
+
+    ⚠️ P0 chỉ dựng bảng + repo. Refresh cron (P2) sẽ update qua `update_tokens_locked`
+    với `SELECT ... FOR UPDATE` — refresh_token Zalo SINGLE-USE, hai process cùng refresh
+    mà không lock = mất luôn cả cặp.
+    """
+
+    __tablename__ = "zalo_oa_tokens"
+
+    shop_id: Mapped[str] = mapped_column(
+        Text,
+        ForeignKey("shops.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    oa_id: Mapped[str] = mapped_column(Text, nullable=False)
+    access_token: Mapped[str] = mapped_column(Text, nullable=False)
+    refresh_token: Mapped[str] = mapped_column(Text, nullable=False)
+    access_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    refresh_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    oa_secret_key: Mapped[str] = mapped_column(Text, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )

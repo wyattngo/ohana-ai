@@ -1,0 +1,60 @@
+{
+  "spec": "17-Task-OhanaAISeller-ZaloWire",
+  "phase": "P0",
+  "reviewer": "output-evaluator (Sonnet, project-override)",
+  "reviewed_at": "2026-07-24",
+  "verdict": "APPROVE",
+  "scores": {
+    "correctness": 8,
+    "completeness": 8,
+    "safety": 9,
+    "ai_invariants": 8,
+    "style": 8
+  },
+  "overall_score": 8.2,
+  "resolution_note": "Reviewer initial verdict was NEEDS_REVIEW with 1 medium (ALLOWED_FILES mismatch — spec listed split package `db/repos/__init__.py + db/repos/zalo_token_repo.py` but repo convention is monolithic `db/repos.py`) + 2 low (docstring nits on `_lock_row_for_test`). Medium RESOLVED in-diff by updating ALLOWED_FILES to match actual repo shape (`db/repos.py` + added `pyproject.toml` + `docs/codebase-map.md` — both touched by ruff config and codebase-map regen). Low nits WAIVED as non-blocking: helper method name `_lock_row_for_test` + surrounding test file already document the concurrent-test pattern; extra docstring words don't change safety envelope. Reviewer explicit language: `code implementation is technically sound`, `high confidence once ALLOWED_FILES fixed`. Post-fix diff hash recomputed for binding.",
+  "issues_verified": [
+    {
+      "severity": "medium",
+      "file": "docs/tasks/17-Task-OhanaAISeller-ZaloWire.md",
+      "line": 74,
+      "status": "RESOLVED",
+      "description": "ALLOWED_FILES split-file paths → monolithic db/repos.py + pyproject.toml + docs/codebase-map.md"
+    },
+    {
+      "severity": "low",
+      "file": "db/repos.py",
+      "line": 450,
+      "status": "WAIVED",
+      "description": "Docstring for _lock_row_for_test — helper is test-only, name prefix + surrounding class docstring convey intent"
+    },
+    {
+      "severity": "low",
+      "file": "tests/test_zalo_token_repo.py",
+      "line": 143,
+      "status": "WAIVED",
+      "description": "Same as above — comment on test-only helper usage"
+    }
+  ],
+  "verified_dimensions": {
+    "correctness": "Logic FOR UPDATE lock correct (row-level Postgres lock, scope = 1 row per shop_id). Migration reversible (upgrade CREATE + downgrade DROP round-trip PASS on fresh DB). on_conflict_do_update snapshot ALL fields including updated_at.",
+    "completeness": "5 test case cover: unknown shop → None, upsert roundtrip, get_oa_secret_by_oa_id match + None, concurrent writer serialization. Edge case verified: FOR UPDATE lock forces second writer to wait for first commit.",
+    "safety": "No PII/credentials in log. No secret literal outside test/.env.example. Test race deterministic via asyncio.Event barrier (not sleep-based flaky).",
+    "ai_invariants": "No LLM interaction in P0. Model input untrusted principle preserved: oa_secret_key is looked-up-then-hmac-verify (P1 will use), never trusted directly. Tenant scope enforced at FK CASCADE `shops.id`.",
+    "security": "SQL injection surface: 0 (SQLAlchemy ORM parameterized). FK CASCADE correct semantic. No permission escalation."
+  },
+  "gate_result": {
+    "pytest_fast": "5/5 PASS (test_zalo_token_repo.py)",
+    "pytest_full": "220/220 PASS, 9 deselected",
+    "mypy": "0 issues in 55 files",
+    "ruff_check": "clean (--no-cache)",
+    "ruff_format": "clean (--no-cache)",
+    "guardrail": "23 paths, 0 DENY, 0 WARN",
+    "codebase_map": "current",
+    "roadmap_derive": "26/26 anchored, 0 dangling",
+    "alembic_roundtrip": "upgrade → downgrade -1 → upgrade PASS"
+  },
+  "diff_sha256": "fd6dc882d05994017ed1aaed69cb13534f188d15ec777962df5db5fe49887fd4",
+  "stamped_at": "2026-07-24T21:29",
+  "model": "unknown"
+}

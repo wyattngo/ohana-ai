@@ -15,7 +15,7 @@ is rewritten by `gen_codebase_map.py` and must not be hand-edited.
 | `auth` | 2 |
 | `bridge` | 3 |
 | `channels` | 4 |
-| `db` | 15 |
+| `db` | 16 |
 | `parsing` | 4 |
 | `retrieval` | 3 |
 | `tools` | 5 |
@@ -28,14 +28,14 @@ is rewritten by `gen_codebase_map.py` and must not be hand-edited.
 **`auth/`** — `identity.py`
 **`bridge/`** — `ohana_client.py` · `zalo_sender.py`
 **`channels/`** — `base.py` · `identity.py`
-**`db/`** — `env.py` · `0001_initial_tenant_first.py` · `0002_pending_reply.py` · `0003_foundation_entities.py` · `0004_embedding_dim_1024.py` · `0005_conversation_unique.py` · `0006_message_conversation_fk.py` · `0007_shops_profile.py` · `0008_pending_reply_snapshot_ttl_label.py` · `0009_webhook_event_log.py` · `models.py` · `repos.py` · `session.py` · `shop_repo.py`
+**`db/`** — `env.py` · `0001_initial_tenant_first.py` · `0002_pending_reply.py` · `0003_foundation_entities.py` · `0004_embedding_dim_1024.py` · `0005_conversation_unique.py` · `0006_message_conversation_fk.py` · `0007_shops_profile.py` · `0008_pending_reply_snapshot_ttl_label.py` · `0009_webhook_event_log.py` · `0010_zalo_oa_tokens.py` · `models.py` · `repos.py` · `session.py` · `shop_repo.py`
 **`parsing/`** — `chunk.py` · `extract.py` · `ingest.py`
 **`retrieval/`** — `base.py` · `pgvector.py`
 **`tools/`** — `ohana_read.py` · `registry.py` · `shop_kb.py` · `wiki.py`
 
 ## Migrations
 
-Count: 9 · latest on disk: `0009_webhook_event_log.py`
+Count: 10 · latest on disk: `0010_zalo_oa_tokens.py`
 
 ```
 0001_initial_tenant_first.py
@@ -47,6 +47,7 @@ Count: 9 · latest on disk: `0009_webhook_event_log.py`
 0007_shops_profile.py
 0008_pending_reply_snapshot_ttl_label.py
 0009_webhook_event_log.py
+0010_zalo_oa_tokens.py
 ```
 
 ## Registered tool names (candidates)
@@ -68,5 +69,6 @@ Count: 9 · latest on disk: `0009_webhook_event_log.py`
 `Shop` (db/models.py)
 `SizeRule` (db/models.py)
 `WebhookEventLog` (db/models.py)
+`ZaloOAToken` (db/models.py)
 
 <!-- AUTOGEN:END -->

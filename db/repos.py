@@ -35,6 +35,7 @@ from db.models import (
     ShopKnowledge,
     ShopProfile,
     WebhookEventLog,
+    ZaloOAToken,
 )
 
 # Khai tường minh thay vì nhận string tuỳ ý: `role` sai chính tả (vd "Assistant") sẽ làm
@@ -344,3 +345,106 @@ class WebhookEventRepo:
         inserted = (await self._session.execute(stmt)).first()
         await self._session.commit()
         return inserted is not None
+
+
+class ZaloOATokenRepo:
+    """Zalo OA credentials + verify secret per shop (spec 17 P0, `GD0-ZALO`).
+
+    KHÔNG `shop_scope` — cùng biên với `WebhookEventRepo`: đây là bảng nền-tảng
+    (credentials/creds-adjacent), lookup theo `shop_id` (từ auth) HOẶC theo `oa_id` (từ
+    webhook body chưa verify, chỉ tra key rồi verify signature). Method `get_by_shop` dùng
+    khi đã có scope; `get_oa_secret_by_oa_id` là seam của P1 verify.
+
+    `update_tokens_locked` PHẢI dùng `SELECT ... FOR UPDATE` — refresh_token Zalo là
+    SINGLE-USE, hai process refresh cùng shop mà không lock = 1 process ghi cặp mới, 1
+    process refresh trên cặp CŨ (đã bị Zalo invalidate) rồi ghi đè cặp mới bằng lỗi. Kết
+    quả: mất luôn khả năng refresh, phải re-auth code manual (cần OA admin). Lock scope là
+    1 row PostgreSQL, không advisory global — không serialize giữa các shop khác nhau.
+
+    P0 chỉ dựng seam. Refresh cron trong P2 sẽ implement pattern double-check:
+    (1) BEGIN; SELECT ... FOR UPDATE trả row (2) nếu `access_expires_at > now() + margin`
+    ⇒ process khác đã refresh xong, dùng luôn (3) nếu chưa ⇒ gọi Zalo refresh + ghi cặp mới
+    + COMMIT.
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get_by_shop(self, shop_id: str) -> ZaloOAToken | None:
+        """Row theo `shop_id` PK, hoặc None."""
+        stmt = select(ZaloOAToken).where(ZaloOAToken.shop_id == shop_id)
+        return (await self._session.execute(stmt)).scalar_one_or_none()
+
+    async def get_oa_secret_by_oa_id(self, oa_id: str) -> str | None:
+        """Verify key theo `oa_id` — dùng ở P1 signature verify.
+
+        `oa_id` KHÔNG unique ở DB (2 shop có thể liên kết cùng OA test), nhưng ở runtime
+        thật 1 OA thuộc 1 shop. Nếu trùng ⇒ trả secret của row scan đầu tiên; caller (P1
+        verify) chỉ cần secret đúng, không cần scope. `LIMIT 1` để không phụ thuộc thứ tự
+        row ngầm.
+        """
+        stmt = select(ZaloOAToken.oa_secret_key).where(ZaloOAToken.oa_id == oa_id).limit(1)
+        return (await self._session.execute(stmt)).scalar_one_or_none()
+
+    async def update_tokens_locked(
+        self,
+        *,
+        shop_id: str,
+        oa_id: str,
+        access_token: str,
+        refresh_token: str,
+        access_expires_at: datetime,
+        refresh_expires_at: datetime,
+        oa_secret_key: str,
+        _reuse_transaction: bool = False,
+    ) -> None:
+        """Upsert row với `SELECT ... FOR UPDATE` lock — race-safe cho refresh cron.
+
+        Nếu row chưa tồn tại: lock KHÔNG có tác dụng (không có row để lock), fallback về
+        INSERT — chấp nhận được vì "chưa tồn tại" là initial seed từ OAuth code flow (P2),
+        không race với refresh cron. Refresh chỉ chạy khi đã có row.
+
+        `_reuse_transaction=True` cho test concurrent (writer_a đã mở transaction + lock
+        bằng `_lock_row_for_test`). Production caller luôn dùng default (False) — mỗi call
+        tự mở/commit transaction.
+        """
+        if not _reuse_transaction:
+            # BEGIN implicit — SQLAlchemy async session bắt đầu transaction ở query đầu tiên.
+            # `FOR UPDATE` sẽ block writer khác cho tới commit/rollback.
+            lock_stmt = select(ZaloOAToken).where(ZaloOAToken.shop_id == shop_id).with_for_update()
+            await self._session.execute(lock_stmt)
+
+        upsert_stmt = (
+            pg_insert(ZaloOAToken)
+            .values(
+                shop_id=shop_id,
+                oa_id=oa_id,
+                access_token=access_token,
+                refresh_token=refresh_token,
+                access_expires_at=access_expires_at,
+                refresh_expires_at=refresh_expires_at,
+                oa_secret_key=oa_secret_key,
+            )
+            .on_conflict_do_update(
+                index_elements=["shop_id"],
+                set_={
+                    "oa_id": oa_id,
+                    "access_token": access_token,
+                    "refresh_token": refresh_token,
+                    "access_expires_at": access_expires_at,
+                    "refresh_expires_at": refresh_expires_at,
+                    "oa_secret_key": oa_secret_key,
+                    "updated_at": datetime.now(UTC),
+                },
+            )
+        )
+        await self._session.execute(upsert_stmt)
+        if not _reuse_transaction:
+            await self._session.commit()
+
+    async def _lock_row_for_test(self, shop_id: str) -> None:
+        """Test-only helper — mở transaction + lock row để mô phỏng process A giữ lock
+        trong khi test writer B đang chờ. KHÔNG dùng ở production code (name-prefix `_`).
+        """
+        lock_stmt = select(ZaloOAToken).where(ZaloOAToken.shop_id == shop_id).with_for_update()
+        await self._session.execute(lock_stmt)
