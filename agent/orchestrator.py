@@ -1,9 +1,7 @@
-"""F3 receive-and-draft orchestrator (spec 01 §3 Sub-task E).
+"""Receive-and-draft orchestration.
 
-Glues inbound customer message → draft (from a `Drafter` — F1+F2 context injected by the
-LLM adapter later) → `policy_gate.decide` → either `sender.send(...)` or a parked
-`PendingReply` row scoped to `shop_id`. The two branches are the ONLY outcomes; there is no
-side channel that sends without gating.
+Glues inbound customer message → draft → policy classification → a parked ``PendingReply``
+scoped to ``shop_id``. The MPV has no customer-send path; seller approval is required.
 
 Identity contract (spec 06 F1 — was a shim before):
   - `customer_id` and `conversation_id` are OURS, already resolved. This module never sees
@@ -84,7 +82,7 @@ class Drafter(Protocol):
 
 @dataclass(frozen=True)
 class ReceiveOutcome:
-    action: Literal["auto_send", "park"]
+    action: Literal["park"]
     reason: str
     reply_id: str | None  # set only for park; None for auto_send
 
@@ -100,14 +98,13 @@ async def receive_and_draft(
     session_factory: async_sessionmaker[AsyncSession],
     shop_auto_enabled_intents: frozenset[str],
 ) -> ReceiveOutcome:
-    """Draft → decide → send OR park. Returns the outcome for the caller to log/telemetrize.
+    """Draft → classify → park. Returns the outcome for the caller to log/telemetrize.
 
-    `shop_id` MUST come from verified auth; the sender is called with the SAME `shop_id`
-    (no way to redirect a send to another shop). Park path writes ONLY to a repo scoped to
+    `shop_id` MUST come from verified auth. The park path writes ONLY to a repo scoped to
     the same `shop_id` — no cross-shop mutation possible even under a buggy caller.
 
-    `shop_auto_enabled_intents` is the shop-level opt-in set for auto-send. If the intent
-    the drafter emits isn't in this set, the gate parks even at high confidence.
+    ``sender`` and ``shop_auto_enabled_intents`` remain in the signature so existing channel
+    wiring stays compatible; neither can bypass the manual-review requirement.
     """
     # History load TRƯỚC khi draft. Repo scope theo `shop_id` ⇒ conversation của shop khác
     # trả rỗng chứ không raise (xem `MessageRepo.last_n`), nên một `conversation_id` sai
@@ -139,21 +136,7 @@ async def receive_and_draft(
         )
     )
 
-    if decision.action == "auto_send":
-        await sender.send(shop_id=shop_id, customer_id=customer_id, text=draft.text)
-        # Ghi SAU khi gửi thành công, không phải trước (spec 10 H1). `send()` nổ ⇒ ngoại lệ
-        # bay lên và KHÔNG có row nào — lịch sử không bao giờ khai một điều chưa xảy ra.
-        # Ghi trước sẽ làm AI lượt sau tưởng nó đã trả lời khách rồi, và im lặng.
-        async with session_factory() as session:
-            await MessageRepo(session, shop_scope=shop_id).append(
-                conversation_id=conversation_id,
-                customer_id=customer_id,
-                role="assistant",
-                content=draft.text,
-            )
-        return ReceiveOutcome(action="auto_send", reason=decision.reason, reply_id=None)
-
-    # Park path — new PendingReply row, shop_id BAKED from repo scope (not caller args).
+    # New PendingReply row, shop_id BAKED from repo scope (not caller args).
     #
     # CỐ Ý KHÔNG ghi `messages` ở đây (PRE-1004, Wyatt ký 2026-07-20). `PendingReply` đã là
     # bản ghi của nhánh này, và chưa có worker nào thực sự gửi (`api/inbox.py` approve chỉ

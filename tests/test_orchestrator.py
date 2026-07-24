@@ -151,8 +151,8 @@ async def test_sensitive_intent_parks_and_never_sends() -> None:
 
 
 @pytest.mark.asyncio
-async def test_safe_high_confidence_auto_enabled_sends() -> None:
-    """The one path that reaches the customer without a seller in the loop."""
+async def test_safe_high_confidence_reply_still_parks() -> None:
+    """MPV never reaches the customer without a seller in the loop."""
     from sqlalchemy import select
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -170,10 +170,6 @@ async def test_safe_high_confidence_auto_enabled_sends() -> None:
     )
     sender = _FakeSender()
 
-    # `_seed_parents` LÀ bắt buộc kể từ spec 10 H1. Comment cũ ở đây nói auto_send "writes
-    # NO row" nên không đụng FK nào — điều đó đúng cho tới H1, khi nhánh auto_send bắt đầu
-    # ghi `messages` (role=assistant) sau khi gửi thành công. Composite FK của H0 lập tức
-    # từ chối id giả `conv1`/`cust1`, và đó là FK làm đúng việc của nó.
     await _seed_parents(
         session_factory, shop_id="shop_a", customer_id="cust1", conversation_id="conv1"
     )
@@ -188,18 +184,13 @@ async def test_safe_high_confidence_auto_enabled_sends() -> None:
         shop_auto_enabled_intents=frozenset({"general_qa"}),
     )
 
-    assert outcome.action == "auto_send"
-    assert outcome.reply_id is None
-    assert len(sender.sends) == 1
-    assert sender.sends[0] == {
-        "shop_id": "shop_a",
-        "customer_id": "cust1",
-        "text": "We are open 9-6.",
-    }
+    assert outcome.action == "park"
+    assert outcome.reply_id is not None
+    assert sender.sends == []
 
     async with session_factory() as s:
         rows = (await s.execute(select(PendingReply))).scalars().all()
-    assert rows == [], "auto_send path must NOT create a pending_reply row"
+    assert len(rows) == 1
 
     await engine.dispose()
 

@@ -83,6 +83,8 @@ class Message(Base):
     customer_id: Mapped[str] = mapped_column(Text, nullable=False)
     role: Mapped[str] = mapped_column(Text, nullable=False)  # user | assistant | seller | system
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    source_channel: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_platform_msg_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -92,6 +94,9 @@ class Message(Base):
         # Index thứ hai, KHÔNG thay thế cái trên: cái cũ phục vụ truy vấn theo shop, cái này
         # phục vụ đường đọc history của H2 (`last-N của conversation này`).
         Index("idx_msg_shop_conv_created", "shop_id", "conversation_id", "created_at"),
+        UniqueConstraint(
+            "source_channel", "source_platform_msg_id", name="uq_messages_source_event"
+        ),
         ForeignKeyConstraint(
             ["shop_id", "conversation_id"],
             ["conversations.shop_id", "conversations.id"],
@@ -181,6 +186,9 @@ class Conversation(Base):
     channel: Mapped[str] = mapped_column(Text, nullable=False)
     external_thread_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_inbound_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    next_debounce_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     window_status: Mapped[str] = mapped_column(
         Text, nullable=False, server_default="active"
     )  # active | warning | expired
@@ -218,6 +226,7 @@ class Conversation(Base):
             name="fk_conversations_customer_same_shop",
         ),
         Index("idx_conv_shop_last_inbound", "shop_id", "last_inbound_at"),
+        Index("idx_conv_debounce", "next_debounce_at"),
     )
 
 
@@ -450,4 +459,47 @@ class WebhookEventLog(Base):
     shop_id: Mapped[str] = mapped_column(Text, nullable=False)
     received_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class ShopChannelBinding(Base):
+    """A verified external page/OA bound to exactly one shop.
+
+    The composite key deliberately permits one webhook endpoint to serve many pages while
+    keeping lookup tenant-safe after a channel has verified its signed event.
+    """
+
+    __tablename__ = "shop_channel_binding"
+
+    channel: Mapped[str] = mapped_column(Text, primary_key=True)
+    endpoint: Mapped[str] = mapped_column(Text, primary_key=True)
+    page_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    shop_id: Mapped[str] = mapped_column(
+        Text, ForeignKey("shops.id", name="fk_channel_binding_shop"), nullable=False
+    )
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class WebhookOutbox(Base):
+    """Durable work created alongside an idempotency record before returning webhook ACK."""
+
+    __tablename__ = "webhook_outbox"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    channel: Mapped[str] = mapped_column(Text, nullable=False)
+    platform_msg_id: Mapped[str] = mapped_column(Text, nullable=False)
+    shop_id: Mapped[str] = mapped_column(Text, nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'delivered')", name="ck_webhook_outbox_status"
+        ),
+        UniqueConstraint("channel", "platform_msg_id", name="uq_webhook_outbox_event"),
+        Index("idx_webhook_outbox_pending", "status", "id"),
     )

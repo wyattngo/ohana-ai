@@ -1,20 +1,8 @@
-"""Draft-to-customer policy gate (spec 01 §3 Sub-task E, §4 acceptance-blocking).
+"""Draft policy gate.
 
-The ONE code path that lets a draft reach a customer without a seller in the loop. Every
-decision surface flows through `decide(...)`; there is no back-door for auto-send.
-
-Rule precedence (highest wins):
-
-  1. Sensitive intent (complaint, refund, price_negotiation, specific_order) → PARK.
-     Applies even when confidence is 1.0 and the shop has opted into auto-send. Spec §4
-     "user trust" flag: these categories BURN the seller if AI gets them wrong.
-  2. Confidence below `threshold` → PARK. Prevents a low-quality draft from riding the
-     safe-intent lane just because the shop opted in.
-  3. Shop not opted into auto-send for this intent → PARK. Shop-level consent.
-  4. Otherwise → AUTO_SEND.
-
-The blocklist is a `frozenset` — a stray `.discard()` in a later refactor would raise at
-runtime rather than silently poke a hole through the gate.
+The MPV is human-in-the-loop: every generated reply is parked for seller review. Intent and
+confidence remain in ``DraftContext`` because the next policy phase will use them to mark
+ESCALATE, but neither can send a customer message.
 """
 
 from __future__ import annotations
@@ -53,4 +41,4 @@ def decide(ctx: DraftContext, *, threshold: float = DEFAULT_CONFIDENCE_THRESHOLD
         return DraftDecision(action="park", reason="park:low_confidence")
     if not ctx.shop_auto_enabled_for_intent:
         return DraftDecision(action="park", reason="park:auto_disabled_for_intent")
-    return DraftDecision(action="auto_send", reason="send:within_policy")
+    return DraftDecision(action="park", reason="park:manual_review_required")

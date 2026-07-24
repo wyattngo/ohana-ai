@@ -32,9 +32,11 @@ from db.models import (
     Conversation,
     Message,
     PendingReply,
+    ShopChannelBinding,
     ShopKnowledge,
     ShopProfile,
     WebhookEventLog,
+    WebhookOutbox,
 )
 
 # Khai tường minh thay vì nhận string tuỳ ý: `role` sai chính tả (vd "Assistant") sẽ làm
@@ -77,6 +79,54 @@ class ConversationRepo:
             .where(Conversation.id == conversation_id)
         )
         return (await self._session.execute(stmt)).scalar_one_or_none()
+
+    async def refresh_debounce(self, conversation_id: str, *, due_at: datetime) -> bool:
+        """Push this conversation's persistent timer forward after an inbound message."""
+        stmt = (
+            update(Conversation)
+            .where(Conversation.shop_id == self._shop_scope)
+            .where(Conversation.id == conversation_id)
+            .values(next_debounce_at=due_at, last_inbound_at=datetime.now(UTC))
+        )
+        result = cast("CursorResult[Any]", await self._session.execute(stmt))
+        await self._session.commit()
+        return bool(result.rowcount)
+
+
+class DebounceRepo:
+    """Global scheduler access; only this repo may claim due conversations."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def claim_due(self, *, now: datetime, limit: int = 100) -> Sequence[Conversation]:
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        candidates = (
+            await self._session.execute(
+                select(Conversation.id)
+                .where(Conversation.next_debounce_at.is_not(None))
+                .where(Conversation.next_debounce_at <= now)
+                .order_by(Conversation.next_debounce_at)
+                .limit(limit)
+            )
+        ).scalars().all()
+        claimed: list[Conversation] = []
+        for conversation_id in candidates:
+            row = (
+                await self._session.execute(
+                    update(Conversation)
+                    .where(Conversation.id == conversation_id)
+                    .where(Conversation.next_debounce_at.is_not(None))
+                    .where(Conversation.next_debounce_at <= now)
+                    .values(next_debounce_at=None)
+                    .returning(Conversation)
+                )
+            ).scalar_one_or_none()
+            if row is not None:
+                claimed.append(row)
+        await self._session.commit()
+        return claimed
 
 
 class PendingReplyRepo:
@@ -226,6 +276,36 @@ class MessageRepo:
         await self._session.commit()
         return row
 
+    async def append_inbound_once(
+        self,
+        *,
+        conversation_id: str,
+        customer_id: str,
+        content: str,
+        channel: str,
+        platform_msg_id: str,
+    ) -> bool:
+        """Persist a webhook message once, even when a worker retries after a crash."""
+        stmt = (
+            pg_insert(Message)
+            .values(
+                shop_id=self._shop_scope,
+                conversation_id=conversation_id,
+                customer_id=customer_id,
+                role="user",
+                content=content,
+                source_channel=channel,
+                source_platform_msg_id=platform_msg_id,
+            )
+            .on_conflict_do_nothing(
+                constraint="uq_messages_source_event"
+            )
+            .returning(Message.id)
+        )
+        inserted = (await self._session.execute(stmt)).first()
+        await self._session.commit()
+        return inserted is not None
+
     async def last_n(self, conversation_id: str, *, limit: int = 20) -> list[Message]:
         """N message GẦN NHẤT của conversation này, trả theo thứ tự thời gian TĂNG dần.
 
@@ -344,3 +424,85 @@ class WebhookEventRepo:
         inserted = (await self._session.execute(stmt)).first()
         await self._session.commit()
         return inserted is not None
+
+    async def record_with_outbox(
+        self,
+        *,
+        channel: str,
+        platform_msg_id: str,
+        shop_id: str,
+        payload: dict[str, Any],
+    ) -> bool:
+        """Atomically record a new event and the work its worker must process.
+
+        A retry sees the unique event key and creates neither a second outbox row nor a
+        second draft. The webhook route will call this after channel-signature verification.
+        """
+        async with self._session.begin():
+            stmt = (
+                pg_insert(WebhookEventLog)
+                .values(channel=channel, platform_msg_id=platform_msg_id, shop_id=shop_id)
+                .on_conflict_do_nothing(index_elements=["channel", "platform_msg_id"])
+                .returning(WebhookEventLog.platform_msg_id)
+            )
+            inserted = (await self._session.execute(stmt)).first()
+            if inserted is None:
+                return False
+            self._session.add(
+                WebhookOutbox(
+                    channel=channel,
+                    platform_msg_id=platform_msg_id,
+                    shop_id=shop_id,
+                    payload=payload,
+                    status="pending",
+                )
+            )
+        return True
+
+
+class ShopChannelBindingRepo:
+    """Read verified channel ownership; webhook bodies never choose the shop."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def resolve_verified(
+        self, *, channel: str, endpoint: str, page_id: str
+    ) -> str | None:
+        stmt = (
+            select(ShopChannelBinding.shop_id)
+            .where(ShopChannelBinding.channel == channel)
+            .where(ShopChannelBinding.endpoint == endpoint)
+            .where(ShopChannelBinding.page_id == page_id)
+            .where(ShopChannelBinding.verified_at.is_not(None))
+        )
+        return (await self._session.execute(stmt)).scalar_one_or_none()
+
+
+class WebhookOutboxRepo:
+    """Minimal durable queue backed by Postgres; a worker owns delivery state."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def pending(self, *, limit: int = 100) -> Sequence[WebhookOutbox]:
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        stmt = (
+            select(WebhookOutbox)
+            .where(WebhookOutbox.status == "pending")
+            .order_by(WebhookOutbox.id)
+            .limit(limit)
+        )
+        return (await self._session.execute(stmt)).scalars().all()
+
+    async def mark_delivered(self, outbox_id: int) -> bool:
+        stmt = (
+            update(WebhookOutbox)
+            .where(WebhookOutbox.id == outbox_id)
+            .where(WebhookOutbox.status == "pending")
+            .values(status="delivered", delivered_at=datetime.now(UTC))
+        )
+        result = cast("CursorResult[Any]", await self._session.execute(stmt))
+        await self._session.commit()
+        return bool(result.rowcount)

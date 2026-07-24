@@ -226,3 +226,52 @@ async def test_record_event_concurrent_same_key_yields_one_row(fresh_db) -> None
     results = await asyncio.gather(_one(), _one())
     assert sum(results) == 1, f"đúng một True mong đợi, được {results}"
     assert await _count_events(session_factory) == 1
+
+
+async def test_record_with_outbox_is_idempotent_and_atomic(fresh_db) -> None:  # type: ignore[no-untyped-def]
+    """Retry creates one event ledger row and exactly one pending work item."""
+    from sqlalchemy import func, select
+
+    from db.models import WebhookOutbox
+    from db.repos import WebhookEventRepo
+
+    _, session_factory = await fresh_db()
+    async with session_factory() as s:
+        first = await WebhookEventRepo(s).record_with_outbox(
+            channel="zalo",
+            platform_msg_id="msg-outbox-1",
+            shop_id=_SHOP,
+            payload={"message": "xin chào"},
+        )
+    async with session_factory() as s:
+        duplicate = await WebhookEventRepo(s).record_with_outbox(
+            channel="zalo",
+            platform_msg_id="msg-outbox-1",
+            shop_id=_SHOP,
+            payload={"message": "xin chào"},
+        )
+    async with session_factory() as s:
+        outbox_count = (
+            await s.execute(select(func.count()).select_from(WebhookOutbox))
+        ).scalar_one()
+
+    assert first is True
+    assert duplicate is False
+    assert await _count_events(session_factory) == 1
+    assert outbox_count == 1
+
+
+async def test_outbox_marks_each_pending_item_once(fresh_db) -> None:  # type: ignore[no-untyped-def]
+    from db.repos import WebhookEventRepo, WebhookOutboxRepo
+
+    _, session_factory = await fresh_db()
+    async with session_factory() as s:
+        await WebhookEventRepo(s).record_with_outbox(
+            channel="zalo", platform_msg_id="msg-deliver-1", shop_id=_SHOP, payload={}
+        )
+    async with session_factory() as s:
+        repo = WebhookOutboxRepo(s)
+        rows = await repo.pending()
+        assert len(rows) == 1
+        assert await repo.mark_delivered(rows[0].id) is True
+        assert await repo.mark_delivered(rows[0].id) is False

@@ -62,9 +62,8 @@ def test_auto_disabled_for_intent_parks_even_at_high_confidence() -> None:
     assert d.action == "park"
 
 
-def test_high_confidence_safe_intent_auto_enabled_sends() -> None:
-    """All three conditions met → auto_send. The ONE path that lets a draft reach a customer
-    without a seller in the loop."""
+def test_high_confidence_safe_intent_still_requires_manual_review() -> None:
+    """MPV never sends directly, even for a safe, high-confidence answer."""
     from agent.policy_gate import DraftContext, decide
 
     d = decide(
@@ -74,7 +73,8 @@ def test_high_confidence_safe_intent_auto_enabled_sends() -> None:
             shop_auto_enabled_for_intent=True,
         )
     )
-    assert d.action == "auto_send"
+    assert d.action == "park"
+    assert d.reason == "park:manual_review_required"
 
 
 def test_default_threshold_conservative() -> None:

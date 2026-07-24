@@ -338,8 +338,8 @@ async def test_cross_shop_read_returns_empty_not_raise(fresh_db) -> None:
 
 
 @pytest.mark.asyncio
-async def test_auto_send_persists_assistant_message(fresh_db) -> None:
-    """(b) Nhánh `auto_send` ⇒ thêm ĐÚNG 1 row `role='assistant'`, SAU khi gửi thành công."""
+async def test_high_confidence_reply_still_parks_without_sending(fresh_db) -> None:
+    """MPV keeps even high-confidence replies for seller review."""
     from agent.orchestrator import receive_and_draft
     from bridge.zalo_sender import MockZaloSender
 
@@ -360,9 +360,9 @@ async def test_auto_send_persists_assistant_message(fresh_db) -> None:
         shop_auto_enabled_intents=frozenset({"product_info"}),
     )
 
-    assert outcome.action == "auto_send"
-    assert len(sender.sends) == 1
-    assert await _messages(engine, shop, conv) == [("assistant", "dạ còn size M ạ")]
+    assert outcome.action == "park"
+    assert sender.sends == []
+    assert await _messages(engine, shop, conv) == []
 
 
 @pytest.mark.asyncio
@@ -402,12 +402,8 @@ async def test_park_writes_no_assistant_message(fresh_db) -> None:
 
 
 @pytest.mark.asyncio
-async def test_failed_send_writes_no_assistant_message(fresh_db) -> None:
-    """(e) `sender.send` nổ ⇒ KHÔNG có row assistant.
-
-    Đây là test phân biệt "ghi sau khi gửi" với "ghi trước khi gửi". Ghi trước thì lịch sử
-    khai một điều chưa từng xảy ra, và AI lượt sau sẽ tưởng nó đã trả lời khách rồi.
-    """
+async def test_park_does_not_call_sender_even_if_it_would_fail(fresh_db) -> None:
+    """The manual-review MPV has no sender call before seller approval."""
     from agent.orchestrator import receive_and_draft
 
     engine, sf = await fresh_db()
@@ -415,19 +411,19 @@ async def test_failed_send_writes_no_assistant_message(fresh_db) -> None:
     async with engine.begin() as c:
         cus, conv = await _seed_shop(c, shop)
 
-    with pytest.raises(RuntimeError, match="Zalo API down"):
-        await receive_and_draft(
-            shop_id=shop,
-            customer_id=cus,
-            conversation_id=conv,
-            message="còn size M không",
-            drafter=_FakeDrafter(),
-            sender=_ExplodingSender(),
-            session_factory=sf,
-            shop_auto_enabled_intents=frozenset({"product_info"}),
-        )
+    outcome = await receive_and_draft(
+        shop_id=shop,
+        customer_id=cus,
+        conversation_id=conv,
+        message="còn size M không",
+        drafter=_FakeDrafter(),
+        sender=_ExplodingSender(),
+        session_factory=sf,
+        shop_auto_enabled_intents=frozenset({"product_info"}),
+    )
 
-    assert await _messages(engine, shop, conv) == [], "gửi THẤT BẠI mà vẫn ghi assistant"
+    assert outcome.action == "park"
+    assert await _messages(engine, shop, conv) == []
 
 
 @pytest.mark.asyncio
