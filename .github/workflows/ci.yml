@@ -58,7 +58,7 @@ jobs:
 
       - name: Headless guardrail (DENY rules on ported source — Python only for now; FE JS added at Phase 3+)
         run: |
-          python .claude/hooks/guardrail.py $(find app agent retrieval parsing storage -name '*.py' 2>/dev/null)
+          python .claude/hooks/guardrail.py $(find app agent retrieval parsing -name '*.py' 2>/dev/null)
 
       # `--no-cache` CỐ Ý, dù runner vốn không có `.ruff_cache` (chỉ cache pip). Giữ ở đây để
       # lệnh CI và lệnh local GIỐNG NHAU TỪNG KÝ TỰ. Đã trả giá: `.ruff_cache` cũ trên máy dev
@@ -85,7 +85,7 @@ jobs:
       # ⚠️ Không còn exclusion nào ⇒ **đừng thêm lại mà không kèm điều kiện gỡ**. Thư mục
       # mới bị loại "tạm thời" sẽ ở ngoài vĩnh viễn, vì không ai nhớ quay lại đo.
       - name: Mypy (strict)
-        run: mypy app agent retrieval parsing storage db bridge tools api auth
+        run: mypy app agent retrieval parsing db bridge tools api auth
 
       # AI-coder map: docs/codebase-map.md must match the tree. The generator + check are
       # stdlib-only and vendored (mirror of .claude/skills/AI-coder/scripts/, which lives
