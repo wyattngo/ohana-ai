@@ -139,7 +139,8 @@ PRE-1504: api/webhook.py build_router chữ ký hiện tại (drafter + gì nữ
 ### Phase P1 — Dọn dead code loại-2 + sửa comment nói dối
 
 <!-- ADP:PHASE P1 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=4808b0a, gate_exit=0, duration=14s, review=PASS(judge=APPROVE,model=claude-haiku-4-5-20251001,bound=953ca22155c6,tier=medium), smoke=N/A(code-removal + comment — không service runtime người dùng quan sát; đúng-sai verify bằng GATE_FULL xanh sau khi xoá (suite + mypy + ruff chứng minh 0 reader) + CI.), ran=2026-07-24T17:10
 ROADMAP: GD0-DRAFTER
 GOAL: `storage/base.py`+`storage/local.py`+`storage/__init__.py` bị xoá; `tools/registry.py::register()` + `TOOLS` global bị xoá (GIỮ `Tool` dataclass); comment "no Drafter yet" ở `app/main.py:16-19` + `api/webhook.py:8` sửa thành sự thật (LLMDrafter tồn tại từ spec 13, chưa mount vì PRE-004+PDPL). GATE_FULL xanh sau khi xoá = chứng minh code đã chết.
 APPROACH: Xoá thuần sau PRE-1501/1502 xác nhận 0 reader — nếu PRE thấy reader, DỪNG báo Wyatt (không tự migrate trong phase dọn). `Tool` dataclass GIỮ nguyên (đó là shape sống DI dùng). Comment sửa: nêu đúng trạng thái "impl có (spec 13), chưa mount — chờ GD0-ZALO/PRE-004 + chủ PDPL", không hứa hẹn thời điểm.
