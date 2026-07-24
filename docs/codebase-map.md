@@ -53,7 +53,7 @@ Count: 9 · latest on disk: `0009_webhook_event_log.py`
 
 ## Registered tool names (candidates)
 
-- `tools/registry.py` — 1 candidate name(s): `read`
+- `tools/registry.py` — 0 candidate name(s): 
 
 ## Model classes
 

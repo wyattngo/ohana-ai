@@ -16,6 +16,7 @@ a few weeks later.
 from __future__ import annotations
 
 import argparse
+import ast
 import re
 import sys
 from pathlib import Path
@@ -115,22 +116,65 @@ def section_migrations(root: Path, rel: str) -> list[str]:
     return [f"Count: {len(revs)} · latest on disk: `{revs[-1]}`", "", "```", *revs, "```"]
 
 
+TOOL_NAME = re.compile(r"[a-z][a-z0-9_]{2,40}")
+
+
+def _tool_names(text: str) -> set[str] | None:
+    """Registration sites, found structurally. Two shapes, chosen for precision:
+    a `name="x"` keyword on any call, and a string first argument to a call
+    whose name mentions tool/register (covers decorators). Dispatch-table dicts
+    are deliberately not scanned — statically, `{"tool_x": handler}` is
+    indistinguishable from a type map or a response envelope, and a map that
+    lists noise stops being read. Returns None when the source does not parse —
+    the caller falls back rather than guessing."""
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return None
+    names: set[str] = set()
+
+    def keep(v: object) -> None:
+        if isinstance(v, str) and TOOL_NAME.fullmatch(v):
+            names.add(v)
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        for kw in node.keywords:
+            if kw.arg == "name" and isinstance(kw.value, ast.Constant):
+                keep(kw.value.value)
+        func = node.func
+        fname = (func.attr if isinstance(func, ast.Attribute)
+                 else func.id if isinstance(func, ast.Name) else "")
+        if ("tool" in fname.lower() or "register" in fname.lower()) and node.args:
+            first = node.args[0]
+            if isinstance(first, ast.Constant):
+                keep(first.value)
+    return names
+
+
 def section_tools(root: Path, registries: list[str]) -> list[str]:
-    """Names registered in the project's tool sources. Pattern-based on purpose:
-    the map records what is there, and a wrong-looking entry is a finding."""
+    """Names registered in the project's tool sources. Structural where the
+    source parses; the map records what is there, and a wrong-looking entry is
+    a finding."""
     if not registries:
         return ["*no registry source configured*"]
     out = []
-    name_re = re.compile(r"""["']([a-z][a-z0-9_]{2,40})["']\s*,""")
+    fallback_re = re.compile(r"""["']([a-z][a-z0-9_]{2,40})["']""")
     for rel in registries:
         p = root / rel
         if not p.is_file():
             out.append(f"- `{rel}` — **missing**")
             continue
         text = p.read_text(encoding="utf-8", errors="replace")
-        names = sorted(set(name_re.findall(text)))
+        found = _tool_names(text) if p.suffix == ".py" else None
+        note = ""
+        if found is None:
+            found = set(fallback_re.findall(text))
+            note = " (source did not parse — pattern fallback, expect noise)"
+        names = sorted(found)
         shown = ", ".join(f"`{n}`" for n in names[:40])
-        out.append(f"- `{rel}` — {len(names)} candidate name(s): {shown}")
+        out.append(f"- `{rel}` — {len(names)} candidate name(s){note}: {shown}")
     return out
 
 

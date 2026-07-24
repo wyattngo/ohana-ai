@@ -6,10 +6,15 @@ skill knows a package name, a gate command, or a file path until it reads one.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 CONFIG_NAME = ".ai-coder.conf"
 REPEATABLE = {"pair", "registry", "invariant"}
+
+# Whitespace followed by '#' ends the value. A '#' glued to text (an anchor in
+# a regex, say) is kept — only ' # like this' reads as a comment.
+_INLINE_COMMENT = re.compile(r"\s+#.*$")
 
 
 class ProfileError(Exception):
@@ -39,6 +44,13 @@ class Profile:
         pkgs = self.words("packages")
         if not pkgs:
             raise ProfileError(f"{CONFIG_NAME}: 'packages' is empty — nothing to check")
+        bad = [p for p in pkgs if not p.isidentifier()]
+        if bad:
+            # Refuse rather than skip: a polluted list silently narrows every
+            # downstream check while still printing "ok".
+            raise ProfileError(
+                f"{CONFIG_NAME}: 'packages' contains non-package token(s): "
+                f"{' '.join(bad)!r} — fix the line before trusting any check")
         return pkgs
 
     def path(self, key: str) -> Path | None:
@@ -69,6 +81,7 @@ def load(root: Path | None = None) -> Profile:
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
+        line = _INLINE_COMMENT.sub("", line).rstrip()
         key, sep, val = line.partition("=")
         if not sep:
             raise ProfileError(f"{cfg}:{lineno}: expected 'key = value', got {line!r}")
