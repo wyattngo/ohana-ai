@@ -50,7 +50,8 @@ class Profile:
             # downstream check while still printing "ok".
             raise ProfileError(
                 f"{CONFIG_NAME}: 'packages' contains non-package token(s): "
-                f"{' '.join(bad)!r} — fix the line before trusting any check")
+                f"{' '.join(bad)!r} — fix the line before trusting any check"
+            )
         return pkgs
 
     def path(self, key: str) -> Path | None:

@@ -144,8 +144,13 @@ def _tool_names(text: str) -> set[str] | None:
             if kw.arg == "name" and isinstance(kw.value, ast.Constant):
                 keep(kw.value.value)
         func = node.func
-        fname = (func.attr if isinstance(func, ast.Attribute)
-                 else func.id if isinstance(func, ast.Name) else "")
+        fname = (
+            func.attr
+            if isinstance(func, ast.Attribute)
+            else func.id
+            if isinstance(func, ast.Name)
+            else ""
+        )
         if ("tool" in fname.lower() or "register" in fname.lower()) and node.args:
             first = node.args[0]
             if isinstance(first, ast.Constant):

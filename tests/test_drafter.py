@@ -133,9 +133,13 @@ async def test_persona_prompt_injected_into_system_message(fresh_db) -> None:
 
     systems = [m for m in llm.seen_messages[0] if m["role"] == "system"]
     assert systems, "không có system message nào — persona không được tiêm"
-    expected = build_persona_prompt(persona, shop_display_name=f"Shop {shop}")
-    assert any(m["content"] == expected for m in systems), (
-        "system message không khớp build_persona_prompt — persona/display_name sai"
+    expected_persona = build_persona_prompt(persona, shop_display_name=f"Shop {shop}")
+    # Spec 16 C0: system prompt = persona + _INJECTION_DIRECTIVE (+ _GROUNDING_DIRECTIVE
+    # khi có tool). Đổi equality → substring check: persona vẫn có mặt nguyên vẹn, chỉ
+    # được append thêm directive. Ép cứng equality = cấm bất kỳ mở rộng nào, vô lý cho
+    # spec đang chủ động nhét thêm directive vào cùng chỗ.
+    assert any(expected_persona in m["content"] for m in systems), (
+        "system message không chứa build_persona_prompt output — persona/display_name sai"
     )
 
 
@@ -161,8 +165,20 @@ async def test_history_threaded_between_system_and_current_message(fresh_db) -> 
     )
 
     contents = [m["content"] for m in llm.seen_messages[0]]
-    # H1, A1 xuất hiện theo thứ tự và trước tin hiện tại H2.
-    assert contents.index("H1") < contents.index("A1") < contents.index("H2")
+
+    # H1, A1 xâu nguyên văn (history KHÔNG wrap tag — spec 16 C0: chỉ wrap tin đang soạn,
+    # history có role tách bạch rồi). H2 (message hiện tại) được wrap <customer_message>.
+    def _find(needle: str) -> int:
+        for i, c in enumerate(contents):
+            if needle in c:
+                return i
+        raise ValueError(f"{needle!r} không có trong contents={contents!r}")
+
+    assert _find("H1") < _find("A1") < _find("H2")
+    # H2 phải nằm trong tag customer_message (spec 16 C0).
+    assert any("<customer_message>H2</customer_message>" in c for c in contents), (
+        f"H2 không được wrap <customer_message> — contents={contents!r}"
+    )
     # system đứng đầu.
     assert llm.seen_messages[0][0]["role"] == "system"
 

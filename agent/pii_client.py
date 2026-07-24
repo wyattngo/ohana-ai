@@ -51,6 +51,10 @@ class PIIFilteringClient(LLMClient):
     def __init__(self, inner: LLMClient) -> None:
         super().__init__()
         self._inner = inner
+        # Spec 16 C0 destination log: cummulative PII hits của call GẦN NHẤT. Endpoint
+        # đọc để log `hits=<dict>` (không log text). Reset đầu mỗi call. Cùng semantic
+        # với `last_usage` ở ABC — side-channel single-turn, không thread-safe cross-turn.
+        self.last_hits: dict[str, int] = {}
 
     # ── redact helpers ──────────────────────────────────────────────────────────────
 
@@ -98,6 +102,53 @@ class PIIFilteringClient(LLMClient):
         """
         return [cls._redact_message(m) for m in messages]
 
+    def _redact_and_track(self, messages: list[ChatMessage]) -> list[ChatMessage]:
+        """B0 fail-closed redact + C0 hits tracking. Reset `last_hits` đầu mỗi call, gộp
+        `hits` từ mọi message text sau redact. Endpoint đọc `last_hits` để log destination
+        (spec 16 C0: `hits=<dict>` KHÔNG log text).
+
+        Dùng bare `redact` (top-level import) để test monkeypatch `pc.redact` áp cứng
+        (fail-closed test của B0). Import local trong function tạo binding mới mỗi call,
+        làm monkeypatch vô hiệu — bug đã dính khi ship C0.
+        """
+        total: dict[str, int] = {}
+
+        def _track_str(s: str) -> str:
+            r = redact(s)
+            for k, v in r.hits.items():
+                total[k] = total.get(k, 0) + v
+            return r.text
+
+        redacted: list[ChatMessage] = []
+        for msg in messages:
+            content = msg.get("content")
+            if isinstance(content, str):
+                new_content: str | list[ContentPart] = _track_str(content)
+            elif isinstance(content, list):
+                new_parts: list[ContentPart] = []
+                for part in content:
+                    if part.get("type") == "text":
+                        new_parts.append(
+                            {"type": "text", "text": _track_str(str(part.get("text", "")))}
+                        )
+                    else:
+                        new_parts.append(part)
+                new_content = new_parts
+            else:
+                new_content = redact(content)  # fail-closed cho shape lạ
+
+            new_msg: ChatMessage = {"role": msg["role"], "content": new_content}
+            if "tool_calls" in msg:
+                new_msg["tool_calls"] = msg["tool_calls"]
+            if "tool_call_id" in msg:
+                new_msg["tool_call_id"] = msg["tool_call_id"]
+            if "name" in msg:
+                new_msg["name"] = msg["name"]
+            redacted.append(new_msg)
+
+        self.last_hits = total
+        return redacted
+
     # ── delegate ────────────────────────────────────────────────────────────────────
 
     async def complete(
@@ -108,7 +159,7 @@ class PIIFilteringClient(LLMClient):
         temperature: float = 0.7,
         max_tokens: int | None = None,
     ) -> str:
-        redacted = self._redact_messages(messages)
+        redacted = self._redact_and_track(messages)
         result = await self._inner.complete(
             redacted, model=model, temperature=temperature, max_tokens=max_tokens
         )
@@ -124,7 +175,7 @@ class PIIFilteringClient(LLMClient):
         temperature: float = 0.7,
         max_tokens: int | None = None,
     ) -> AssistantStep:
-        redacted = self._redact_messages(messages)
+        redacted = self._redact_and_track(messages)
         result = await self._inner.step(
             redacted,
             tools=tools,
@@ -150,7 +201,7 @@ class PIIFilteringClient(LLMClient):
         native đó với messages đã redact; (2) người đọc thấy ngay 3 method đều cover
         thay vì phải đọc ABC để suy ra.
         """
-        redacted = self._redact_messages(messages)
+        redacted = self._redact_and_track(messages)
         async for event in self._inner.step_stream(
             redacted,
             tools=tools,
@@ -175,7 +226,7 @@ class PIIFilteringClient(LLMClient):
         nghĩa là subclass check sẽ TypeError. Giữ nguyên semantic redact-then-delegate;
         nếu ai thêm consumer sau này, wrapper đã sẵn.
         """
-        redacted = self._redact_messages(messages)
+        redacted = self._redact_and_track(messages)
         return self._inner.stream(
             redacted, model=model, temperature=temperature, max_tokens=max_tokens
         )
