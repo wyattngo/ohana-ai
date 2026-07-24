@@ -1,6 +1,6 @@
 # Vendored AI-coder map generator
 
-`gen_codebase_map.py` + `profile.py` are **mirrors** of the canonical skill at
+`gen_codebase_map.py` + `conf.py` are **mirrors** of the canonical skill at
 `.claude/skills/AI-coder/scripts/` (outside this repo, so CI cannot reach it).
 
 CI runs `gen_codebase_map.py --check` to fail the build if `docs/…-map.md` no
