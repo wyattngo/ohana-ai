@@ -1,6 +1,6 @@
 # ROADMAP STATUS — ohana-ai (L3, SINH MÁY)
 
-> **AUTO-GENERATED bởi `.claude/tools/adp-roadmap.sh` @ 2026-07-24T17:10.**
+> **AUTO-GENERATED bởi `.claude/tools/adp-roadmap.sh` @ 2026-07-24T21:29.**
 > Đây là VIEW join từ L1 (`docs/ROADMAP.md`) × L2 (`docs/tasks/*.md`) × git — **KHÔNG phải source of truth**.
 > ĐỪNG sửa tay phía trên `NOTES_HUMAN`. Muốn đổi kế hoạch → sửa L1. Muốn đổi trạng thái → chạy `adp-checkpoint.sh`.
 
@@ -8,7 +8,7 @@
 
 **Internal: 13/36 work item hoàn tất (36%)** ← đây là mẫu số của "100% Roadmap"
 External: 0/9 (0%) — chờ bên thứ ba, **không tính vào 100%**
-Phase gate-passed: 39/52
+Phase gate-passed: 40/57
 
 
 
@@ -41,7 +41,7 @@ Phase gate-passed: 39/52
 | `GD0-UI` | ✅ DONE | 3/3 | 04:P0 04:P1 04:P2  |
 | `GD0-WIKI` | ⛔ BLOCKED | 1/2 | 01:3 03:3  |
 | `GD0-WINDOW` | ⛔ BLOCKED | 0/1 | 03:10  |
-| `GD0-ZALO` | ⛔ BLOCKED | 0/1 | 03:2  |
+| `GD0-ZALO` | ⛔ BLOCKED | 1/6 | 03:2 17:P0 17:P1 17:P2 17:P3 17:P4  |
 | `GD1-STATE` | ⚪ chưa có spec | 0/0 | — |
 | `GD2-ANALYTICS` | ⚪ chưa có spec | 0/0 | — |
 | `GD2-CARRIER` | ⚪ chưa có spec | 0/0 | — |
@@ -59,7 +59,7 @@ Phase gate-passed: 39/52
 |---|---|---|---|
 | `GD0-TOOLS` | ⛔ BLOCKED | 1/2 | 01:4 03:4  |
 | `GD0-WINDOW` | ⛔ BLOCKED | 0/1 | 03:10  |
-| `GD0-ZALO` | ⛔ BLOCKED | 0/1 | 03:2  |
+| `GD0-ZALO` | ⛔ BLOCKED | 1/6 | 03:2 17:P0 17:P1 17:P2 17:P3 17:P4  |
 | `GD1-COD` | ⚪ chưa có spec | 0/0 | — |
 | `GD1-PAY` | ⚪ chưa có spec | 0/0 | — |
 | `GD1-SHIP` | ⚪ chưa có spec | 0/0 | — |

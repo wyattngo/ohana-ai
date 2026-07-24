@@ -67,7 +67,8 @@
 ### P0 — Config + token storage foundation
 
 <!-- ADP:PHASE P0 -->
-STATUS: IN_PROGRESS
+STATUS: DONE
+EVIDENCE: commit=7474604, gate_exit=0, duration=15s, review=PASS(judge=APPROVE,model=unknown,bound=fd6dc882d059,tier=medium), smoke=N/A(P0 hàm data-layer thuần, không có mặt runtime người dùng quan sát; alembic upgrade/downgrade round-trip đo trong test là đủ.), ran=2026-07-24T21:29
 ROADMAP: GD0-ZALO
 GOAL: Có bảng `zalo_oa_tokens(shop_id PK, oa_id, access_token, refresh_token, access_expires_at, refresh_expires_at, oa_secret_key, updated_at)` + migration idempotent + repo có method `get_by_shop(shop_id)` và `update_tokens_locked(shop_id, ...)` với `SELECT ... FOR UPDATE`. Env vars `ZALO_APP_ID`, `ZALO_APP_SECRET_KEY` thêm vào `.env.example` (rỗng, nhóm dưới ZALO_ hiện có). Chưa có runtime user quan sát; đúng-sai chứng minh bằng test tất định trên repo + alembic upgrade/downgrade round-trip.
 APPROACH: `oa_secret_key` để CÙNG bảng với token vì cả hai đều per-OA và cùng vòng đời (liên kết OA↔App), KHÔNG tách sang `shops` — tách = 2 truy vấn mỗi webhook + 2 nơi phải xoay khi rotate. `access_expires_at` là `TIMESTAMPTZ` không phải `expires_in` seconds vì thời điểm hết hạn không đổi khi row bị đọc lại — lưu `expires_in` phải cộng `now()` mỗi lần đọc, dễ off-by-race. `update_tokens_locked` dùng `SELECT ... FOR UPDATE` (Postgres row lock, không advisory lock) vì scope lock = 1 row = shop_id — advisory lock global làm serialize refresh giữa shops không cần thiết. Alternative đã bỏ: dùng `shops.zalo_*` cột — làm shops row hot (mọi request đọc), và migration retrofit đắt sau khi có data.
