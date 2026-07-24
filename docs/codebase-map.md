@@ -18,7 +18,6 @@ is rewritten by `gen_codebase_map.py` and must not be hand-edited.
 | `db` | 15 |
 | `parsing` | 4 |
 | `retrieval` | 3 |
-| `storage` | 3 |
 | `tools` | 5 |
 
 ## Modules
@@ -32,7 +31,6 @@ is rewritten by `gen_codebase_map.py` and must not be hand-edited.
 **`db/`** — `env.py` · `0001_initial_tenant_first.py` · `0002_pending_reply.py` · `0003_foundation_entities.py` · `0004_embedding_dim_1024.py` · `0005_conversation_unique.py` · `0006_message_conversation_fk.py` · `0007_shops_profile.py` · `0008_pending_reply_snapshot_ttl_label.py` · `0009_webhook_event_log.py` · `models.py` · `repos.py` · `session.py` · `shop_repo.py`
 **`parsing/`** — `chunk.py` · `extract.py` · `ingest.py`
 **`retrieval/`** — `base.py` · `pgvector.py`
-**`storage/`** — `base.py` · `local.py`
 **`tools/`** — `ohana_read.py` · `registry.py` · `shop_kb.py` · `wiki.py`
 
 ## Migrations

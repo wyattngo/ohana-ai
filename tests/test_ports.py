@@ -52,5 +52,6 @@ def test_parsing_imports_clean() -> None:
     _compile_and_grep(sorted((REPO / "parsing").glob("*.py")))
 
 
-def test_storage_imports_clean() -> None:
-    _compile_and_grep(sorted((REPO / "storage").glob("*.py")))
+# Phase 1.2 port sanity for `storage/` retired: spec 15 P1 deleted the package
+# (0 reader — DI drafter took over). See tests/test_runtime_wiring.py for the
+# invariant that keeps it gone.

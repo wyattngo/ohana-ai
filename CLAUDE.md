@@ -20,7 +20,7 @@ pytest -q                   # default gate — live test bị loại (addopts: -
 pytest -q -x                # GATE_RUNNER của ADP, dừng ở lỗi đầu
 ruff check . --no-cache     # lint (E,F,I,B,UP,S — gồm bandit S). --no-cache BẮT BUỘC: xem §4
 ruff format --check . --no-cache
-mypy app agent retrieval parsing storage db bridge tools api auth   # strict; TOÀN BỘ code sản phẩm, không loại thư mục nào
+mypy app agent retrieval parsing db bridge tools api auth   # strict; TOÀN BỘ code sản phẩm, không loại thư mục nào
 alembic upgrade head        # cần DATABASE_URL trỏ Postgres+pgvector
 
 # Live smoke — real net, nondeterministic, KHÔNG chạy trong CI. Chạy tay khi đổi model/endpoint:
@@ -67,7 +67,6 @@ agent/        orchestrator (history load + cap kép) · llm_client · embedder �
 channels/     base (Protocol) · identity (resolve_conversation — upsert, race-safe) · zalo/ adapter
 retrieval/    pgvector.py — PgvectorRetriever(shop_scope=) hard filter SQL-level
 parsing/      chunk · ingest · extract (Wiki doc)
-storage/      base · local
 bridge/       ohana_client (REST platform API, verify=True) · zalo_sender (MockZaloSender)
 auth/         identity.py — HS256 JWT (user_id, shop_id, role) · require_admin · CSRF
 tools/        registry · wiki (search_wiki) · ohana_read (order_status) · shop_kb (lookup_size/lookup_shipping — tất định, KHÔNG RAG)
@@ -108,7 +107,8 @@ docs/tasks/           L2 spec — sinh **JIT khi code**, KHÔNG preemptive
 | Từ `drnickv4/` | Sang `ohana-ai/` | Ghi chú |
 |---|---|---|
 | `agent/llm_client.py` + `providers/` | cùng path | reuse nguyên |
-| `agent/embedder.py`, `retrieval/`, `parsing/`, `storage/` | cùng path | reuse — thêm `shop_id` scope SQL-level |
+| `agent/embedder.py`, `retrieval/`, `parsing/` | cùng path | reuse — thêm `shop_id` scope SQL-level |
+| `storage/` | ~~cùng path~~ | Ported, then retired spec 15 P1 (0 reader — DI drafter took over). |
 | `agent/orchestrator.py` | cùng path | adapt async cho pending_reply |
 | `tools/registry.py` | cùng path | port nguyên shape Tool dataclass |
 | `bridge/onfa_client.py` | `bridge/ohana_client.py` | viết mới, pattern REST + `verify=True` |

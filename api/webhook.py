@@ -5,9 +5,12 @@ registry the caller passes in, `{external_id}` is the per-shop endpoint id that 
 gateway was configured with. Nothing in this module knows which platforms exist — adding one
 means registering an adapter, not editing request handling (roadmap §5.2.1).
 
-Still NOT mounted in `app/main.py`: there is no concrete `Drafter` implementation yet, and
-mounting would expose a path that reaches the draft engine. `enabled=False` is a second,
-independent guard so even a mounted router refuses by default until PRE-004 clears.
+Still NOT mounted in `app/main.py`: `agent/drafter.py::LLMDrafter` shipped in spec 13, so a
+concrete `Drafter` exists — the block is customer-inbound safety, not missing code. Mounting
+opens the path that reaches the draft engine, which requires Zalo signature-verify + creds
+(`GD0-ZALO`, PRE-004, blocked on Tân) and starts the PDPL 60-day clock (workflow §2.5, no
+legal owner yet). `enabled=False` is a second, independent guard so even a mounted router
+refuses by default until PRE-004 clears.
 
 `shop_id` is DERIVED from `(channel, external_id)` via lookup. The request body is untrusted
 and MUST NOT supply a shop_id claim (R1.1 extended) — note the body is handed straight to the
