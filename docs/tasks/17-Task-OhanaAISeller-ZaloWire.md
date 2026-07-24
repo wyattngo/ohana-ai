@@ -91,17 +91,18 @@ REVIEW: PASS ref=docs/reviews/17-P0-auto-verdict.json
 ### P1 — Signature verify at `api/webhook.py:88`
 
 <!-- ADP:PHASE P1 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 ROADMAP: GD0-ZALO
 GOAL: Payload không có header `X-ZEvent-Signature` HOẶC hash sai → HTTP 401 TRƯỚC khi `parse_inbound` chạy. Hash đúng (per `sha256_hex(app_id + raw_body_bytes.decode("utf-8") + timestamp + oa_secret_key)`, key = OA Secret Key per-shop từ `zalo_oa_tokens`, timestamp = `data["timestamp"]` string trong body) → pass, downstream nhận raw body đã verify. Verify chạy 1 lần trên raw bytes, downstream re-parse cùng bytes đó (không re-await `req.body()`). Test golden fixture: valid → 200, wrong sig → 401, missing header → 401, malformed JSON body → 400, replay attack (timestamp cũ >5min) → 401, oa_id không nhận diện được → 401.
 APPROACH: Verify TRƯỚC parse là chốt chặn — nếu parse trước rồi verify, `pydantic` đã có thể throw hoặc leak side-effect. `hmac.compare_digest` (constant-time) chống timing attack. Timestamp check ±5min chống replay — cửa sổ hẹp vì Zalo push realtime, không cần lỏng. **Key lookup: `oa_id` KHÔNG có ở top-level webhook** (chỉ `app_id` — bẫy #2, gọn hơn mẫu code third-party). Suy `oa_id` từ candidate `{sender.id, recipient.id}`: với `user_send_*` event, `recipient.id` là oa_id; với `oa_send_*` echo, `sender.id` là oa_id. Verify lookup thử cả 2 IDs vào `zalo_oa_tokens.oa_id` — 1 match → dùng `oa_secret_key` từ row đó; 0 match → 401 (không nhận diện). Index `idx_zalo_oa_tokens_oa_id` tra nhanh. `oa_id` KHÔNG PHẢI shop_id — 1 shop có thể có nhiều OA (multi-brand), 1 OA thuộc đúng 1 shop. Alternative đã bỏ: giả định `body["oa_id"]` — SAI, envelope Zalo không có field này (đã xác từ docs 2026-07-24). Alternative đã bỏ: verify sau parse — nếu parse throw, ta không biết đã verify hay chưa, tạo confusion khi debug. Alternative đã bỏ: dùng App Secret Key thay OA Secret Key — sai key = 100% verify fail dù hash đúng, đây là bẫy #1.
-ALLOWED_FILES: api/webhook.py, channels/zalo/signature.py, db/migrations/versions/0011_zalo_oa_tokens_oa_id_index.py, db/repos.py, tests/test_zalo_signature.py, tests/test_webhook_signature.py, docs/tasks/17-Task-OhanaAISeller-ZaloWire.md, docs/smokes/, docs/reviews/
+ALLOWED_FILES: api/webhook.py, channels/zalo/signature.py, channels/zalo/__init__.py, db/repos.py, docs/codebase-map.md, tests/test_zalo_signature.py, tests/test_webhook_signature.py, tests/test_channel_abstraction.py, tests/test_message_history.py, docs/tasks/17-Task-OhanaAISeller-ZaloWire.md, docs/smokes/, docs/reviews/
 GATE: .venv/bin/python -m pytest tests/test_zalo_signature.py tests/test_webhook_signature.py -x -q
 GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && .venv/bin/mypy app agent retrieval parsing db bridge tools api auth && .venv/bin/ruff check . --no-cache && .venv/bin/ruff format --check . --no-cache && .venv/bin/python .claude/hooks/guardrail.py $(find app agent retrieval parsing -name '*.py') && python3 scripts/ai_coder/gen_codebase_map.py --check && python3 scripts/roadmap_derive.py verify
 RETRY: 0/3
 RISK: high (✅ WYATT KÝ 2026-07-24. Security control tại boundary — verify sót = attacker inject tin khách giả mạo vào draft engine, tin lỗi rời máy khi P4 mount. Floor: `api/webhook.py` ∈ RISK_PATHS.)
 BLOCKED_BY: P0 DONE (cần bảng `zalo_oa_tokens` + `oa_secret_key` column để lookup key theo `oa_id`)
 SMOKE: N/A P1 signature verify là hàm thuần + endpoint test; không có runtime mount (P4 blocked); test tất định trên golden fixture đủ chứng minh. Runtime observation phải chờ P4 mount + Zalo push thật.
+REVIEW: PASS ref=docs/reviews/17-P1-auto-verdict.json human=docs/reviews/17-P1-human-review.md
 <!-- /ADP -->
 
 1. Test (**RED first — RISK:high yêu cầu TDD chặt**): viết `tests/test_zalo_signature.py` — 7 case tất định (valid với oa_id match qua recipient.id, valid với oa_id match qua sender.id [echo], wrong-sig, missing-header, malformed-body, replay-old-timestamp, tampered-body-same-timestamp, oa_id không có trong DB). Confirm ĐỎ.

@@ -14,8 +14,13 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from fastapi import Request
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
 from bridge.zalo_sender import ZaloSender
 from channels.base import InboundMessage
+from channels.zalo.signature import verify_zalo_signature
+from db.repos import ZaloOATokenRepo
 
 
 class ZaloChannel:
@@ -23,6 +28,24 @@ class ZaloChannel:
 
     def __init__(self, *, sender: ZaloSender) -> None:
         self._sender = sender
+
+    async def verify_signature(
+        self, req: Request, session_factory: async_sessionmaker[AsyncSession]
+    ) -> bytes:
+        """Verify webhook signature TRƯỚC parse — trả raw body verified hoặc raise HTTPException.
+
+        Đây là seam channel-scoped: `api/webhook.py` KHÔNG biết Zalo hay Messenger dùng scheme
+        gì; nó gọi `adapter.verify_signature(req, session_factory)`. Adapter THIẾU method này
+        ⇒ core raise 501 (spec 17 P1 HIGH 1: fail-loud, KHÔNG silent-skip) — nên production
+        adapter BẮT BUỘC implement, test adapter cố tình no-op để bypass tường minh.
+
+        Session_factory được tiêm thay vì repo instance vì lookup key là 1 short-lived query,
+        không muốn giữ session mở qua toàn request lifecycle. Repo tự đóng session khi ra khỏi
+        `async with`.
+        """
+        async with session_factory() as session:
+            repo = ZaloOATokenRepo(session)
+            return await verify_zalo_signature(req, repo.get_oa_secret_by_oa_id)
 
     def parse_inbound(self, payload: Mapping[str, Any]) -> InboundMessage:
         # PRE-004 placeholder envelope. Missing sender id is fatal, never defaulted — a

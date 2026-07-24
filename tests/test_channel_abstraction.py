@@ -142,12 +142,22 @@ async def test_brand_new_channel_routes_end_to_end_without_touching_core(fresh_d
     engine, session_factory = await fresh_db()
 
     class FakeChannel:
-        """Một kênh tưởng tượng. Core chưa từng biết nó tồn tại."""
+        """Một kênh tưởng tượng. Core chưa từng biết nó tồn tại.
+
+        `verify_signature` là no-op — test-only bypass tường minh (spec 17 P1 HIGH 1 fix:
+        webhook.py giờ raise 501 nếu adapter thiếu method, thay silent skip). Test chứng minh
+        adapter mới KHÔNG BỊ CẤM có verify no-op — nhưng production adapter PHẢI verify thật.
+        """
 
         name = "fakechan"
 
         def __init__(self) -> None:
             self.sent: list[dict[str, str]] = []
+
+        async def verify_signature(self, req, session_factory):  # type: ignore[no-untyped-def]
+            # Test-only: chấp nhận mọi request, chỉ trả raw body. Production adapter (như
+            # ZaloChannel) phải verify hash + replay + oa_id lookup.
+            return await req.body()
 
         def parse_inbound(self, payload):  # type: ignore[no-untyped-def]
             return InboundMessage(external_user_id=payload["uid"], text=payload["body"])

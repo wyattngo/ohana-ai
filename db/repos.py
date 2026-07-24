@@ -378,10 +378,17 @@ class ZaloOATokenRepo:
     async def get_oa_secret_by_oa_id(self, oa_id: str) -> str | None:
         """Verify key theo `oa_id` — dùng ở P1 signature verify.
 
-        `oa_id` KHÔNG unique ở DB (2 shop có thể liên kết cùng OA test), nhưng ở runtime
-        thật 1 OA thuộc 1 shop. Nếu trùng ⇒ trả secret của row scan đầu tiên; caller (P1
-        verify) chỉ cần secret đúng, không cần scope. `LIMIT 1` để không phụ thuộc thứ tự
-        row ngầm.
+        `oa_id` KHÔNG unique ở DB (2 shop có thể liên kết cùng OA test/shared brand). Ở
+        runtime thật, **operational requirement là 1 OA thuộc 1 shop per env** — enforcement
+        ở tầng onboard/admin, không tầng DB constraint (để test env chia sẻ OA giữa 2 shop
+        dev/staging). `LIMIT 1` không xác định row nào — thứ tự do Postgres quyết, có thể
+        đổi giữa các version.
+
+        **P1 review MED 4 defer to P4:** khi P4 land `endpoint_to_shop` map với binding
+        `(channel, external_id) → (shop_id, allowed_oa_ids)`, verify sẽ check candidate ∈
+        allowed_oa_ids trước khi tra secret — lookup ambiguity không còn nguy hiểm vì
+        endpoint đã pre-declare oa_id nào chấp nhận. Hôm nay P4 BLOCKED, gap này chỉ
+        materialize khi mount (enabled=True) + có multi-shop shared oa_id trong DB thật.
         """
         stmt = select(ZaloOAToken.oa_secret_key).where(ZaloOAToken.oa_id == oa_id).limit(1)
         return (await self._session.execute(stmt)).scalar_one_or_none()

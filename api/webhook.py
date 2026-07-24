@@ -21,9 +21,10 @@ When PRE-004 lands: verify the platform signature over the RAW body before parsi
 
 from __future__ import annotations
 
-from typing import Any, Protocol
+import json
+from typing import Protocol
 
-from fastapi import APIRouter, Body, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from agent.orchestrator import Drafter, ReceiveOutcome, receive_and_draft
@@ -74,8 +75,11 @@ def build_router(
         channel: str,
         external_id: str,
         req: Request,
-        payload: dict[str, Any] = Body(...),
     ) -> dict[str, object]:
+        # ⚠️ `Body(...)` đã bị GỠ (spec 17 P1): FastAPI parse body TRƯỚC handler chạy, tức
+        # payload đã được đọc + parse trước signature verify — mất tính "verify raw bytes".
+        # Giờ đọc raw body qua verify, downstream re-parse cùng bytes để đảm bảo consistency.
+
         if not enabled:
             raise HTTPException(status_code=503, detail="webhook_disabled")
 
@@ -88,8 +92,26 @@ def build_router(
             # Same shape as "unknown channel" — do not leak which endpoints are registered.
             raise HTTPException(status_code=404, detail="unknown_endpoint")
 
-        # TODO(PRE-004): verify platform signature over the RAW body BEFORE parsing.
-        _ = req  # kept for the signature-verify pass — do not remove.
+        # Spec 17 P1: verify signature TRƯỚC parse — chốt chặn duy nhất giữa "webhook mở"
+        # và "adapter đọc payload". Verify FAIL ⇒ HTTPException 401/400 bubble lên FastAPI,
+        # parse_inbound KHÔNG chạy.
+        #
+        # Core KHÔNG biết channel dùng scheme gì (Zalo dùng sha256+OA-secret, Messenger sẽ
+        # dùng HMAC-SHA1+App-secret, v.v). Verify là method của adapter — Core chỉ hỏi
+        # `adapter.verify_signature(...)`.
+        #
+        # **Fail-loud khi adapter thiếu method** (P1 review HIGH 1): trả 501 chứ KHÔNG skip.
+        # Silent skip = adapter mới quên implement ⇒ bypass security control mà không tín
+        # hiệu. 501 làm oncall thấy ngay khi enabled=True + first request. Test FakeChannel
+        # phải add no-op verify_signature (ok — test-only bypass là intent tường minh).
+        verify_fn = getattr(adapter, "verify_signature", None)
+        if verify_fn is None:
+            raise HTTPException(
+                status_code=501,
+                detail="channel_verify_not_implemented",
+            )
+        raw = await verify_fn(req, session_factory)
+        payload = json.loads(raw)
 
         try:
             msg = adapter.parse_inbound(payload)

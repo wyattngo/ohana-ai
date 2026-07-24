@@ -1,0 +1,80 @@
+{
+  "spec": "17-Task-OhanaAISeller-ZaloWire",
+  "phase": "P1",
+  "reviewer": "output-evaluator (Sonnet, project-override)",
+  "reviewed_at": "2026-07-24",
+  "verdict": "APPROVE",
+  "scores": {
+    "correctness": 8,
+    "completeness": 8,
+    "safety": 8,
+    "ai_invariants": 10,
+    "style": 8
+  },
+  "overall_score": 8.4,
+  "resolution_note": "Initial verdict NEEDS_REVIEW với 2 HIGH + 2 MED + 2 LOW. Sau khi apply fix: HIGH 1 (adapter protocol bypass) RESOLVED bằng cách raise HTTP 501 nếu adapter thiếu verify_signature (fail-loud thay silent skip); FakeChannel trong 2 test file thêm no-op verify_signature. HIGH 2 (endpoint↔oa_id binding) DOCUMENTED as known gap defer to P4 với inline TODO reference (P4 land shops.zalo_oa_id + endpoint_to_shop enhanced map). MED 3 (PII logging) RESOLVED bằng logger.info → logger.debug cho sender/recipient IDs. MED 4 (repo docstring ambiguity) RESOLVED bằng expanded docstring giải thích operational-vs-DB constraint + P4 defer reference. LOW 5 (future timestamp test) RESOLVED — added test_replay_future_timestamp_raises_401. LOW 6 (int() defensive parsing) WAIVED — ValueError already caught and mapped 400 correctly. Diff hash recomputed after all fixes.",
+  "issues_verified": [
+    {
+      "severity": "high",
+      "file": "api/webhook.py",
+      "line": 105,
+      "status": "RESOLVED",
+      "description": "Adapter Protocol optional bypass → hard 501 raise. Test FakeChannel opted into no-op verify_signature."
+    },
+    {
+      "severity": "high",
+      "file": "channels/zalo/signature.py",
+      "line": 89,
+      "status": "DEFERRED_P4",
+      "description": "Endpoint↔oa_id confused-deputy gap. Documented inline + spec P4 goal will bind (channel, external_id) → (shop_id, allowed_oa_ids). Materialize only when P4 mounts (enabled=True + multi-shop shared oa_id)."
+    },
+    {
+      "severity": "medium",
+      "file": "channels/zalo/signature.py",
+      "line": 99,
+      "status": "RESOLVED",
+      "description": "logger.info → logger.debug cho sender/recipient IDs (PDPL data-minimization)."
+    },
+    {
+      "severity": "medium",
+      "file": "db/repos.py",
+      "line": 386,
+      "status": "RESOLVED",
+      "description": "Docstring expanded — operational requirement (unique oa_id per shop per env) + P4 defer note."
+    },
+    {
+      "severity": "low",
+      "file": "tests/test_zalo_signature.py",
+      "line": 163,
+      "status": "RESOLVED",
+      "description": "Added test_replay_future_timestamp_raises_401 để cover bi-directional window."
+    },
+    {
+      "severity": "low",
+      "file": "channels/zalo/signature.py",
+      "line": 75,
+      "status": "WAIVED",
+      "description": "int() ValueError caught → 400 correctly. Explicit regex validation nice-to-have but not blocking."
+    }
+  ],
+  "verified_dimensions": {
+    "correctness": "Signature formula matches docs Zalo canonical (sha256+app_id+data+timestamp+OAsecret). Raw body preserved through verify → downstream re-parse. Replay window bi-directional (`abs()`). hmac.compare_digest constant-time.",
+    "completeness": "8 unit + 4 endpoint + 1 future timestamp = 13 tests cover valid via recipient+sender/wrong sig/missing header/malformed body/replay past+future/tampered body/unknown oa_id/parse-skipped-on-verify-fail. Missing: multi-shop shared oa_id (deferred to P4 with test hook).",
+    "safety": "Verify TRƯỚC parse enforced (test proves parse_count=0 on verify fail). Fail-loud 501 if adapter missing method. PII logs demoted to DEBUG. HIGH 2 confused-deputy documented + P4 defer.",
+    "ai_invariants": "No LLM interaction in P1. Boundary preserved: raw body from Zalo untrusted → verify → payload trusted. `hasattr` pattern replaced with strict raise — no silent bypass.",
+    "style": "Vietnamese comments explain WHY (why raise 501, why DEBUG not INFO, why P4 defer). File exclusion + review references inline for future readers."
+  },
+  "gate_result": {
+    "pytest_fast": "13/13 PASS (test_zalo_signature 9 + test_webhook_signature 4)",
+    "pytest_full": "233/233 PASS (baseline 220 + 13 P1)",
+    "mypy": "0 issues in 55 files",
+    "ruff_check": "clean (--no-cache)",
+    "ruff_format": "clean (--no-cache)",
+    "guardrail": "23 paths, 0 DENY, 0 WARN",
+    "codebase_map": "current",
+    "roadmap_derive": "26/26 anchored"
+  },
+  "diff_sha256": "18f93914eef78c2da13e5253ff4281bba7bc7b3b2abcbf1a58e2a5b673aa3e9b",
+  "stamped_at": "2026-07-24T22:04",
+  "model": "unknown"
+}

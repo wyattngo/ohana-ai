@@ -454,6 +454,11 @@ async def test_inbound_persisted_through_real_webhook_route(fresh_db) -> None:
     class FakeChannel:
         name = "fakechan"
 
+        async def verify_signature(self, req, session_factory):  # type: ignore[no-untyped-def]
+            # Spec 17 P1: webhook.py raise 501 nếu adapter thiếu verify_signature. Test-only
+            # no-op — production adapter (ZaloChannel) verify HMAC thật.
+            return await req.body()
+
         def parse_inbound(self, payload):  # type: ignore[no-untyped-def]
             return InboundMessage(external_user_id=payload["uid"], text=payload["body"])
 
