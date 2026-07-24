@@ -9,7 +9,7 @@ is rewritten by `gen_codebase_map.py` and must not be hand-edited.
 
 | Package | Files |
 |---|---:|
-| `agent` | 13 |
+| `agent` | 14 |
 | `api` | 6 |
 | `app` | 4 |
 | `auth` | 2 |
@@ -23,7 +23,7 @@ is rewritten by `gen_codebase_map.py` and must not be hand-edited.
 
 ## Modules
 
-**`agent/`** — `drafter.py` · `embedder.py` · `llm_client.py` · `orchestrator.py` · `persona.py` · `pii.py` · `policy_gate.py` · `openai_client.py` · `openai_embedder.py` · `together_client.py` · `together_embedder.py`
+**`agent/`** — `drafter.py` · `embedder.py` · `llm_client.py` · `orchestrator.py` · `persona.py` · `pii.py` · `pii_client.py` · `policy_gate.py` · `openai_client.py` · `openai_embedder.py` · `together_client.py` · `together_embedder.py`
 **`api/`** — `admin.py` · `chat.py` · `inbox.py` · `mock_auth.py` · `webhook.py`
 **`app/`** — `alert_service.py` · `config.py` · `main.py`
 **`auth/`** — `identity.py`

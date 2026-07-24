@@ -1,0 +1,23 @@
+{
+  "verdict": "APPROVE",
+  "model": "claude-sonnet-5 (via output-evaluator Ohana project override, DEC-OHANA-07)",
+  "scores": {
+    "correctness": 9,
+    "completeness": 9,
+    "safety": 9,
+    "ai_invariants": 9
+  },
+  "overall_score": 9,
+  "issues": [
+    {
+      "severity": "low",
+      "file": "agent/pii_client.py",
+      "line": 165,
+      "description": "stream() method returns AsyncIterator directly without await; semantically correct per ABC signature but could be clearer in docstring that exception from redact() happens before iterator is returned"
+    }
+  ],
+  "summary": "PIIFilteringClient chokepoint pattern correctly implemented as LLMClient decorator. All 4 callable methods covered with proper fail-closed semantics — redaction happens synchronously BEFORE any inner call. Bypass-proof test strategy validates wrapper is on the HTTP request path, not just that redaction logic works. Tool-result messages properly redacted; metadata preserved.",
+  "suggestion": "READY FOR CHECKPOINT. Pass through adp-checkpoint.sh for GATE_FULL + smoke test validation (R1-R3 checklist in docs/smokes/16-B0.md already documented).",
+  "diff_sha256": "b07fe9fdc12d8637763c601683fb78957cfb3afa96b28b5d909a55953b581654",
+  "stamped_at": "2026-07-24T15:15"
+}

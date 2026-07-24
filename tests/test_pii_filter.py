@@ -219,3 +219,304 @@ def test_non_str_input_raises() -> None:
     và lớp bọc B0 fail-closed cần một exception để bắt, không phải một giá trị im lặng."""
     with pytest.raises(TypeError):
         redact(None)  # type: ignore[arg-type]
+
+
+# =======================================================================================
+# B0 — chokepoint wrapping (gate `GD0-STEP2` ô Tests #3)
+#
+# Câu hỏi B0 đo: filter có THẬT SỰ nằm trên đường đi tới LLM khi request đi qua endpoint
+# chưa? Test đơn thuần gọi `PIIFilteringClient(fake).step(...)` chỉ chứng minh code trong
+# wrapper hoạt động — KHÔNG chứng minh production `get_llm_client()` trả về wrapper thay
+# vì raw client. Vì thế mọi test B0 đi **qua HTTP endpoint** với dependency override đặt
+# một inner giả BÊN TRONG wrapper, không thay wrapper.
+#
+# Ngoại lệ 1 test cấu trúc (`test_get_llm_client_returns_wrapped_instance`): không đi qua
+# HTTP vì nó chính là câu hỏi "factory có wrap không?". Nếu factory return raw client thì
+# mọi test HTTP dùng dependency-override cũng vô hiệu — dep-override đè chính factory đó.
+# =======================================================================================
+
+from typing import Any  # noqa: E402
+
+from fastapi.testclient import TestClient  # noqa: E402
+
+from agent.llm_client import AssistantStep, ChatMessage, LLMClient  # noqa: E402
+
+_FIXTURE_SHOP_ID = "fixture-shop-001"
+
+
+class _InspectableInner(LLMClient):
+    """LLMClient subclass ghi lại `messages` mỗi call — thứ B0 cần assert.
+
+    Không phải _FakeLLM cũ (test_chat_endpoint.py): _FakeLLM là duck-typed dependency
+    replacement. Đây là subclass thật để bọc được vào PIIFilteringClient(inner=…) mà
+    không thua type check.
+    """
+
+    def __init__(self, reply: str = "ok") -> None:
+        super().__init__()
+        self.reply = reply
+        self.seen_messages: list[list[ChatMessage]] = []
+        self.step_calls = 0
+        self.complete_calls = 0
+        self.stream_calls = 0
+
+    async def step(self, messages: list[ChatMessage], **kwargs: Any) -> AssistantStep:
+        self.seen_messages.append(list(messages))
+        self.step_calls += 1
+        return AssistantStep(
+            content=self.reply,
+            tool_calls=[],
+            usage={"prompt_tokens": 5, "completion_tokens": 3, "total_tokens": 8},
+        )
+
+    async def complete(self, messages: list[ChatMessage], **kwargs: Any) -> str:
+        self.seen_messages.append(list(messages))
+        self.complete_calls += 1
+        return self.reply
+
+    def stream(self, messages: list[ChatMessage], **kwargs: Any):
+        self.seen_messages.append(list(messages))
+        self.stream_calls += 1
+
+        async def _agen():
+            yield self.reply
+
+        return _agen()
+
+
+def _join_content(messages: list[ChatMessage]) -> str:
+    """Gộp content của mọi message thành một chuỗi — kể cả list[ContentPart]."""
+    parts: list[str] = []
+    for m in messages:
+        c = m.get("content")
+        if isinstance(c, str):
+            parts.append(c)
+        elif isinstance(c, list):
+            for p in c:
+                if isinstance(p, dict) and p.get("type") == "text":
+                    parts.append(str(p.get("text", "")))
+    return "\n".join(parts)
+
+
+@pytest.fixture
+def wrapped_chat_client(monkeypatch: pytest.MonkeyPatch):
+    """Real app · dependency override đặt `PIIFilteringClient(inner=_InspectableInner())`.
+
+    Khác với `chat_client` (test_chat_endpoint.py) bọc thẳng _FakeLLM: ở đây wrapper là
+    thật, inner là fake. Test soi inner để chứng minh WRAPPER thật sự redact trước khi
+    forward. Đây là cách duy nhất chứng minh chokepoint hoạt động qua đường HTTP mà
+    không phải chạm mạng thật.
+    """
+    monkeypatch.setenv("OHANA_ENV", "dev")
+    import api.chat as chat_mod
+    from agent.pii_client import PIIFilteringClient
+    from api.chat import get_llm_client
+    from app.main import app
+
+    inner = _InspectableInner()
+    wrapped = PIIFilteringClient(inner)
+    app.dependency_overrides[get_llm_client] = lambda: wrapped
+    chat_mod._client_cache = None
+    try:
+        yield TestClient(app), inner, wrapped
+    finally:
+        app.dependency_overrides.pop(get_llm_client, None)
+        chat_mod._client_cache = None
+
+
+def _authorize(client: TestClient) -> dict[str, str]:
+    resp = client.post("/api/mock/authorize")
+    assert resp.status_code == 200
+    csrf = client.cookies.get("ohana_csrf")
+    assert csrf, "mock authorize phải mint cookie ohana_csrf"
+    return {"X-CSRF-Token": csrf}
+
+
+# ── câu hỏi trung tâm: content tới inner đã redact chưa? ──
+
+
+def test_endpoint_pipes_content_through_redactor(wrapped_chat_client) -> None:
+    """Gọi POST `/api/chat` với payload chứa SĐT ⇒ inner nhận text đã redact.
+
+    Đây là gate bypass-proof của B0. Nếu ai bỏ wrap ở `get_llm_client()`, hoặc thêm một
+    call-site thứ 4 trực tiếp lên inner, hoặc redactor được gọi ở sai chỗ (sau khi content
+    đã đóng gói), test này đỏ. Không đo tính đúng của regex — đó là việc A0 đã đo — chỉ
+    đo *có redact ở giữa hay không*.
+    """
+    client, inner, _ = wrapped_chat_client
+    headers = _authorize(client)
+
+    resp = client.post(
+        "/api/chat",
+        json={"message": "SĐT em 0912345678, gọi giúp"},
+        headers=headers,
+    )
+
+    assert resp.status_code == 200, resp.text
+    assert inner.step_calls == 1, "endpoint dùng step()"
+    seen = _join_content(inner.seen_messages[0])
+    assert "0912345678" not in seen, (
+        f"PII lọt tới inner client — wrapper không redact.\ninner seen: {seen!r}"
+    )
+    assert "[SĐT]" in seen, (
+        f"kỳ vọng token [SĐT] xuất hiện sau redact (A0 dùng nhãn tiếng Việt).\ninner seen: {seen!r}"
+    )
+
+
+def test_redactor_failure_is_fail_closed(wrapped_chat_client, monkeypatch) -> None:
+    """Redactor raise ⇒ inner **KHÔNG** được gọi.
+
+    Nuốt lỗi rồi vẫn call inner = PII rò với confidence sai (log sẽ nói "đã lọc" trong
+    khi thực tế không). Fail-closed nghĩa: exception phát sinh TRƯỚC `await inner`, nên
+    inner.step_calls phải == 0.
+    """
+    client, inner, _ = wrapped_chat_client
+
+    # Ép redactor raise: monkeypatch trực tiếp `agent.pii_client.redact` (nơi wrapper
+    # import) chứ không phải `agent.pii.redact`. Nếu wrapper import lại từ agent.pii mỗi
+    # call thì patch `agent.pii.redact` mới có tác dụng — trường hợp đó test này báo lỗi
+    # ImportError hoặc AttributeError, làm lộ luôn assumption "wrapper cache redact ở
+    # top-level".
+    import agent.pii_client as pc
+
+    def _boom(_: str) -> Any:
+        raise RuntimeError("simulated redactor failure")
+
+    monkeypatch.setattr(pc, "redact", _boom)
+
+    headers = _authorize(client)
+
+    # Redactor raise TRƯỚC `await inner` → exception bubble ra. FastAPI TestClient mặc
+    # định `raise_server_exceptions=True` nên client raise trực tiếp thay vì trả 500.
+    # Cả hai hành vi đều thoả fail-closed miễn là inner KHÔNG được gọi. Đo cái quan
+    # trọng: inner.step_calls == 0.
+    with pytest.raises(RuntimeError, match="simulated redactor failure"):
+        client.post("/api/chat", json={"message": "bất kỳ text nào"}, headers=headers)
+
+    assert inner.step_calls == 0, (
+        f"redactor raise nhưng inner vẫn được gọi ({inner.step_calls} lần) — fail-OPEN, "
+        f"payload chưa lọc đã bay lên LLM"
+    )
+
+
+def test_wrapper_covers_complete_and_step_stream_too() -> None:
+    """3 abstract method (`complete`/`step`/`step_stream`) đều phải lọc.
+
+    Test này KHÔNG đi qua endpoint vì endpoint hiện chỉ dùng `step`. Nhưng nếu ai thêm
+    một call-site `complete` hoặc `step_stream` (spec 15 sẽ làm) mà wrapper chỉ override
+    `step`, silent-wrong sẽ xảy ra — content chưa lọc lên LLM qua đường mới. Đo bằng
+    unit-level call trực tiếp vào wrapper là hợp lệ ở đây vì câu hỏi là "wrapper có phủ
+    3 method không", không phải "wrapper có nằm trên đường tới LLM không" (B0 test 1 đo
+    cái đó).
+    """
+    from agent.pii_client import PIIFilteringClient
+
+    inner = _InspectableInner()
+    wrapper = PIIFilteringClient(inner)
+    payload: list[ChatMessage] = [
+        {"role": "user", "content": "STK 12345678901 nhận tiền"},
+    ]
+
+    # step
+    import asyncio
+
+    asyncio.run(wrapper.step(payload))
+    assert inner.step_calls == 1
+    assert "12345678901" not in _join_content(inner.seen_messages[-1])
+    assert "[STK]" in _join_content(inner.seen_messages[-1])
+
+    # complete
+    asyncio.run(wrapper.complete(payload))
+    assert inner.complete_calls == 1
+    assert "12345678901" not in _join_content(inner.seen_messages[-1])
+
+    # step_stream — default impl của ABC gọi step(), nên đã redact tại step. Nhưng nếu
+    # provider có native step_stream, wrapper phải override; nay dùng default và assert
+    # nó chạy qua step wrapper.
+    async def _drain() -> None:
+        async for _ in wrapper.step_stream(payload):
+            pass
+
+    prev_step = inner.step_calls
+    asyncio.run(_drain())
+    assert inner.step_calls > prev_step, "step_stream default impl phải đi qua step wrapper"
+
+
+def test_wrapper_redacts_tool_result_messages_too() -> None:
+    """Kết quả tool tầng 1 (role=tool) cũng chứa PII (địa chỉ khách, SĐT trả từ
+    `order_status`) — phải lọc trước khi vòng lại LLM.
+
+    Spec §2 nói rõ: "tin khách, lịch sử, **kết quả tool tầng 1**, trường persona". Test
+    này đo mệnh đề "kết quả tool tầng 1". Không có test này, wrapper có thể chỉ lọc user
+    message và lộ PII qua tool role — gate `GD0-STEP2` ô Tests #2 mà A0 đã ký thẳng cấm.
+    """
+    import asyncio
+
+    from agent.pii_client import PIIFilteringClient
+
+    inner = _InspectableInner()
+    wrapper = PIIFilteringClient(inner)
+    payload: list[ChatMessage] = [
+        {"role": "user", "content": "check đơn"},
+        {
+            "role": "tool",
+            "tool_call_id": "call_1",
+            "name": "order_status",
+            "content": "Người nhận: 0912345678 · 123 Nguyễn Huệ Q1",
+        },
+    ]
+
+    asyncio.run(wrapper.step(payload))
+
+    seen = _join_content(inner.seen_messages[-1])
+    assert "0912345678" not in seen, "SĐT trong tool result KHÔNG được lộ tới LLM"
+    assert "123 Nguyễn Huệ" not in seen, "địa chỉ trong tool result KHÔNG được lộ tới LLM"
+
+
+# ── câu hỏi cấu trúc: factory có return wrapper không? ──
+
+
+def test_get_llm_client_returns_wrapped_instance(monkeypatch) -> None:
+    """Production `get_llm_client()` phải trả `PIIFilteringClient`, KHÔNG raw client.
+
+    Nếu factory return raw TogetherClient, mọi test dependency-override ở trên vẫn xanh
+    (vì test đè cả factory) nhưng PRODUCTION đường request thật KHÔNG có wrapper. Đây là
+    silent-wrong tệ nhất — gate xanh, prod rò. Test này là cửa duy nhất bắt được lỗi đó.
+
+    Monkeypatch TogetherClient để tránh cần TOGETHER_API_KEY: chỉ kiểm cấu trúc factory.
+    """
+    import api.chat as chat_mod
+    from agent.pii_client import PIIFilteringClient
+
+    monkeypatch.setenv("OHANA_ENV", "dev")
+    monkeypatch.setenv("TOGETHER_API_KEY", "test-key-not-used")
+
+    # Reset cache để factory chạy lại từ đầu
+    chat_mod._client_cache = None
+
+    # Stub TogetherClient để không cần key thật; return object có shape LLMClient tối thiểu
+    class _StubInner(LLMClient):
+        async def step(self, messages, **kw):
+            return AssistantStep(content="stub")
+
+        async def complete(self, messages, **kw):
+            return "stub"
+
+        def stream(self, messages, **kw):
+            async def _g():
+                yield "stub"
+
+            return _g()
+
+    import agent.providers.together_client as tc_mod
+
+    monkeypatch.setattr(tc_mod, "TogetherClient", lambda **_: _StubInner())
+
+    try:
+        client = chat_mod.get_llm_client()
+        assert isinstance(client, PIIFilteringClient), (
+            f"get_llm_client() trả {type(client).__name__}, không phải PIIFilteringClient — "
+            f"production request thật sẽ đi bypass wrapper"
+        )
+    finally:
+        chat_mod._client_cache = None

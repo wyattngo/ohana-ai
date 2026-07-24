@@ -184,18 +184,18 @@ REVIEW: PASS ref=docs/reviews/16-A0-auto-verdict.json
 ### Phase B0 — Chokepoint `PIIFilteringClient` + wire (bypass-proof)
 
 <!-- ADP:PHASE B0 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 ROADMAP: GD0-PII
 GOAL: `PIIFilteringClient(LLMClient)` bọc `inner`, redact **mọi** content trong `messages` (kể cả tool-result) rồi mới uỷ nhiệm; phủ CẢ `complete`/`step`/`step_stream`. Redactor raise ⇒ **KHÔNG** gọi `inner` (fail-closed). `api/chat.py::get_llm_client()` trả client **đã bọc**. Test bypass-proof: gọi qua endpoint `/api/chat` với payload chứa SĐT ⇒ fake inner client nhận được text **đã redact**.
 APPROACH: Decorator implement chính ABC ⇒ call-site không cần biết filter tồn tại; call-site thứ 4 thêm sau vẫn an toàn. Test phải đi **qua endpoint**, KHÔNG gọi thẳng `redact()` — test gọi thẳng hàm chỉ chứng minh regex chạy, không chứng minh nó nằm trên đường đi. Fail-closed: bắt exception của redactor và re-raise TRƯỚC `await inner`, không try/except quanh cả block.
 ALLOWED_FILES: agent/pii_client.py, api/chat.py, tests/test_pii_filter.py, docs/tasks/16-Task-OhanaAISeller-PIIFilter.md, docs/reviews/, docs/smokes/
 GATE: .venv/bin/python -m pytest tests/test_pii_filter.py -x -q
-GATE_FULL: (như A0)
-RETRY: 0/3
+GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && .venv/bin/mypy app agent retrieval parsing storage db bridge tools api auth && .venv/bin/ruff check . --no-cache && .venv/bin/ruff format --check . --no-cache && .venv/bin/python .claude/hooks/guardrail.py $(find app agent retrieval parsing storage -name '*.py') && python3 scripts/ai_coder/gen_codebase_map.py --check && python3 scripts/roadmap_derive.py verify
+RETRY: 1/3
 RISK: medium (✅ WYATT KÝ 2026-07-23. Floor: `api/chat.py` ∈ RISK_PATHS. Không high: chỉ chèn lớp bọc, không đổi hành vi endpoint, không chạm đường gửi khách.)
 BLOCKED_BY: A0 DONE · PRE-1601 · PRE-1602
-SMOKE: PASS ref=docs/smokes/16-B0.md — có mặt runtime. Điền OBSERVED bằng `uvicorn app.main:app` + POST `/api/chat` thật với chuỗi chứa SĐT, dán log destination + `hits` THẬT. KHÔNG viết "OK".
-REVIEW: (chờ execute)
+SMOKE: PASS ref=docs/smokes/16-B0.md
+REVIEW: PASS ref=docs/reviews/16-Task-OhanaAISeller-PIIFilter-phase-B0.json
 <!-- /ADP -->
 
 1. Test (**RED trước**): qua endpoint ⇒ inner nhận text đã redact · redactor raise ⇒ inner **không** được gọi · 3 method đều lọc · 212 test cũ xanh nguyên.

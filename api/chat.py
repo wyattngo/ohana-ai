@@ -78,6 +78,7 @@ def get_llm_client() -> LLMClient:
     """
     global _client_cache
     if _client_cache is None:
+        from agent.pii_client import PIIFilteringClient
         from agent.providers.together_client import TogetherClient
 
         # Spec 12 W0 (ISSUE-010): tiêm bộ đếm 429 làm `on_rate_limit`. Import TRONG hàm —
@@ -86,7 +87,11 @@ def get_llm_client() -> LLMClient:
         # `RateLimitError` nguyên vẹn (funnel `OpenAIClient._create`).
         from app import alert_service
 
-        _client_cache = TogetherClient(on_rate_limit=alert_service.record_provider_429)
+        # Spec 16 B0: bọc `PIIFilteringClient` để mọi call-site đi qua LLMClient tự động
+        # redact PII TRƯỚC khi payload rời máy. Chokepoint pattern — call-site thứ 4 thêm
+        # sau vẫn an toàn vì filter nằm trên interface, không rải ở nơi gọi.
+        inner = TogetherClient(on_rate_limit=alert_service.record_provider_429)
+        _client_cache = PIIFilteringClient(inner)
     return _client_cache
 
 
