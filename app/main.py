@@ -13,10 +13,13 @@ of spec 04 Phase P2, gated by `auth.identity.require_admin` on its one route —
 unguarded (P0's note above was the reason it waited). The embedder wired in is
 `api/admin.py`'s `default_embedder()`, a deterministic GD0.5 placeholder — see that function's
 docstring for why the real `agent/providers/openai_embedder.OpenAIEmbedder` isn't used yet (no
-`app/config.py` exists anywhere in this repo). `api/webhook.py` needs a concrete `Drafter` —
-no implementation of that protocol exists yet in `agent/` (spec 01 shipped the orchestrator
-against the protocol, not a drafter) — so wiring it here would mean inventing throwaway glue
-outside this phase's scope; deferred to whichever phase adds a real drafter.
+`app/config.py` exists anywhere in this repo). `api/webhook.py` is intentionally NOT mounted:
+`agent/drafter.py::LLMDrafter` shipped in spec 13, so the Drafter contract has a real
+implementation — but mounting the webhook opens the customer-inbound path, which requires
+Zalo signature-verify + creds (`GD0-ZALO`, PRE-004, blocked on Tân) and starts the PDPL 60-day
+clock (workflow §2.5, still no legal owner). `LLMDrafter` gets constructed in spec 15 P3 and
+proven end-to-end via `MockZaloSender` integration test; the `include_router(webhook)` line
+belongs to `GD0-ZALO` after those two blockers clear.
 """
 
 from __future__ import annotations

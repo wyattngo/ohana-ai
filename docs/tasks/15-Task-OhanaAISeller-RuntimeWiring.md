@@ -139,18 +139,18 @@ PRE-1504: api/webhook.py build_router chữ ký hiện tại (drafter + gì nữ
 ### Phase P1 — Dọn dead code loại-2 + sửa comment nói dối
 
 <!-- ADP:PHASE P1 -->
-STATUS: TODO
+STATUS: IN_PROGRESS
 ROADMAP: GD0-DRAFTER
 GOAL: `storage/base.py`+`storage/local.py`+`storage/__init__.py` bị xoá; `tools/registry.py::register()` + `TOOLS` global bị xoá (GIỮ `Tool` dataclass); comment "no Drafter yet" ở `app/main.py:16-19` + `api/webhook.py:8` sửa thành sự thật (LLMDrafter tồn tại từ spec 13, chưa mount vì PRE-004+PDPL). GATE_FULL xanh sau khi xoá = chứng minh code đã chết.
 APPROACH: Xoá thuần sau PRE-1501/1502 xác nhận 0 reader — nếu PRE thấy reader, DỪNG báo Wyatt (không tự migrate trong phase dọn). `Tool` dataclass GIỮ nguyên (đó là shape sống DI dùng). Comment sửa: nêu đúng trạng thái "impl có (spec 13), chưa mount — chờ GD0-ZALO/PRE-004 + chủ PDPL", không hứa hẹn thời điểm.
 ALLOWED_FILES: storage/, tools/registry.py, app/main.py, api/webhook.py, tests/test_runtime_wiring.py, docs/tasks/15-Task-OhanaAISeller-RuntimeWiring.md, docs/reviews/, docs/smokes/
 GATE: .venv/bin/python -m pytest tests/ -q -m 'not live' -x
-GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && .venv/bin/mypy app agent retrieval parsing storage db bridge tools api auth && .venv/bin/ruff check . --no-cache && .venv/bin/ruff format --check . --no-cache
+GATE_FULL: .venv/bin/python -m pytest tests/ -q -m 'not live' && .venv/bin/mypy app agent retrieval parsing db bridge tools api auth && .venv/bin/ruff check . --no-cache && .venv/bin/ruff format --check . --no-cache
 RETRY: 0/3
-RISK: medium (ĐỀ XUẤT — floor: `tools/registry.py` + `api/webhook.py` ∈ RISK_PATHS. Không high: chỉ xoá dead + sửa comment, KHÔNG đổi logic đang chạy. ⚠️ mypy scope có `storage` — xoá xong phải gỡ `storage` khỏi lệnh mypy trong GATE_FULL + CLAUDE.md §1, nếu không mypy fail "no such module".)
+RISK: medium (ĐỀ XUẤT — floor: `tools/registry.py` + `api/webhook.py` ∈ RISK_PATHS. Không high: chỉ xoá dead + sửa comment, KHÔNG đổi logic đang chạy. ⚠️ mypy scope có `storage` — xoá xong phải gỡ `storage` khỏi lệnh mypy trong GATE_FULL + CLAUDE.md §1, nếu không mypy fail "no such module". Đã áp dụng: `storage` gỡ khỏi `.ai-coder.conf` + CLAUDE.md + GATE_FULL trên đây.)
 BLOCKED_BY: PRE-1501 · PRE-1502
 SMOKE: N/A code-removal + comment — không service runtime người dùng quan sát; đúng-sai verify bằng GATE_FULL xanh sau khi xoá (suite + mypy + ruff chứng minh 0 reader) + CI.
-REVIEW: (chờ execute)
+REVIEW: PASS ref=docs/reviews/15-P1-auto-verdict.json
 <!-- /ADP -->
 
 1. PRE-1501/1502 (grep chính xác). Reader ≠ 0 ⇒ STOP báo Wyatt.
